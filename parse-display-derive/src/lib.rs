@@ -283,10 +283,11 @@ impl<'a> DisplayFormatContext<'a> {
         if let DisplayFormatContext::Struct(data) = self {
             if names.len() == 1 {
                 let name_idx = name.parse::<usize>();
+                let name_row = format!("r#{}", name);
                 let mut idx = 0;
                 for field in &data.fields {
                     if let Some(ident) = &field.ident {
-                        if ident == name || ident == &format!("r#{}", name) {
+                        if ident == name || ident == &name_row {
                             let expr = parse2(quote! {self.#ident}).unwrap();
                             return build_arg_from_field(expr, field);
                         }
