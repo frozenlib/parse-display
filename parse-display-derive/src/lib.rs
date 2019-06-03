@@ -4,6 +4,7 @@ extern crate proc_macro;
 
 use lazy_static::lazy_static;
 use proc_macro2::TokenStream;
+use proc_macro2::{Ident, Span};
 use quote::quote;
 use regex::Regex;
 use syn::*;
@@ -285,7 +286,7 @@ impl<'a> DisplayFormatContext<'a> {
                 let mut idx = 0;
                 for field in &data.fields {
                     if let Some(ident) = &field.ident {
-                        if ident == name {
+                        if ident == name || ident == &format!("r#{}", name) {
                             let expr = parse2(quote! {self.#ident}).unwrap();
                             return build_arg_from_field(expr, field);
                         }

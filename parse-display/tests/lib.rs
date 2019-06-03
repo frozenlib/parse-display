@@ -30,6 +30,54 @@ fn display_struct_field() {
     assert_display(TestStruct { a: 1, b: 2 }, "1 --- 2");
 }
 
+#[test]
+fn display_struct_field_raw() {
+    #[derive(Display)]
+    #[display("{a},{b}")]
+    struct TestStruct {
+        r#a: u32,
+        b: u32,
+    }
+
+    assert_display(TestStruct { a: 1, b: 2 }, "1,2");
+}
+
+#[test]
+fn display_struct_field_raw_keyword() {
+    #[derive(Display)]
+    #[display("{fn},{b}")]
+    struct TestStruct {
+        r#fn: u32,
+        b: u32,
+    }
+
+    assert_display(TestStruct { r#fn: 1, b: 2 }, "1,2");
+}
+
+
+#[test]
+fn display_struct_field_with_parameter() {
+    #[derive(Display)]
+    #[display("{a:<4},{b}")]
+    struct TestStruct {
+        a: u32,
+        b: u32,
+    }
+
+    assert_display(TestStruct { a: 1, b: 2 }, "1   ,2");
+}
+
+#[test]
+fn display_tuple_struct_field() {
+    #[derive(Display)]
+    #[display("{1},{0}")]
+    struct TestStruct(u32,u32);
+
+    assert_display(TestStruct(10,20), "20,10");
+}
+
+
+
 fn assert_display<T: Display>(value: T, display: &str) {
     let value_display = format!("{}", value);
     assert_eq!(value_display, display);
