@@ -2,6 +2,14 @@ use parse_display::*;
 use std::fmt::Display;
 
 #[test]
+fn display_newtype() {
+    #[derive(Display)]
+    struct TestStruct(String);
+
+    assert_display(TestStruct("abcde".into()), "abcde");
+}
+
+#[test]
 fn display_str() {
     #[derive(Display)]
     #[display("abcde")]

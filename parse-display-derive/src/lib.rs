@@ -68,8 +68,17 @@ pub fn derive_from_str(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
     unimplemented!()
 }
 
-fn get_newtype_field(_data: &DataStruct) -> Option<String> {
-    unimplemented!()
+fn get_newtype_field(data: &DataStruct) -> Option<String> {
+    let fields: Vec<_> = data.fields.iter().collect();
+    if fields.len() == 1 {
+        if let Some(ident) = &fields[0].ident {
+            Some(ident.to_string())
+        } else {
+            Some("0".into())
+        }
+    } else {
+        None
+    }
 }
 
 fn make_trait_impl(
