@@ -10,17 +10,17 @@ fn display_str() {
     assert_display(TestStruct, "abcde");
 }
 
-// #[test]
-// fn display_struct_field() {
-//     #[derive(Display)]
-//     #[display("{a} --- {b}")]
-//     struct TestStruct {
-//         a: u32,
-//         b: u32,
-//     }
+#[test]
+fn display_struct_field() {
+    #[derive(Display)]
+    #[display("{a} --- {b}")]
+    struct TestStruct {
+        a: u32,
+        b: u32,
+    }
 
-//     assert_display(TestStruct { a: 1, b: 2 }, "{1} --- {2}");
-// }
+    assert_display(TestStruct { a: 1, b: 2 }, "1 --- 2");
+}
 
 fn assert_display<T: Display>(value: T, display: &str) {
     let value_display = format!("{}", value);

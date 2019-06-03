@@ -45,6 +45,7 @@ fn derive_display_for_struct(input: &DeriveInput, data: &DataStruct) -> TokenStr
         &mut format_args,
     );
 
+
     make_trait_impl(
         input,
         quote! { std::fmt::Display },
@@ -247,42 +248,42 @@ impl DisplayFormatPart {
 
 enum DisplayFormatContext<'a> {
     Struct(&'a DataStruct),
-    Path(&'a Path),
+    Expr(&'a Expr),
 }
 
 impl<'a> DisplayFormatContext<'a> {
     fn build_arg(&self, name: &str) -> TokenStream {
-        fn build_arg_from_field(ident: &Ident, field: &Field) -> TokenStream {
-            let path = parse2(quote! {self.#ident}).unwrap();
+        fn build_arg_from_field(expr: ExprField, field: &Field) -> TokenStream {
             let has = HelperAttributes::from(&field.attrs);
             if let Some(format) = has.format {
                 let mut format_str = String::new();
                 let mut format_args = Vec::new();
                 format.build(
-                    DisplayFormatContext::Path(&path),
+                    DisplayFormatContext::Expr(&Expr::Field(expr)),
                     &mut format_str,
                     &mut format_args,
                 );
                 quote! { format_args!(#format_str #(,#format_args)*) }
             } else {
-                quote! { &#path }
+                quote! { &#expr }
             }
         }
 
         let names: Vec<_> = name.split('.').collect();
         if let DisplayFormatContext::Struct(data) = self {
             if names.len() == 1 {
-                let name_ident: Ident = parse_str(name).unwrap();
                 let name_idx = name.parse::<usize>();
                 let mut idx = 0;
                 for field in &data.fields {
                     if let Some(ident) = &field.ident {
                         if ident == name {
-                            return build_arg_from_field(&name_ident, field);
+                            let expr = parse2(quote! {self.#ident}).unwrap();
+                            return build_arg_from_field(expr, field);
                         }
                     } else {
                         if name_idx == Ok(idx) {
-                            return build_arg_from_field(&name_ident, field);
+                            let expr = parse_str(&format!("self.{}", idx)).unwrap();
+                            return build_arg_from_field(expr, field);
                         }
                     }
                     idx += 1;
@@ -292,7 +293,7 @@ impl<'a> DisplayFormatContext<'a> {
         }
         let p_base = match self {
             DisplayFormatContext::Struct(_) => quote! { self },
-            DisplayFormatContext::Path(p_base) => quote! { #p_base },
+            DisplayFormatContext::Expr(expr) => quote! { #expr },
         };
         let p: Path = parse_str(name).unwrap();
         quote! { &#p_base.#p }
