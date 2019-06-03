@@ -1,0 +1,114 @@
+{
+    // tasks.json 形式の詳細についての資料は、
+    // https://go.microsoft.com/fwlink/?LinkId=733558 をご覧ください
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "type": "shell",
+            "label": "cargo build",
+            "command": "cargo",
+            "args": [
+                "build"
+            ],
+            "problemMatcher": [
+                "$rustc"
+            ],
+            // "group": {
+            //     "kind": "build",
+            //     "isDefault": true
+            // },
+            "presentation": {
+                "panel": "dedicated",
+                "clear": true,
+            },
+            // "options": {
+            //     "env": {
+            //         "RUST_BACKTRACE": "1",
+            //     }
+            // }
+        },
+        {
+            "type": "shell",
+            "label": "cargo build release",
+            "command": "cargo",
+            "args": [
+                "build",
+                "--release"
+            ],
+            "problemMatcher": [
+                "$rustc"
+            ],
+            "presentation": {
+                "panel": "dedicated",
+                "clear": true,
+            },
+        },
+        {
+            "type": "shell",
+            "label": "cargo test",
+            "command": "cargo",
+            "args": [
+                "test"
+            ],
+            "problemMatcher": [
+                "$rustc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "panel": "dedicated",
+                "clear": true,
+            },
+        },
+        {
+            "type": "shell",
+            "label": "cargo run exmaple",
+            "command": "cargo",
+            "args": [
+                "run",
+                "--example",
+                "${fileBasenameNoExtension}",
+            ],
+            "problemMatcher": [
+                "$rustc"
+            ],
+            "presentation": {
+                "panel": "dedicated",
+                "clear": true,
+            }
+        },
+        {
+            "type": "shell",
+            "label": "cargo doc",
+            "command": "cargo",
+            "args": [
+                "doc"
+            ],
+            "problemMatcher": [
+                "$rustc"
+            ],
+            "presentation": {
+                "panel": "dedicated",
+                "clear": true,
+            }
+        },
+        {
+            "type": "shell",
+            "label": "cargo doc open",
+            "command": "cargo",
+            "args": [
+                "doc",
+                "--open"
+            ],
+            "problemMatcher": [
+                "$rustc"
+            ],
+            "presentation": {
+                "panel": "dedicated",
+                "clear": true,
+            }
+        },
+    ]
+}

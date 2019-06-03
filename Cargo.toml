@@ -1,0 +1,6 @@
+[workspace]
+members = [
+    "parse-display",
+    "parse-display-derive",
+]
+
