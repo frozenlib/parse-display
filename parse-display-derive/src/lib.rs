@@ -104,7 +104,7 @@ impl HelperAttributes {
                         match m {
                             syn::NestedMeta::Literal(Lit::Str(s)) => {
                                 if has.format.is_some() {
-                                    panic!("display format can be specified only once.")
+                                    panic!("Display format can be specified only once.")
                                 }
                                 has.format = Some(DisplayFormat::from(&s.value()));
                             }
@@ -114,7 +114,7 @@ impl HelperAttributes {
                                 ..
                             })) if ident == "style" => {
                                 if has.style.is_some() {
-                                    panic!("display style can be specified only once.");
+                                    panic!("Display style can be specified only once.");
                                 }
                                 has.style = Some(DisplayStyle::from(&s.value()));
                             }
