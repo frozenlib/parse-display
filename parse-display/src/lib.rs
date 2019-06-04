@@ -1,20 +1,18 @@
 use serde::de::Deserializer;
 use std::fmt;
-use std::fmt::{Debug, Display, Formatter};
+use std::fmt::{Display, Formatter};
 use std::marker::PhantomData;
 use std::str::FromStr;
 
 pub use parse_display_derive::Display;
 
-pub struct ParseEnumError;
-impl Debug for ParseEnumError {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "cannot parse enum")
-    }
+#[derive(Debug)]
+pub struct ParseError {
+    message: &'static str,
 }
-impl Display for ParseEnumError {
+impl Display for ParseError {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "cannot parse enum")
+        write!(f, "{}", &self.message)
     }
 }
 pub fn deserialize_from_str<'de, D, T>(d: D) -> Result<T, D::Error>
