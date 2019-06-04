@@ -103,9 +103,9 @@ fn display_tuple_struct_field() {
 fn display_tuple_struct_nested_field() {
     #[derive(Display)]
     #[display("{1.1},{1.0},{0}")]
-    struct TestStruct(u32, (u32,u32));
+    struct TestStruct(u32, (u32, u32));
 
-    assert_display(TestStruct(10, (20,30)), "30,20,10");
+    assert_display(TestStruct(10, (20, 30)), "30,20,10");
 }
 
 
