@@ -252,17 +252,6 @@ enum DisplayFormatPart {
     EscapedEndBraket,
     Var { name: String, parameters: String },
 }
-impl DisplayFormatPart {
-    fn as_str(&self) -> Option<&str> {
-        use DisplayFormatPart::*;
-        match self {
-            Str(s) => Some(&s),
-            EscapedBeginBraket => Some("{"),
-            EscapedEndBraket => Some("}"),
-            _ => None,
-        }
-    }
-}
 
 enum DisplayFormatContext<'a> {
     Struct(&'a DataStruct),
@@ -319,14 +308,4 @@ impl<'a> DisplayFormatContext<'a> {
         }
         quote! { &#expr }
     }
-}
-
-fn parse_ident(s: &str) -> syn::parse::Result<Ident> {
-    parse_str(s).or_else(|e| {
-        if s.starts_with("r#") {
-            Err(e)
-        } else {
-            parse_str(&format!("r#{}", s))
-        }
-    })
 }
