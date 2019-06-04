@@ -224,7 +224,7 @@ fn display_tuple_struct_nested_field() {
 fn display_tuple_struct_attribute() {
     #[derive(Display)]
     #[display("{0},{1}")]
-    struct TestStruct(#[display("AAA-{}")]u32, u32);
+    struct TestStruct(#[display("AAA-{}")] u32, u32);
 
     assert_display(TestStruct(10, 20), "AAA-10,20");
 }
@@ -422,7 +422,7 @@ fn display_enum_none() {
 }
 
 #[test]
-fn display_enum_common_format(){
+fn display_enum_common_format() {
     #[derive(Display)]
     #[display("{0}")]
     enum TestEnum {
@@ -435,7 +435,7 @@ fn display_enum_common_format(){
 }
 
 #[test]
-fn display_enum_common_format_variant_name(){
+fn display_enum_common_format_variant_name() {
     #[derive(Display)]
     #[display("{}-{0}")]
     enum TestEnum {
@@ -448,7 +448,7 @@ fn display_enum_common_format_variant_name(){
 }
 
 #[test]
-fn display_enum_variant_format(){
+fn display_enum_variant_format() {
     #[derive(Display)]
     enum TestEnum {
         #[display("AAA")]
@@ -463,7 +463,7 @@ fn display_enum_variant_format(){
 }
 
 #[test]
-fn display_enum_variant_format_var(){
+fn display_enum_variant_format_typle_var() {
     #[derive(Display)]
     enum TestEnum {
         #[display("AAA-{0}")]
@@ -477,7 +477,15 @@ fn display_enum_variant_format_var(){
     assert_display(TestEnum::B("abc".into()), "BBB+abc");
 }
 
-
+#[test]
+fn display_enum_variant_format_record_var() {
+    #[derive(Display)]
+    enum TestEnum {
+        #[display("x={x},y={y}")]
+        A { x: u32, y: u32 },
+    }
+    assert_display(TestEnum::A { x: 10, y: 20 }, "x=10,y=20");
+}
 
 
 fn assert_display<T: Display>(value: T, display: &str) {
