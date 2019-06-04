@@ -228,7 +228,27 @@ fn display_enum() {
         XyzXyz,
     }
     assert_display(TestEnum::AbcDef, "AbcDef");
+    assert_display(TestEnum::XyzXyz, "XyzXyz");
 }
+
+#[test]
+fn display_enum_snake_case() {
+    #[derive(Display)]
+    #[display(style = "snake_case")]
+    enum TestEnum {
+        AbcDef,
+        XyzXyz,
+        Abc1,
+        Abc1Abc2,
+        _Xxx,
+    }
+    assert_display(TestEnum::AbcDef, "abc_def");
+    assert_display(TestEnum::XyzXyz, "xyz_xyz");
+    assert_display(TestEnum::Abc1, "abc1");
+    assert_display(TestEnum::Abc1Abc2, "abc1_abc2");
+    assert_display(TestEnum::_Xxx, "xxx");
+}
+
 
 fn assert_display<T: Display>(value: T, display: &str) {
     let value_display = format!("{}", value);

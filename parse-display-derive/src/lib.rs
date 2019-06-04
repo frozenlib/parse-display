@@ -255,6 +255,14 @@ impl DisplayStyle {
     }
 }
 fn ident_to_string(ident: &Ident, style: DisplayStyle) -> String {
+    fn convert_case(c: char, to_upper: bool) -> char {
+        if to_upper {
+            c.to_ascii_uppercase()
+        } else {
+            c.to_ascii_lowercase()
+        }
+    }
+
     let s = ident.to_string();
     let (line_head, word_head, normal, sep) = match style {
         DisplayStyle::None => {
@@ -266,10 +274,35 @@ fn ident_to_string(ident: &Ident, style: DisplayStyle) -> String {
         DisplayStyle::UpperCamelCase => (true, true, false, ""),
         DisplayStyle::LowerKebabCase => (false, false, false, "-"),
         DisplayStyle::UpperKebabCase => (true, true, true, "-"),
-        _ => unimplemented!(),
     };
+    let mut is_line_head = true;
+    let mut is_word_head = true;
+    let mut last = '\0';
 
-    unimplemented!()
+    let mut r = String::new();
+
+    for c in s.chars() {
+        if !c.is_alphanumeric() && !c.is_digit(10) {
+            is_word_head = true;
+            continue;
+        }
+        if !is_word_head {
+            if !last.is_ascii_uppercase() && c.is_ascii_uppercase() {
+                is_word_head = true;
+            }
+        }
+        last = c;
+        let (to_upper, sep) = match (is_line_head, is_word_head) {
+            (true, _) => (line_head, ""),
+            (false, true) => (word_head, sep),
+            (false, false) => (normal, ""),
+        };
+        r.push_str(sep);
+        r.push(convert_case(c, to_upper));
+        is_word_head = false;
+        is_line_head = false;
+    }
+    r
 }
 
 
