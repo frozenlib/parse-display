@@ -411,6 +411,47 @@ fn display_enum_none() {
     assert_display(TestEnum::_Xxx, "_Xxx");
 }
 
+#[test]
+fn display_enum_common_format(){
+    #[derive(Display)]
+    #[display("{0}")]
+    enum TestEnum {
+        A(u32),
+        B(String),
+    }
+
+    assert_display(TestEnum::A(10), "10");
+    assert_display(TestEnum::B("abc".into()), "abc");
+}
+
+#[test]
+fn display_enum_common_format_variant_name(){
+    #[derive(Display)]
+    #[display("{}-{0}")]
+    enum TestEnum {
+        A(u32),
+        B(String),
+    }
+
+    assert_display(TestEnum::A(10), "A-10");
+    assert_display(TestEnum::B("abc".into()), "B-abc");
+}
+
+#[test]
+fn display_enum_variant_format(){
+    #[derive(Display)]
+    enum TestEnum {
+        #[display("AAA")]
+        A(u32),
+
+        #[display("BBB")]
+        B(String),
+    }
+
+    assert_display(TestEnum::A(10), "AAA");
+    assert_display(TestEnum::B("abc".into()), "BBB");
+}
+
 
 
 fn assert_display<T: Display>(value: T, display: &str) {

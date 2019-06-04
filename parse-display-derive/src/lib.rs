@@ -92,7 +92,7 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream 
         let has_variant = HelperAttributes::from(&variant.attrs);
 
         let format;
-        let format = if let Some(format) = &has.format {
+        let format = if let Some(format) = has_variant.format.as_ref().or(has.format.as_ref()) {
             format
         } else {
             format = DisplayFormat::from("{}");
