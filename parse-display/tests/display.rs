@@ -158,6 +158,32 @@ fn display_struct_field_attribute_var() {
     assert_display(value, "1+2,3-4");
 }
 
+#[test]
+fn display_struct_field_attribute_var_nested() {
+    #[derive(Display)]
+    #[display("__{a}")]
+    struct TestStruct {
+        #[display("{x.l}+{x.m}")]
+        a: TestStruct2,
+    }
+
+    struct TestStruct2 {
+        x: TestStruct3,
+    }
+    struct TestStruct3 {
+        l: u32,
+        m: u32,
+    }
+
+    let value = TestStruct {
+        a: TestStruct2 {
+            x: TestStruct3 { l: 10, m: 20 },
+        },
+    };
+
+    assert_display(value, "__10+20");
+}
+
 
 #[test]
 fn display_struct_field_another_attribute() {
@@ -170,7 +196,6 @@ fn display_struct_field_another_attribute() {
     }
     assert_display(TestStruct { a: 1, b: 2 }, "1,2");
 }
-
 
 
 #[test]
