@@ -219,8 +219,8 @@ impl HelperAttributes {
 #[derive(Copy, Clone)]
 enum DisplayStyle {
     None,
-    Lower,
-    Upper,
+    LowerCase,
+    UpperCase,
     LowerSnakeCase,
     UpperSnakeCase,
     LowerCamelCase,
@@ -234,8 +234,8 @@ impl DisplayStyle {
         use DisplayStyle::*;
         match s {
             "none" => None,
-            "lower" => Lower,
-            "UPPER" => Upper,
+            "lowercase" => LowerCase,
+            "UPPERCASE" => UpperCase,
             "snake_case" => LowerSnakeCase,
             "SNAKE_CASE" => UpperSnakeCase,
             "camelCase" => LowerCamelCase,
@@ -247,8 +247,8 @@ impl DisplayStyle {
                     "Invalid display style. \
                      The following values are available: \
                      \"none\", \
-                     \"lower\", \
-                     \"UPPER\", \
+                     \"lowercase\", \
+                     \"UPPERCASE\", \
                      \"snake_case\", \
                      \"SNAKE_CASE\", \
                      \"camelCase\", \
@@ -274,8 +274,8 @@ fn ident_to_string(ident: &Ident, style: DisplayStyle) -> String {
         DisplayStyle::None => {
             return s;
         }
-        DisplayStyle::Lower => (false, false, false, ""),
-        DisplayStyle::Upper => (true, true, true, ""),
+        DisplayStyle::LowerCase => (false, false, false, ""),
+        DisplayStyle::UpperCase => (true, true, true, ""),
         DisplayStyle::LowerSnakeCase => (false, false, false, "_"),
         DisplayStyle::UpperSnakeCase => (true, true, true, "_"),
         DisplayStyle::LowerCamelCase => (false, true, false, ""),
