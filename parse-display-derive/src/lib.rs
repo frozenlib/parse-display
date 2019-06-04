@@ -3,8 +3,7 @@
 extern crate proc_macro;
 
 use lazy_static::lazy_static;
-use proc_macro2::TokenStream;
-use proc_macro2::{Ident, Span};
+use proc_macro2::{Ident, TokenStream};
 use quote::quote;
 use regex::Regex;
 use syn::*;
@@ -301,6 +300,7 @@ impl<'a> DisplayFormatContext<'a> {
                         }
                     } else {
                         if name_idx == Ok(idx) {
+                            let idx = Index::from(idx);
                             return build_arg_from_field(field, quote! { self.#idx });
                         }
                     }

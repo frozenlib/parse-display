@@ -94,11 +94,10 @@ fn display_struct_nested_field() {
 fn display_tuple_struct_field() {
     #[derive(Display)]
     #[display("{1},{0}")]
-    struct TestStruct(u32,u32);
+    struct TestStruct(u32, u32);
 
-    assert_display(TestStruct(10,20), "20,10");
+    assert_display(TestStruct(10, 20), "20,10");
 }
-
 
 
 fn assert_display<T: Display>(value: T, display: &str) {
