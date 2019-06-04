@@ -3,7 +3,7 @@
 extern crate proc_macro;
 
 use lazy_static::lazy_static;
-use proc_macro2::{Ident, TokenStream};
+use proc_macro2::TokenStream;
 use quote::quote;
 use regex::Regex;
 use syn::*;
@@ -303,9 +303,19 @@ impl<'a> DisplayFormatContext<'a> {
             DisplayFormatContext::Field(expr) => expr.clone(),
         };
         for name in names {
-            let member: Member = expect!(parse_str(&name), "Parse failed '{}'", &name);
+            let member = to_member(&name);
             expr.extend(quote! { .#member });
         }
         quote! { &#expr }
     }
+}
+fn to_member(s: &str) -> Member {
+    let s_raw;
+    let s_new = if !s.parse::<usize>().is_ok() {
+        s_raw = format!("r#{}", s);
+        &s_raw
+    } else {
+        s
+    };
+    expect!(parse_str(&s_new), "Parse failed '{}'", &s)
 }

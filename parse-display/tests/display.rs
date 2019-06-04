@@ -89,6 +89,28 @@ fn display_struct_nested_field() {
     assert_display(value, "2,3");
 }
 
+#[test]
+fn display_struct_nested_field_raw_keyword() {
+    #[derive(Display)]
+    #[display("{fn.fn},{b.y}")]
+    struct TestStruct {
+        r#fn: TestStruct2,
+        b: TestStruct2,
+    }
+
+    struct TestStruct2 {
+        r#fn: u32,
+        y: u32,
+    }
+
+    let value = TestStruct {
+        r#fn: TestStruct2 { r#fn: 1, y: 2 },
+        b: TestStruct2 { r#fn: 3, y: 4 },
+    };
+
+    assert_display(value, "1,4");
+}
+
 
 #[test]
 fn display_tuple_struct_field() {
