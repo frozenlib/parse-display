@@ -135,6 +135,31 @@ fn display_struct_field_attribute() {
 }
 
 #[test]
+fn display_struct_field_attribute_var() {
+    #[derive(Display)]
+    #[display("{a},{b}")]
+    struct TestStruct {
+        #[display("{x}+{y}")]
+        a: TestStruct2,
+        #[display("{x}-{y}")]
+        b: TestStruct2,
+    }
+
+    struct TestStruct2 {
+        x: u32,
+        y: u32,
+    }
+
+    let value = TestStruct {
+        a: TestStruct2 { x: 1, y: 2 },
+        b: TestStruct2 { x: 3, y: 4 },
+    };
+
+    assert_display(value, "1+2,3-4");
+}
+
+
+#[test]
 fn display_struct_field_another_attribute() {
     #[derive(Display)]
     #[display("{a},{b}")]
