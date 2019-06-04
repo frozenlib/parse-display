@@ -72,15 +72,16 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream 
         let fields = match &variant.fields {
             Fields::Named(fields) => {
                 let fields = fields.named.iter().map(|f| {
-                    let ident = &f.ident;
-                    quote! { #ident }
+                    let field_ident = f.ident.as_ref().unwrap();
+                    let var_ident = binding_var_from_ident(field_ident);
+                    quote! { #field_ident : #var_ident }
                 });
                 quote! { { #(#fields,)* } }
             }
             Fields::Unnamed(fields) => {
                 let len = fields.unnamed.iter().count();
                 let fields = (0..len).map(|idx| {
-                    let ident = parse_str::<Ident>(&format!("value{}", idx)).unwrap();
+                    let ident = binding_var_from_idx(idx);
                     quote! { #ident }
                 });
                 quote! { ( #(#fields,)* ) }
@@ -457,7 +458,7 @@ impl<'a> DisplayFormatContext<'a> {
         for name in names {
             if is_match_binding {
                 is_match_binding = false;
-                let ident = to_match_binding_ident(&name);
+                let ident = binding_var_from_str(&name);
                 expr.extend(quote! { #ident });
             } else {
                 let member = to_member(&name);
@@ -477,13 +478,19 @@ fn to_member(s: &str) -> Member {
     };
     expect!(parse_str(&s_new), "Parse failed '{}'", &s)
 }
-fn to_match_binding_ident(s: &str) -> Ident {
-    let index_str;
+fn binding_var_from_str(s: &str) -> Ident {
     let ident = if let Ok(idx) = s.parse::<usize>() {
-        index_str = format!("value{}", idx);
-        &index_str
+        format!("_value_{}", idx)
     } else {
-        s
+        let s = s.trim_start_matches("r#");
+        format!("_value_{}", s)
     };
-    parse_str(ident).unwrap()
+    parse_str(&ident).unwrap()
 }
+fn binding_var_from_idx(idx: usize) -> Ident {
+    parse_str(&format!("_value_{}", idx)).unwrap()
+}
+fn binding_var_from_ident(ident: &Ident) -> Ident {
+    binding_var_from_str(&ident.to_string())
+}
+
