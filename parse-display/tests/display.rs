@@ -184,6 +184,19 @@ fn display_struct_field_attribute_var_nested() {
     assert_display(value, "__10+20");
 }
 
+#[test]
+#[allow(dead_code)]
+fn display_struct_field_attribute_self() {
+    #[derive(Display)]
+    #[display("{a},{b}")]
+    struct TestStruct {
+        #[display("_{}_")]
+        a: u32,
+        b: u32,
+    }
+    assert_display(TestStruct { a: 1, b: 2 }, "_1_,2");
+}
+
 
 #[test]
 fn display_struct_field_another_attribute() {

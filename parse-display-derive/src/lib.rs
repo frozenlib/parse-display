@@ -276,6 +276,14 @@ impl<'a> DisplayFormatContext<'a> {
                 quote! { &#expr }
             }
         }
+        if name.is_empty() {
+            match self {
+                DisplayFormatContext::Struct(_) => panic!("{} is not allowd in struct format."),
+                DisplayFormatContext::Field(expr) => {
+                    return quote! { &#expr };
+                }
+            };
+        }
 
         let names: Vec<_> = name.split('.').collect();
         if let DisplayFormatContext::Struct(data) = self {
