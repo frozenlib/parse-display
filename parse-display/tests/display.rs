@@ -221,6 +221,16 @@ fn display_tuple_struct_nested_field() {
 }
 
 #[test]
+fn display_tuple_struct_attribute() {
+    #[derive(Display)]
+    #[display("{0},{1}")]
+    struct TestStruct(#[display("AAA-{}")]u32, u32);
+
+    assert_display(TestStruct(10, 20), "AAA-10,20");
+}
+
+
+#[test]
 fn display_enum() {
     #[derive(Display)]
     enum TestEnum {
@@ -451,6 +461,22 @@ fn display_enum_variant_format(){
     assert_display(TestEnum::A(10), "AAA");
     assert_display(TestEnum::B("abc".into()), "BBB");
 }
+
+#[test]
+fn display_enum_variant_format_var(){
+    #[derive(Display)]
+    enum TestEnum {
+        #[display("AAA-{0}")]
+        A(u32),
+
+        #[display("BBB+{0}")]
+        B(String),
+    }
+
+    assert_display(TestEnum::A(10), "AAA-10");
+    assert_display(TestEnum::B("abc".into()), "BBB+abc");
+}
+
 
 
 
