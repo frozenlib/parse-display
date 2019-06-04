@@ -142,9 +142,10 @@ impl HelperAttributes {
                         }
                     }
                 }
-                _ => {
-                    panic!("Invalid helper attribute. ({:?})", m);
+                Meta::NameValue(nv) if nv.ident == "display" => {
+                    panic!("`display` helper attribute must use `#[display(...)]`.");
                 }
+                _ => {}
             }
         }
         has

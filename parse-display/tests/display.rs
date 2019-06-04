@@ -122,6 +122,20 @@ fn display_tuple_struct_field() {
 }
 
 #[test]
+fn display_struct_field_attribute() {
+    #[derive(Display)]
+    #[display("{a},{b}")]
+    struct TestStruct {
+        #[display("AAAA")]
+        #[allow(dead_code)]
+        a: u32,
+        b: u32,
+    }
+    assert_display(TestStruct { a: 1, b: 2 }, "AAAA,2");
+}
+
+
+#[test]
 fn display_tuple_struct_nested_field() {
     #[derive(Display)]
     #[display("{1.1},{1.0},{0}")]
