@@ -110,5 +110,25 @@
                 "clear": true,
             }
         },
+        {
+            "type": "shell",
+            "label": "cargo expand test",
+            "command": "cargo",
+            "args": [
+                "expand",
+                "--test",
+                "lib"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}/parse-display"
+            },
+            "problemMatcher": [
+                "$rustc"
+            ],
+            "presentation": {
+                "panel": "dedicated",
+                "clear": true,
+            }
+        },
     ]
 }

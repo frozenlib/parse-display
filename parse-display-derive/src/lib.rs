@@ -9,6 +9,15 @@ use quote::quote;
 use regex::Regex;
 use syn::*;
 
+macro_rules! expect {
+    ($e:expr, $($arg:tt)*) => {
+        if let Ok(x) = $e {
+            x
+        } else {
+            panic!($($arg)*);
+        }
+    };
+}
 
 #[proc_macro_derive(Display, attributes(display))]
 pub fn derive_display(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
@@ -258,18 +267,18 @@ impl DisplayFormatPart {
 
 enum DisplayFormatContext<'a> {
     Struct(&'a DataStruct),
-    Expr(&'a Expr),
+    Field(TokenStream),
 }
 
 impl<'a> DisplayFormatContext<'a> {
     fn build_arg(&self, name: &str) -> TokenStream {
-        fn build_arg_from_field(expr: ExprField, field: &Field) -> TokenStream {
+        fn build_arg_from_field(field: &Field, expr: TokenStream) -> TokenStream {
             let has = HelperAttributes::from(&field.attrs);
             if let Some(format) = has.format {
                 let mut format_str = String::new();
                 let mut format_args = Vec::new();
                 format.build(
-                    DisplayFormatContext::Expr(&Expr::Field(expr)),
+                    DisplayFormatContext::Field(expr),
                     &mut format_str,
                     &mut format_args,
                 );
@@ -288,13 +297,11 @@ impl<'a> DisplayFormatContext<'a> {
                 for field in &data.fields {
                     if let Some(ident) = &field.ident {
                         if ident == name || ident == &name_row {
-                            let expr = parse2(quote! {self.#ident}).unwrap();
-                            return build_arg_from_field(expr, field);
+                            return build_arg_from_field(field, quote! { self.#ident });
                         }
                     } else {
                         if name_idx == Ok(idx) {
-                            let expr = parse_str(&format!("self.{}", idx)).unwrap();
-                            return build_arg_from_field(expr, field);
+                            return build_arg_from_field(field, quote! { self.#idx });
                         }
                     }
                     idx += 1;
@@ -302,11 +309,24 @@ impl<'a> DisplayFormatContext<'a> {
                 panic!("Unknown field '{}'.", name);
             }
         }
-        let p_base = match self {
-            DisplayFormatContext::Struct(_) => quote! { self },
-            DisplayFormatContext::Expr(expr) => quote! { #expr },
+        let mut expr = match self {
+            DisplayFormatContext::Struct(_) => quote! {self},
+            DisplayFormatContext::Field(expr) => expr.clone(),
         };
-        let p: Path = parse_str(name).unwrap();
-        quote! { &#p_base.#p }
+        for name in names {
+            let ident: Ident = expect!(parse_str(&name), "Parse failed '{}'", &name);
+            expr.extend(quote! { .#ident });
+        }
+        quote! { &#expr }
     }
+}
+
+fn parse_ident(s: &str) -> syn::parse::Result<Ident> {
+    parse_str(s).or_else(|e| {
+        if s.starts_with("r#") {
+            Err(e)
+        } else {
+            parse_str(&format!("r#{}", s))
+        }
+    })
 }
