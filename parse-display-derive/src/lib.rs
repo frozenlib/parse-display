@@ -31,24 +31,24 @@ pub fn derive_display(input: proc_macro::TokenStream) -> proc_macro::TokenStream
 fn derive_display_for_struct(input: &DeriveInput, data: &DataStruct) -> TokenStream {
     let has = HelperAttributes::from(&input.attrs);
 
-    let display_format;
-    let display_format = if let Some(display_format) = &has.format {
-        display_format
+    let format;
+    let format = if let Some(format) = &has.format {
+        format
     } else {
         if let Some(newtype_field) = get_newtype_field(data) {
             let p = DisplayFormatPart::Var {
                 name: newtype_field,
                 parameters: String::new(),
             };
-            display_format = DisplayFormat(vec![p]);
-            &display_format
+            format = DisplayFormat(vec![p]);
+            &format
         } else {
             panic!("`#[display(\"format\")]` is required except newtype pattern.");
         }
     };
     let mut format_str = String::new();
     let mut format_args = Vec::new();
-    display_format.build(
+    format.build(
         DisplayFormatContext::Struct(&data),
         &mut format_str,
         &mut format_args,
@@ -65,8 +65,72 @@ fn derive_display_for_struct(input: &DeriveInput, data: &DataStruct) -> TokenStr
         },
     )
 }
-fn derive_display_for_enum(_input: &DeriveInput, _data: &DataEnum) -> TokenStream {
-    unimplemented!()
+fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream {
+    fn make_arm(input: &DeriveInput, has: &HelperAttributes, variant: &Variant) -> TokenStream {
+        let enum_ident = &input.ident;
+        let variant_ident = &variant.ident;
+        let fields = match &variant.fields {
+            Fields::Named(fields) => {
+                let fields = fields.named.iter().map(|f| {
+                    let ident = &f.ident;
+                    quote! { #ident }
+                });
+                quote! { { #(#fields,)* } }
+            }
+            Fields::Unnamed(fields) => {
+                let len = fields.unnamed.iter().count();
+                let fields = (0..len).map(|idx| {
+                    let ident = parse_str::<Ident>(&format!("value{}", idx)).unwrap();
+                    quote! { #ident }
+                });
+                quote! { ( #(#fields,)* ) }
+            }
+            Fields::Unit => {
+                quote! {}
+            }
+        };
+        let has_variant = HelperAttributes::from(&variant.attrs);
+
+        let format;
+        let format = if let Some(format) = &has.format {
+            format
+        } else {
+            format = DisplayFormat::from("{}");
+            &format
+        };
+
+        let style = has_variant
+            .style
+            .or(has.style)
+            .unwrap_or(DisplayStyle::None);
+
+        let mut format_str = String::new();
+        let mut format_args = Vec::new();
+        format.build(
+            DisplayFormatContext::Variant { variant, style },
+            &mut format_str,
+            &mut format_args,
+        );
+
+        quote! {
+            #enum_ident::#variant_ident #fields => {
+                std::write!(f, #format_str #(,#format_args)*)
+            },
+        }
+    }
+    let has = HelperAttributes::from(&input.attrs);
+    let arms = data.variants.iter().map(|v| make_arm(input, &has, v));
+    make_trait_impl(
+        input,
+        quote! { std::fmt::Display},
+        quote! {
+            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                match self {
+                    #(#arms)*
+                }
+            }
+        },
+    )
 }
 
 
@@ -152,8 +216,9 @@ impl HelperAttributes {
     }
 }
 
-
+#[derive(Copy, Clone)]
 enum DisplayStyle {
+    None,
     LowerSnakeCase,
     UpperSnakeCase,
     LowerCamelCase,
@@ -166,6 +231,7 @@ impl DisplayStyle {
     fn from(s: &str) -> Self {
         use DisplayStyle::*;
         match s {
+            "none" => None,
             "snake_case" => LowerSnakeCase,
             "SNAKE_CASE" => UpperSnakeCase,
             "camelCase" => LowerCamelCase,
@@ -176,6 +242,7 @@ impl DisplayStyle {
                 panic!(
                     "Invalid display style. \
                      The following values are available: \
+                     \"none\",
                      \"snake_case\", \
                      \"SNAKE_CASE\", \
                      \"camelCase\", \
@@ -187,6 +254,24 @@ impl DisplayStyle {
         }
     }
 }
+fn ident_to_string(ident: &Ident, style: DisplayStyle) -> String {
+    let s = ident.to_string();
+    let (line_head, word_head, normal, sep) = match style {
+        DisplayStyle::None => {
+            return s;
+        }
+        DisplayStyle::LowerSnakeCase => (false, false, false, "_"),
+        DisplayStyle::UpperSnakeCase => (true, true, true, "_"),
+        DisplayStyle::LowerCamelCase => (false, true, false, ""),
+        DisplayStyle::UpperCamelCase => (true, true, false, ""),
+        DisplayStyle::LowerKebabCase => (false, false, false, "-"),
+        DisplayStyle::UpperKebabCase => (true, true, true, "-"),
+        _ => unimplemented!(),
+    };
+
+    unimplemented!()
+}
+
 
 struct DisplayFormat(Vec<DisplayFormatPart>);
 impl DisplayFormat {
@@ -256,31 +341,39 @@ enum DisplayFormatPart {
 
 enum DisplayFormatContext<'a> {
     Struct(&'a DataStruct),
-    Field(TokenStream),
+    Field(&'a Member),
+    Variant {
+        variant: &'a Variant,
+        style: DisplayStyle,
+    },
 }
 
 impl<'a> DisplayFormatContext<'a> {
     fn build_arg(&self, name: &str) -> TokenStream {
-        fn build_arg_from_field(field: &Field, expr: TokenStream) -> TokenStream {
+        fn build_arg_from_field(field: &Field, member: &Member) -> TokenStream {
             let has = HelperAttributes::from(&field.attrs);
             if let Some(format) = has.format {
                 let mut format_str = String::new();
                 let mut format_args = Vec::new();
                 format.build(
-                    DisplayFormatContext::Field(expr),
+                    DisplayFormatContext::Field(member),
                     &mut format_str,
                     &mut format_args,
                 );
                 quote! { format_args!(#format_str #(,#format_args)*) }
             } else {
-                quote! { &#expr }
+                quote! { &self.#member }
             }
         }
         if name.is_empty() {
             match self {
                 DisplayFormatContext::Struct(_) => panic!("{} is not allowd in struct format."),
-                DisplayFormatContext::Field(expr) => {
-                    return quote! { &#expr };
+                DisplayFormatContext::Field(member) => {
+                    return quote! { &self.#member };
+                }
+                DisplayFormatContext::Variant { variant, style } => {
+                    let s = ident_to_string(&variant.ident, *style);
+                    return quote! { #s };
                 }
             };
         }
@@ -294,12 +387,15 @@ impl<'a> DisplayFormatContext<'a> {
                 for field in &data.fields {
                     if let Some(ident) = &field.ident {
                         if ident == name || ident == &name_row {
-                            return build_arg_from_field(field, quote! { self.#ident });
+                            return build_arg_from_field(
+                                field,
+                                &parse2(quote! { #ident }).unwrap(),
+                            );
                         }
                     } else {
                         if name_idx == Ok(idx) {
                             let idx = Index::from(idx);
-                            return build_arg_from_field(field, quote! { self.#idx });
+                            return build_arg_from_field(field, &parse2(quote! { #idx }).unwrap());
                         }
                     }
                     idx += 1;
@@ -307,13 +403,25 @@ impl<'a> DisplayFormatContext<'a> {
                 panic!("Unknown field '{}'.", name);
             }
         }
+        let mut is_match_binding = false;
+
         let mut expr = match self {
-            DisplayFormatContext::Struct(_) => quote! {self},
-            DisplayFormatContext::Field(expr) => expr.clone(),
+            DisplayFormatContext::Struct(_) => quote! { self },
+            DisplayFormatContext::Field(member) => quote! { self.#member },
+            DisplayFormatContext::Variant { .. } => {
+                is_match_binding = true;
+                quote! {}
+            }
         };
         for name in names {
-            let member = to_member(&name);
-            expr.extend(quote! { .#member });
+            if is_match_binding {
+                is_match_binding = false;
+                let ident = to_match_binding_ident(&name);
+                expr.extend(quote! { #ident });
+            } else {
+                let member = to_member(&name);
+                expr.extend(quote! { .#member });
+            }
         }
         quote! { &#expr }
     }
@@ -327,4 +435,14 @@ fn to_member(s: &str) -> Member {
         s
     };
     expect!(parse_str(&s_new), "Parse failed '{}'", &s)
+}
+fn to_match_binding_ident(s: &str) -> Ident {
+    let index_str;
+    let ident = if let Ok(idx) = s.parse::<usize>() {
+        index_str = format!("value{}", idx);
+        &index_str
+    } else {
+        s
+    };
+    parse_str(ident).unwrap()
 }

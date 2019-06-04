@@ -220,6 +220,15 @@ fn display_tuple_struct_nested_field() {
     assert_display(TestStruct(10, (20, 30)), "30,20,10");
 }
 
+#[test]
+fn display_enum() {
+    #[derive(Display)]
+    enum TestEnum {
+        AbcDef,
+        XyzXyz,
+    }
+    assert_display(TestEnum::AbcDef, "AbcDef");
+}
 
 fn assert_display<T: Display>(value: T, display: &str) {
     let value_display = format!("{}", value);
