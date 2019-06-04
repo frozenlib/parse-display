@@ -303,8 +303,8 @@ impl<'a> DisplayFormatContext<'a> {
             DisplayFormatContext::Field(expr) => expr.clone(),
         };
         for name in names {
-            let ident: Ident = expect!(parse_str(&name), "Parse failed '{}'", &name);
-            expr.extend(quote! { .#ident });
+            let member: Member = expect!(parse_str(&name), "Parse failed '{}'", &name);
+            expr.extend(quote! { .#member });
         }
         quote! { &#expr }
     }
