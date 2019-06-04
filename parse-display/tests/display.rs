@@ -122,17 +122,30 @@ fn display_tuple_struct_field() {
 }
 
 #[test]
+#[allow(dead_code)]
 fn display_struct_field_attribute() {
     #[derive(Display)]
     #[display("{a},{b}")]
     struct TestStruct {
         #[display("AAAA")]
-        #[allow(dead_code)]
         a: u32,
         b: u32,
     }
     assert_display(TestStruct { a: 1, b: 2 }, "AAAA,2");
 }
+
+#[test]
+fn display_struct_field_another_attribute() {
+    #[derive(Display)]
+    #[display("{a},{b}")]
+    struct TestStruct {
+        #[allow(dead_code)]
+        a: u32,
+        b: u32,
+    }
+    assert_display(TestStruct { a: 1, b: 2 }, "1,2");
+}
+
 
 
 #[test]
