@@ -123,7 +123,7 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream 
     let arms = data.variants.iter().map(|v| make_arm(input, &has, v));
     make_trait_impl(
         input,
-        quote! { std::fmt::Display},
+        quote! { std::fmt::Display },
         quote! {
             fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
                 match self {
@@ -135,10 +135,37 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream 
 }
 
 
-#[proc_macro_derive(FromStr, attributes(display_format, display_style, from_str_default))]
+#[proc_macro_derive(FromStr, attributes(display, from_str))]
 pub fn derive_from_str(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let _input = parse_macro_input!(input as DeriveInput);
-
+    let input = parse_macro_input!(input as DeriveInput);
+    match &input.data {
+        Data::Struct(data) => derive_from_str_for_struct(&input, data).into(),
+        Data::Enum(data) => derive_from_str_for_enum(&input, data).into(),
+        _ => panic!("`#[derive(FromStr)]` supports only enum or struct."),
+    }
+}
+fn derive_from_str_for_struct(input: &DeriveInput, data: &DataStruct) -> TokenStream {
+    let has = HelperAttributes::from(&input.attrs);
+    if let Some(regex) = &has.regex {
+        unimplemented!()
+    } else if let Some(format) = &has.format {
+        unimplemented!()
+    } else {
+        unimplemented!()
+    }
+    make_trait_impl(
+        input,
+        quote! { std::str::FromStr },
+        quote! {
+            type Err = parse_display::PraseError;
+            fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+                unimplemented!()
+            }
+        },
+    )
+}
+fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream {
+    let has = HelperAttributes::from(&input.attrs);
     unimplemented!()
 }
 
@@ -172,48 +199,103 @@ fn make_trait_impl(
 struct HelperAttributes {
     format: Option<DisplayFormat>,
     style: Option<DisplayStyle>,
+    regex: Option<String>,
+    default_self: bool,
+    default_fields: Vec<String>,
 }
+const DISPLAY_HELPER_USAGE: &str =
+    "available syntax is `#[display(\"format\", style = \"style\")]`";
+const FROM_STR_HELPER_USAGE: &str = "available syntax is `#[from_str(regex = \"regex\")]`";
 impl HelperAttributes {
     fn from(attrs: &[Attribute]) -> Self {
         let mut has = Self {
             format: None,
             style: None,
+            regex: None,
+            default_self: false,
+            default_fields: Vec::new(),
         };
         for a in attrs {
             let m = a.parse_meta().unwrap();
             match &m {
                 Meta::List(ml) if ml.ident == "display" => {
                     for m in ml.nested.iter() {
-                        match m {
-                            syn::NestedMeta::Literal(Lit::Str(s)) => {
-                                if has.format.is_some() {
-                                    panic!("Display format can be specified only once.")
-                                }
-                                has.format = Some(DisplayFormat::from(&s.value()));
-                            }
-                            syn::NestedMeta::Meta(Meta::NameValue(MetaNameValue {
-                                ident,
-                                lit: Lit::Str(s),
-                                ..
-                            })) if ident == "style" => {
-                                if has.style.is_some() {
-                                    panic!("Display style can be specified only once.");
-                                }
-                                has.style = Some(DisplayStyle::from(&s.value()));
-                            }
-                            m => {
-                                panic!("Invalid helper attribute metadata. ({:?})", m);
-                            }
-                        }
+                        has.set_display_nested_meta(m);
                     }
                 }
                 Meta::NameValue(nv) if nv.ident == "display" => {
-                    panic!("`display` helper attribute must use `#[display(...)]`.");
+                    panic!(
+                        "`#[display = ..]` is not allowed. ({}).",
+                        DISPLAY_HELPER_USAGE
+                    );
+                }
+                Meta::List(ml) if ml.ident == "from_str" => {
+                    for m in ml.nested.iter() {
+                        has.set_from_str_nested_meta(m);
+                    }
+                }
+                Meta::NameValue(nv) if nv.ident == "from_str" => {
+                    panic!(
+                        "`#[from_str = ..]` is not allowed. ({}).",
+                        FROM_STR_HELPER_USAGE
+                    );
                 }
                 _ => {}
             }
         }
         has
+    }
+    fn set_display_nested_meta(&mut self, m: &NestedMeta) {
+        match m {
+            NestedMeta::Literal(Lit::Str(s)) => {
+                if self.format.is_some() {
+                    panic!("display format can be specified only once.")
+                }
+                self.format = Some(DisplayFormat::from(&s.value()));
+            }
+            NestedMeta::Meta(Meta::NameValue(MetaNameValue {
+                ident,
+                lit: Lit::Str(s),
+                ..
+            })) if ident == "style" => {
+                if self.style.is_some() {
+                    panic!("display style can be specified only once.");
+                }
+                self.style = Some(DisplayStyle::from(&s.value()));
+            }
+            m => {
+                panic!("`{:?}` is not allowed. ({})", m, DISPLAY_HELPER_USAGE);
+            }
+        }
+    }
+    fn set_from_str_nested_meta(&mut self, m: &NestedMeta) {
+        match m {
+            NestedMeta::Meta(Meta::NameValue(MetaNameValue {
+                ident,
+                lit: Lit::Str(s),
+                ..
+            })) if ident == "regex" => {
+                if self.regex.is_some() {
+                    panic!("from_str regex can be specified only once.");
+                }
+                self.regex = Some(s.value());
+            }
+            NestedMeta::Meta(Meta::Word(ident)) if ident == "default" => {
+                self.default_self = true;
+            }
+            NestedMeta::Meta(Meta::List(l)) if l.ident == "default" => {
+                for m in l.nested.iter() {
+                    if let NestedMeta::Literal(Lit::Str(s)) = m {
+                        self.default_fields.push(s.value());
+                    } else {
+                        panic!("{:?} is not allowed in `#[from_str(default(..))]`.", m);
+                    }
+                }
+            }
+            m => {
+                panic!("`{:?}` is not allowed. ({})", m, FROM_STR_HELPER_USAGE);
+            }
+        }
     }
 }
 

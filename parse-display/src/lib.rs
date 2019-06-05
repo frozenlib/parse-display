@@ -4,7 +4,7 @@ use std::fmt::{Display, Formatter};
 use std::marker::PhantomData;
 use std::str::FromStr;
 
-pub use parse_display_derive::Display;
+pub use parse_display_derive::{Display, FromStr};
 
 #[derive(Debug)]
 pub struct ParseError {
@@ -41,6 +41,6 @@ where
         }
     }
     d.deserialize_str(StrVisitor {
-        _phantom: PhantomData::default(),
+        _phantom: PhantomData,
     })
 }
