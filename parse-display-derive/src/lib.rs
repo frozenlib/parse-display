@@ -46,14 +46,14 @@ fn derive_display_for_struct(input: &DeriveInput, data: &DataStruct) -> TokenStr
             panic!("`#[display(\"format\")]` is required except newtype pattern.");
         }
     };
-    let (format_str, format_args) = format.build(DisplayFormatContext::Struct(&data));
+    let args = format.to_format_args(DisplayFormatContext::Struct(&data));
 
     make_trait_impl(
         input,
         quote! { std::fmt::Display },
         quote! {
             fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-                std::write!(f, #format_str #(,#format_args)*)
+                std::write!(f, #args)
             }
         },
     )
@@ -98,12 +98,11 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream 
             .or(has.style)
             .unwrap_or(DisplayStyle::None);
 
-        let (format_str, format_args) =
-            format.build(DisplayFormatContext::Variant { variant, style });
+        let args = format.to_format_args(DisplayFormatContext::Variant { variant, style });
 
         quote! {
             #enum_ident::#variant_ident #fields => {
-                std::write!(f, #format_str #(,#format_args)*)
+                std::write!(f, #args)
             },
         }
     }
@@ -420,7 +419,7 @@ impl DisplayFormat {
         }
         Self(ps)
     }
-    fn build(&self, context: DisplayFormatContext) -> (String, Vec<TokenStream>) {
+    fn to_format_args(&self, context: DisplayFormatContext) -> TokenStream {
         let mut format_str = String::new();
         let mut format_args = Vec::new();
         for p in &self.0 {
@@ -437,7 +436,7 @@ impl DisplayFormat {
                 }
             }
         }
-        (format_str, format_args)
+        quote! { #format_str #(,#format_args)* }
     }
 }
 
@@ -462,8 +461,8 @@ impl<'a> DisplayFormatContext<'a> {
         fn build_arg_from_field(field: &Field, member: &Member) -> TokenStream {
             let has = HelperAttributes::from(&field.attrs);
             if let Some(format) = has.format {
-                let (format_str, format_args) = format.build(DisplayFormatContext::Field(member));
-                quote! { format_args!(#format_str #(,#format_args)*) }
+                let args = format.to_format_args(DisplayFormatContext::Field(member));
+                quote! { format_args!(#args) }
             } else {
                 quote! { &self.#member }
             }
