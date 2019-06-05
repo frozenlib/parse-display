@@ -46,14 +46,7 @@ fn derive_display_for_struct(input: &DeriveInput, data: &DataStruct) -> TokenStr
             panic!("`#[display(\"format\")]` is required except newtype pattern.");
         }
     };
-    let mut format_str = String::new();
-    let mut format_args = Vec::new();
-    format.build(
-        DisplayFormatContext::Struct(&data),
-        &mut format_str,
-        &mut format_args,
-    );
-
+    let (format_str, format_args) = format.build(DisplayFormatContext::Struct(&data));
 
     make_trait_impl(
         input,
@@ -105,13 +98,8 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream 
             .or(has.style)
             .unwrap_or(DisplayStyle::None);
 
-        let mut format_str = String::new();
-        let mut format_args = Vec::new();
-        format.build(
-            DisplayFormatContext::Variant { variant, style },
-            &mut format_str,
-            &mut format_args,
-        );
+        let (format_str, format_args) =
+            format.build(DisplayFormatContext::Variant { variant, style });
 
         quote! {
             #enum_ident::#variant_ident #fields => {
@@ -432,12 +420,9 @@ impl DisplayFormat {
         }
         Self(ps)
     }
-    fn build(
-        &self,
-        context: DisplayFormatContext,
-        format_str: &mut String,
-        format_args: &mut Vec<TokenStream>,
-    ) {
+    fn build(&self, context: DisplayFormatContext) -> (String, Vec<TokenStream>) {
+        let mut format_str = String::new();
+        let mut format_args = Vec::new();
         for p in &self.0 {
             use DisplayFormatPart::*;
             match p {
@@ -451,8 +436,8 @@ impl DisplayFormat {
                     format_args.push(context.build_arg(&name));
                 }
             }
-
         }
+        (format_str, format_args)
     }
 }
 
@@ -477,13 +462,7 @@ impl<'a> DisplayFormatContext<'a> {
         fn build_arg_from_field(field: &Field, member: &Member) -> TokenStream {
             let has = HelperAttributes::from(&field.attrs);
             if let Some(format) = has.format {
-                let mut format_str = String::new();
-                let mut format_args = Vec::new();
-                format.build(
-                    DisplayFormatContext::Field(member),
-                    &mut format_str,
-                    &mut format_args,
-                );
+                let (format_str, format_args) = format.build(DisplayFormatContext::Field(member));
                 quote! { format_args!(#format_str #(,#format_args)*) }
             } else {
                 quote! { &self.#member }
