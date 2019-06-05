@@ -468,14 +468,12 @@ impl<'a> DisplayFormatContext<'a> {
             }
         }
         if name.is_empty() {
-            match self {
+            return match self {
                 DisplayFormatContext::Struct(_) => panic!("{} is not allowd in struct format."),
-                DisplayFormatContext::Field(member) => {
-                    return quote! { &self.#member };
-                }
+                DisplayFormatContext::Field(member) => quote! { &self.#member },
                 DisplayFormatContext::Variant { variant, style } => {
                     let s = ident_to_string(&variant.ident, *style);
-                    return quote! { #s };
+                    quote! { #s }
                 }
             };
         }
@@ -484,11 +482,11 @@ impl<'a> DisplayFormatContext<'a> {
         if let DisplayFormatContext::Struct(data) = self {
             if names.len() == 1 {
                 let name_idx = name.parse::<usize>();
-                let name_row = format!("r#{}", name);
+                let name_raw = format!("r#{}", name);
                 let mut idx = 0;
                 for field in &data.fields {
                     if let Some(ident) = &field.ident {
-                        if ident == name || ident == &name_row {
+                        if ident == name || ident == &name_raw {
                             return build_arg_from_field(
                                 field,
                                 &parse2(quote! { #ident }).unwrap(),
