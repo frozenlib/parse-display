@@ -168,11 +168,22 @@ fn build_from_str_body_by_struct_format(data: &DataStruct, format: &DisplayForma
             });
             quote! { { #(#fields,)* } }
         }
-        Fields::Unnamed(_fields) => {
-            // for (idx, field) in fields.unnamed.iter().enumerate() {
-            //     //
-            // }
-            unimplemented!();
+        Fields::Unnamed(fields) => {
+            let fields = fields.unnamed.iter().enumerate().map(|(idx, field)| {
+                let key = FieldKey::Unnamed(idx);
+                if let Some(e) = root.fields.get(&key) {
+                    if let Some(c) = e.capture {
+                        let msg = format!("field `{}` parse failed.", idx);
+                        return quote! {  c.get(#c)
+                            .map(|m| m.as_str()).unwrap_or("")
+                            .parse()
+                            .expect(#msg)
+                        };
+                    }
+                }
+                panic!("`{}` is not appear in format.", idx)
+            });
+            quote! { ( #(#fields,)* ) }
         }
         Fields::Unit => quote! {},
     };
@@ -708,7 +719,7 @@ fn binding_var_from_ident(ident: &Ident) -> Ident {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 enum FieldKey {
     Named(String),
-    Unnamed(u32),
+    Unnamed(usize),
 }
 
 impl FieldKey {

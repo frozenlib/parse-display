@@ -21,6 +21,14 @@ fn from_str_struct() {
     assert_from_str("12,50", TestStruct { a: 12, b: 50 });
 }
 
+#[test]
+fn from_str_tuple_struct() {
+    #[derive(FromStr, Debug, Eq, PartialEq)]
+    #[display("{0},{1}")]
+    struct TestStruct(u32,u32);
+    assert_from_str("12,50", TestStruct(12,50));
+}
+
 
 fn assert_from_str<T: FromStr + Debug + Eq>(s: &str, value: T) {
     if let Ok(a) = s.parse::<T>() {
