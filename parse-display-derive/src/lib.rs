@@ -123,13 +123,17 @@ pub fn derive_from_str(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
 fn derive_from_str_for_struct(input: &DeriveInput, data: &DataStruct) -> TokenStream {
     let has = HelperAttributes::from(&input.attrs);
     let body = if let Some(regex) = &has.regex {
-        unimplemented!()
+        let mut tree = FieldTree::new();
+        tree.push_regex(&regex);
+        build_from_str_body_by_struct(data, tree)
     } else {
         let format = has
             .format
             .or_else(|| DisplayFormat::from_newtype_struct(data))
             .expect("`#[display(\"format\")]` or `#[display(regex = \"regex\")]` is required except newtype pattern.");
-        build_from_str_body_by_struct_format(data, &format)
+        let mut tree = FieldTree::new();
+        tree.push_format(&format);
+        build_from_str_body_by_struct(data, tree)
     };
     make_trait_impl(
         input,
@@ -142,11 +146,8 @@ fn derive_from_str_for_struct(input: &DeriveInput, data: &DataStruct) -> TokenSt
         },
     )
 }
-fn build_from_str_body_by_struct_format(data: &DataStruct, format: &DisplayFormat) -> TokenStream {
-    let mut tree = FieldTree::new();
-    tree.push_format(format);
+fn build_from_str_body_by_struct(data: &DataStruct, mut tree: FieldTree) -> TokenStream {
     let regex = tree.build_regex();
-
     let root = &tree.root;
     if root.capture.is_some() {
         panic!("`(?P<>)` (empty capture name) is not allowd in struct's regex.")
@@ -228,11 +229,11 @@ impl FieldTree {
     }
     fn push_regex(&mut self, s: &str) {
         lazy_static! {
-            static ref REGEX_CAPTURE: Regex = Regex::new(r"\(\?<([_0-9a-zA-Z.]*)>").unwrap();
+            static ref REGEX_CAPTURE: Regex = Regex::new(r"\(\?P<([_0-9a-zA-Z.]*)>").unwrap();
         }
-        let s = REGEX_CAPTURE.replace(s, |c: &Captures| {
+        let s = REGEX_CAPTURE.replace_all(s, |c: &Captures| {
             let node = self.root.field_deep(c.get(1).unwrap().as_str());
-            format!("(?<{}>", node.set_capture(&mut self.capture_next))
+            format!("(?P<{}>", node.set_capture(&mut self.capture_next))
         });
         self.hirs.push(to_hir(&s));
     }
@@ -400,7 +401,11 @@ impl HelperAttributes {
                 self.style = Some(DisplayStyle::from(&s.value()));
             }
             m => {
-                panic!("`{:?}` is not allowed. ({})", m, DISPLAY_HELPER_USAGE);
+                panic!(
+                    "`{}` is not allowed. ({})",
+                    quote! { #m },
+                    DISPLAY_HELPER_USAGE
+                );
             }
         }
     }
