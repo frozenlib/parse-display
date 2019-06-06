@@ -2,13 +2,13 @@ use parse_display::*;
 use std::fmt::Debug;
 use std::str::FromStr;
 
-// #[test]
-// fn from_str_newtype() {
-//     #[derive(FromStr, Debug, Eq)]
-//     struct TestStruct(u32);
+#[test]
+fn from_str_newtype() {
+    #[derive(FromStr, Debug, Eq, PartialEq)]
+    struct TestStruct(u32);
 
-//     assert_from_str("12", TestStruct(12));
-// }
+    assert_from_str("12", TestStruct(12));
+}
 
 #[test]
 fn from_str_struct() {
@@ -25,8 +25,16 @@ fn from_str_struct() {
 fn from_str_tuple_struct() {
     #[derive(FromStr, Debug, Eq, PartialEq)]
     #[display("{0},{1}")]
-    struct TestStruct(u32,u32);
-    assert_from_str("12,50", TestStruct(12,50));
+    struct TestStruct(u32, u32);
+    assert_from_str("12,50", TestStruct(12, 50));
+}
+
+#[test]
+fn from_str_unit_struct() {
+    #[derive(FromStr, Debug, Eq, PartialEq)]
+    #[display("abc")]
+    struct TestStruct;
+    assert_from_str("abc", TestStruct);
 }
 
 

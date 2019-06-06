@@ -124,10 +124,12 @@ fn derive_from_str_for_struct(input: &DeriveInput, data: &DataStruct) -> TokenSt
     let has = HelperAttributes::from(&input.attrs);
     let body = if let Some(regex) = &has.regex {
         unimplemented!()
-    } else if let Some(format) = &has.format {
-        build_from_str_body_by_struct_format(data, format)
     } else {
-        unimplemented!()
+        let format = has
+            .format
+            .or_else(|| DisplayFormat::from_newtype_struct(data))
+            .expect("`#[display(\"format\")]` or `#[display(regex = \"regex\")]` is required except newtype pattern.");
+        build_from_str_body_by_struct_format(data, &format)
     };
     make_trait_impl(
         input,
@@ -157,7 +159,7 @@ fn build_from_str_body_by_struct_format(data: &DataStruct, format: &DisplayForma
                 if let Some(e) = root.fields.get(&key) {
                     if let Some(c) = e.capture {
                         let msg = format!("field `{}` parse failed.", ident);
-                        return quote! {  #ident : c.get(#c)
+                        return quote! { #ident : c.get(#c)
                             .map(|m| m.as_str()).unwrap_or("")
                             .parse()
                             .expect(#msg)
@@ -169,12 +171,12 @@ fn build_from_str_body_by_struct_format(data: &DataStruct, format: &DisplayForma
             quote! { { #(#fields,)* } }
         }
         Fields::Unnamed(fields) => {
-            let fields = fields.unnamed.iter().enumerate().map(|(idx, field)| {
+            let fields = fields.unnamed.iter().enumerate().map(|(idx, _)| {
                 let key = FieldKey::Unnamed(idx);
                 if let Some(e) = root.fields.get(&key) {
                     if let Some(c) = e.capture {
                         let msg = format!("field `{}` parse failed.", idx);
-                        return quote! {  c.get(#c)
+                        return quote! { c.get(#c)
                             .map(|m| m.as_str()).unwrap_or("")
                             .parse()
                             .expect(#msg)
