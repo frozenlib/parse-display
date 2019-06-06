@@ -76,13 +76,11 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream 
         };
         let has_variant = HelperAttributes::from(&variant.attrs);
 
-        let format;
-        let format = if let Some(format) = has_variant.format.as_ref().or(has.format.as_ref()) {
-            format
-        } else {
-            format = DisplayFormat::from("{}");
-            &format
-        };
+        let format = has_variant
+            .format
+            .or_else(|| has.format.clone())
+            .or_else(|| DisplayFormat::from_unit_variant(&variant))
+            .expect("`#[display(\"format\")]` is required except unit variant.");
 
         let style = has_variant
             .style
@@ -496,6 +494,7 @@ fn ident_to_string(ident: &Ident, style: DisplayStyle) -> String {
 }
 
 
+#[derive(Clone)]
 struct DisplayFormat(Vec<DisplayFormatPart>);
 impl DisplayFormat {
     fn from(mut s: &str) -> DisplayFormat {
@@ -527,7 +526,7 @@ impl DisplayFormat {
                 s = &s[c.get(0).unwrap().end()..];
                 continue;
             }
-            panic!("Invalid display format. \"{}\"", s);
+            panic!("invalid display format. \"{}\"", s);
         }
         Self(ps)
     }
@@ -537,6 +536,13 @@ impl DisplayFormat {
             parameters: String::new(),
         };
         Some(Self(vec![p]))
+    }
+    fn from_unit_variant(variant: &Variant) -> Option<Self> {
+        if let Fields::Unit = &variant.fields {
+            Some(Self::from("{}"))
+        } else {
+            None
+        }
     }
 
     fn to_format_args(&self, context: DisplayFormatContext) -> TokenStream {
@@ -560,6 +566,7 @@ impl DisplayFormat {
     }
 }
 
+#[derive(Clone)]
 enum DisplayFormatPart {
     Str(String),
     EscapedBeginBraket,
