@@ -33,23 +33,11 @@ pub fn derive_display(input: proc_macro::TokenStream) -> proc_macro::TokenStream
 
 fn derive_display_for_struct(input: &DeriveInput, data: &DataStruct) -> TokenStream {
     let has = HelperAttributes::from(&input.attrs);
-
-    let format;
-    let format = if let Some(format) = &has.format {
-        format
-    } else {
-        if let Some(newtype_field) = get_newtype_field(data) {
-            let p = DisplayFormatPart::Var {
-                name: newtype_field,
-                parameters: String::new(),
-            };
-            format = DisplayFormat(vec![p]);
-            &format
-        } else {
-            panic!("`#[display(\"format\")]` is required except newtype pattern.");
-        }
-    };
-    let args = format.to_format_args(DisplayFormatContext::Struct(&data));
+    let args = has
+        .format
+        .or_else(|| DisplayFormat::from_newtype_field(data))
+        .expect("`#[display(\"format\")]` is required except newtype pattern.")
+        .to_format_args(DisplayFormatContext::Struct(&data));
 
     make_trait_impl(
         input,
@@ -543,6 +531,14 @@ impl DisplayFormat {
         }
         Self(ps)
     }
+    fn from_newtype_field(data: &DataStruct) -> Option<Self> {
+        let p = DisplayFormatPart::Var {
+            name: get_newtype_field(data)?,
+            parameters: String::new(),
+        };
+        Some(Self(vec![p]))
+    }
+
     fn to_format_args(&self, context: DisplayFormatContext) -> TokenStream {
         let mut format_str = String::new();
         let mut format_args = Vec::new();
