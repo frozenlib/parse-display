@@ -5,7 +5,10 @@ extern crate proc_macro;
 use lazy_static::lazy_static;
 use proc_macro2::TokenStream;
 use quote::quote;
-use regex::Regex;
+use regex::*;
+use regex_syntax::hir::Hir;
+use std::collections::HashMap;
+use std::collections::HashSet;
 use syn::*;
 
 macro_rules! expect {
@@ -133,27 +136,148 @@ pub fn derive_from_str(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
 }
 fn derive_from_str_for_struct(input: &DeriveInput, data: &DataStruct) -> TokenStream {
     let has = HelperAttributes::from(&input.attrs);
-    if let Some(regex) = &has.regex {
+    let body = if let Some(regex) = &has.regex {
         unimplemented!()
     } else if let Some(format) = &has.format {
-        unimplemented!()
+        build_from_str_body_by_struct_format(data, format)
     } else {
         unimplemented!()
-    }
+    };
     make_trait_impl(
         input,
         quote! { std::str::FromStr },
         quote! {
             type Err = parse_display::PraseError;
             fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-                unimplemented!()
+                #body
             }
         },
     )
 }
+fn build_from_str_body_by_struct_format(data: &DataStruct, format: &DisplayFormat) -> TokenStream {
+    let mut tree = MemberTree::new();
+    tree.push_format(format);
+    let regex = tree.build_regex();
+
+
+    let s = "";
+
+
+    quote! {
+        lazy_static::lazy_static! {
+            static ref RE: regex::Regex = regex::Regex::new(#regex).unwrap();
+        }
+        if let Some(c) = RE.captures(&s) {
+            Self {
+
+            }
+
+            unimplemented!()
+        }
+    }
+
+}
 fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream {
     let has = HelperAttributes::from(&input.attrs);
+
     unimplemented!()
+}
+
+
+struct MemberTree {
+    root: MemberEntry,
+    capture_next: usize,
+    hirs: Vec<Hir>,
+}
+struct MemberEntry {
+    members: HashMap<String, MemberEntry>,
+    capture: Option<usize>,
+}
+
+impl MemberTree {
+    fn new() -> Self {
+        Self {
+            root: MemberEntry::new(),
+            capture_next: 1,
+            hirs: vec![Hir::anchor(regex_syntax::hir::Anchor::StartText)],
+        }
+    }
+    fn push_regex(&mut self, s: &str) {
+        lazy_static! {
+            static ref REGEX_CAPTURE: Regex = Regex::new(r"\(\?<([_0-9a-zA-Z.]*)>").unwrap();
+        }
+        let s = REGEX_CAPTURE.replace(s, |c: &Captures| {
+            let node = self.root.get(c.get(1).unwrap().as_str());
+            format!("(?<{}>", node.set_capture(&mut self.capture_next))
+        });
+        self.hirs.push(to_hir(&s));
+    }
+    fn push_format(&mut self, format: &DisplayFormat) {
+        use regex_syntax::hir::*;
+        for p in &format.0 {
+            match p {
+                DisplayFormatPart::Str(s) => {
+                    for c in s.chars() {
+                        self.hirs.push(Hir::literal(Literal::Unicode(c)));
+                    }
+                }
+                DisplayFormatPart::EscapedBeginBraket => {
+                    self.hirs.push(Hir::literal(Literal::Unicode('{')));
+                }
+                DisplayFormatPart::EscapedEndBraket => {
+                    self.hirs.push(Hir::literal(Literal::Unicode('}')));
+                }
+                DisplayFormatPart::Var { name, .. } => {
+                    let node = self.root.get(&name);
+                    let c = node.set_capture(&mut self.capture_next);
+                    self.hirs.push(to_hir(&format!("(?P<{}>.**)", c)));
+                }
+
+            }
+        }
+    }
+    fn build_regex(&mut self) -> String {
+        let mut hirs = self.hirs.clone();
+        hirs.push(Hir::anchor(regex_syntax::hir::Anchor::EndText));
+        Hir::concat(hirs).to_string()
+    }
+}
+impl MemberEntry {
+    fn new() -> Self {
+        Self {
+            members: HashMap::new(),
+            capture: None,
+        }
+    }
+    fn member(&mut self, name: &str) -> &mut Self {
+        self.members.entry(name.to_string()).or_insert(Self::new())
+    }
+    fn get(&mut self, names: &str) -> &mut Self {
+        let mut node = self;
+        if names.is_empty() {
+            for name in names.split('.') {
+                node = node.member(name);
+            }
+        }
+        node
+    }
+    fn set_capture(&mut self, capture_next: &mut usize) -> String {
+        let c = if let Some(c) = self.capture {
+            c
+        } else {
+            let c = *capture_next;
+            self.capture = Some(c);
+            *capture_next += 1;
+            c
+        };
+        format!("value_{}", c)
+    }
+}
+fn to_hir(s: &str) -> Hir {
+    let a = regex_syntax::ast::parse::Parser::new().parse(s).unwrap();
+    regex_syntax::hir::translate::Translator::new()
+        .translate(s, &a)
+        .unwrap()
 }
 
 fn get_newtype_field(data: &DataStruct) -> Option<String> {
