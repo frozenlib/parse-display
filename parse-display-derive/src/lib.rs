@@ -35,7 +35,7 @@ fn derive_display_for_struct(input: &DeriveInput, data: &DataStruct) -> TokenStr
     let has = HelperAttributes::from(&input.attrs);
     let args = has
         .format
-        .or_else(|| DisplayFormat::from_newtype_field(data))
+        .or_else(|| DisplayFormat::from_newtype_struct(data))
         .expect("`#[display(\"format\")]` is required except newtype pattern.")
         .to_format_args(DisplayFormatContext::Struct(&data));
 
@@ -133,7 +133,7 @@ fn derive_from_str_for_struct(input: &DeriveInput, data: &DataStruct) -> TokenSt
         input,
         quote! { std::str::FromStr },
         quote! {
-            type Err = parse_display::PraseError;
+            type Err = parse_display::ParseError;
             fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
                 #body
             }
@@ -141,49 +141,74 @@ fn derive_from_str_for_struct(input: &DeriveInput, data: &DataStruct) -> TokenSt
     )
 }
 fn build_from_str_body_by_struct_format(data: &DataStruct, format: &DisplayFormat) -> TokenStream {
-    let mut tree = MemberTree::new();
+    let mut tree = FieldTree::new();
     tree.push_format(format);
     let regex = tree.build_regex();
 
-
-    let s = "";
-
-
+    let root = &tree.root;
+    if root.capture.is_some() {
+        panic!("`(?P<>)` (empty capture name) is not allowd in struct's regex.")
+    }
+    let ps = match &data.fields {
+        Fields::Named(fields) => {
+            let fields = fields.named.iter().map(|field| {
+                let ident = &field.ident.as_ref().unwrap();
+                let key = FieldKey::from_ident(ident);
+                if let Some(e) = root.fields.get(&key) {
+                    if let Some(c) = e.capture {
+                        let msg = format!("field `{}` parse failed.", ident);
+                        return quote! {  #ident : c.get(#c)
+                            .map(|m| m.as_str()).unwrap_or("")
+                            .parse()
+                            .expect(#msg)
+                        };
+                    }
+                }
+                panic!("`{}` is not appear in format.", ident)
+            });
+            quote! { { #(#fields,)* } }
+        }
+        Fields::Unnamed(_fields) => {
+            // for (idx, field) in fields.unnamed.iter().enumerate() {
+            //     //
+            // }
+            unimplemented!();
+        }
+        Fields::Unit => quote! {},
+    };
     quote! {
         lazy_static::lazy_static! {
             static ref RE: regex::Regex = regex::Regex::new(#regex).unwrap();
         }
         if let Some(c) = RE.captures(&s) {
-            Self {
-
-            }
-
-            unimplemented!()
+             return Ok(Self #ps );
         }
+        Err(parse_display::ParseError { message : "invalid format." } )
     }
-
 }
-fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream {
-    let has = HelperAttributes::from(&input.attrs);
+fn derive_from_str_for_enum(input: &DeriveInput, _data: &DataEnum) -> TokenStream {
+    // let has = HelperAttributes::from(&input.attrs);
 
     unimplemented!()
 }
 
 
-struct MemberTree {
-    root: MemberEntry,
+#[derive(Debug)]
+struct FieldTree {
+    root: FieldEntry,
     capture_next: usize,
     hirs: Vec<Hir>,
 }
-struct MemberEntry {
-    members: HashMap<String, MemberEntry>,
+#[derive(Debug)]
+struct FieldEntry {
+    fields: HashMap<FieldKey, FieldEntry>,
     capture: Option<usize>,
 }
 
-impl MemberTree {
+impl FieldTree {
     fn new() -> Self {
-        Self {
-            root: MemberEntry::new(),
+        FieldTree {
+            root: FieldEntry::new(),
             capture_next: 1,
             hirs: vec![Hir::anchor(regex_syntax::hir::Anchor::StartText)],
         }
@@ -193,7 +218,7 @@ impl MemberTree {
             static ref REGEX_CAPTURE: Regex = Regex::new(r"\(\?<([_0-9a-zA-Z.]*)>").unwrap();
         }
         let s = REGEX_CAPTURE.replace(s, |c: &Captures| {
-            let node = self.root.get(c.get(1).unwrap().as_str());
+            let node = self.root.field_deep(c.get(1).unwrap().as_str());
             format!("(?<{}>", node.set_capture(&mut self.capture_next))
         });
         self.hirs.push(to_hir(&s));
@@ -214,13 +239,14 @@ impl MemberTree {
                     self.hirs.push(Hir::literal(Literal::Unicode('}')));
                 }
                 DisplayFormatPart::Var { name, .. } => {
-                    let node = self.root.get(&name);
+                    let node = self.root.field_deep(&name);
                     let c = node.set_capture(&mut self.capture_next);
                     self.hirs.push(to_hir(&format!("(?P<{}>.**)", c)));
                 }
 
             }
         }
+
     }
     fn build_regex(&mut self) -> String {
         let mut hirs = self.hirs.clone();
@@ -228,21 +254,21 @@ impl MemberTree {
         Hir::concat(hirs).to_string()
     }
 }
-impl MemberEntry {
+impl FieldEntry {
     fn new() -> Self {
-        Self {
-            members: HashMap::new(),
+        FieldEntry {
+            fields: HashMap::new(),
             capture: None,
         }
     }
-    fn member(&mut self, name: &str) -> &mut Self {
-        self.members.entry(name.to_string()).or_insert(Self::new())
+    fn field(&mut self, key: FieldKey) -> &mut Self {
+        self.fields.entry(key).or_insert(Self::new())
     }
-    fn get(&mut self, names: &str) -> &mut Self {
+    fn field_deep(&mut self, names: &str) -> &mut Self {
         let mut node = self;
-        if names.is_empty() {
+        if !names.is_empty() {
             for name in names.split('.') {
-                node = node.member(name);
+                node = node.field(FieldKey::from_str(name));
             }
         }
         node
@@ -530,7 +556,7 @@ impl DisplayFormat {
         }
         Self(ps)
     }
-    fn from_newtype_field(data: &DataStruct) -> Option<Self> {
+    fn from_newtype_struct(data: &DataStruct) -> Option<Self> {
         let p = DisplayFormatPart::Var {
             name: get_newtype_field(data)?,
             parameters: String::new(),
@@ -677,5 +703,35 @@ fn binding_var_from_idx(idx: usize) -> Ident {
 }
 fn binding_var_from_ident(ident: &Ident) -> Ident {
     binding_var_from_str(&ident.to_string())
+}
+
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+enum FieldKey {
+    Named(String),
+    Unnamed(u32),
+}
+
+impl FieldKey {
+    fn from_str(s: &str) -> FieldKey {
+        if let Ok(idx) = s.parse() {
+            FieldKey::Unnamed(idx)
+        } else {
+            let s = if s.starts_with("r#") { &s[2..] } else { s };
+            FieldKey::Named(s.to_string())
+        }
+    }
+    fn from_string(mut s: String) -> FieldKey {
+        if let Ok(idx) = s.parse() {
+            FieldKey::Unnamed(idx)
+        } else {
+            if s.starts_with("r#") {
+                s.drain(0..2);
+            }
+            FieldKey::Named(s)
+        }
+    }
+    fn from_ident(ident: &Ident) -> FieldKey {
+        Self::from_string(ident.to_string())
+    }
 }
 

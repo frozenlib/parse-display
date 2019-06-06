@@ -8,7 +8,7 @@ pub use parse_display_derive::{Display, FromStr};
 
 #[derive(Debug)]
 pub struct ParseError {
-    message: &'static str,
+    pub message: &'static str,
 }
 impl Display for ParseError {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
