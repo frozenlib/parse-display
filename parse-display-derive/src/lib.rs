@@ -136,19 +136,21 @@ fn derive_from_str_for_struct(input: &DeriveInput, data: &DataStruct) -> TokenSt
     )
 }
 fn build_from_str_body_by_struct(data: &DataStruct, mut tree: FieldTree) -> TokenStream {
+    fn to_expr(root: &FieldEntry, key: &FieldKey) -> TokenStream {
+        if let Some(e) = root.fields.get(&key) {
+            if let Some(expr) = e.to_expr(std::slice::from_ref(key)) {
+                return expr;
+            }
+        }
+        panic!("field `{}` is not appear in format.", key);
+    }
+
     let root = &tree.root;
     let code = if root.use_default {
         let mut setters = Vec::new();
         root.visit(|keys, node| {
-            if let Some(c) = node.capture {
-                let msg = format!("field `{}` parse failed.", join(keys, "."));
-                let setter = quote! {
-                    value #(.#keys)* = c.get(#c)
-                        .map_or("", |m| m.as_str())
-                        .parse()
-                        .expect(#msg);
-                };
-                setters.push(setter);
+            if let Some(expr) = node.to_expr(&keys) {
+                setters.push(quote! { value #(.#keys)* = #expr; });
             }
         });
         quote! {
@@ -163,38 +165,16 @@ fn build_from_str_body_by_struct(data: &DataStruct, mut tree: FieldTree) -> Toke
         let ps = match &data.fields {
             Fields::Named(fields) => {
                 let fields = fields.named.iter().map(|field| {
-                    let ident = &field.ident.as_ref().unwrap();
-                    let key = FieldKey::from_ident(ident);
-                    if let Some(e) = root.fields.get(&key) {
-                        if let Some(c) = e.capture {
-                            let msg = format!("field `{}` parse failed.", ident);
-                            return quote! { #ident : c.get(#c)
-                                .map_or("", |m| m.as_str())
-                                .parse()
-                                .expect(#msg)
-                            };
-                        } else if e.use_default {
-                            return quote! { #ident : std::default::Default::default() };
-                        }
-                    }
-                    panic!("`{}` is not appear in format.", ident)
+                    let key = FieldKey::from_ident(field.ident.as_ref().unwrap());
+                    let expr = to_expr(root, &key);
+                    quote! { #key : #expr }
                 });
                 quote! { { #(#fields,)* } }
             }
             Fields::Unnamed(fields) => {
                 let fields = fields.unnamed.iter().enumerate().map(|(idx, _)| {
                     let key = FieldKey::Unnamed(idx);
-                    if let Some(e) = root.fields.get(&key) {
-                        if let Some(c) = e.capture {
-                            let msg = format!("field `{}` parse failed.", idx);
-                            return quote! { c.get(#c)
-                                .map_or("", |m| m.as_str())
-                                .parse()
-                                .expect(#msg)
-                            };
-                        }
-                    }
-                    panic!("`{}` is not appear in format.", idx)
+                    to_expr(root, &key)
                 });
                 quote! { ( #(#fields,)* ) }
             }
@@ -373,6 +353,20 @@ impl FieldEntry {
         }
         for field in &has.default_fields {
             self.field(FieldKey::from_str(field.as_str())).use_default = true;
+        }
+    }
+    fn to_expr(&self, keys: &[FieldKey]) -> Option<TokenStream> {
+        if let Some(c) = self.capture {
+            let msg = format!("field `{}` parse failed.", join(keys, "."));
+            Some(quote! { c.get(#c)
+                .map_or("", |m| m.as_str())
+                .parse()
+                .expect(#msg)
+            })
+        } else if self.use_default {
+            Some(quote! { std::default::Default::default() })
+        } else {
+            None
         }
     }
     fn visit(&self, mut visitor: impl FnMut(&[FieldKey], &Self)) {

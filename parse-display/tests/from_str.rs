@@ -88,6 +88,27 @@ fn from_str_struct_default() {
 }
 
 #[test]
+fn from_str_struct_default_both() {
+    #[derive(FromStr, Debug, Eq, PartialEq)]
+    #[display("{a}")]
+    #[from_str(default)]
+    struct TestStruct {
+        a: u32,
+
+        #[from_str(default)]
+        b: u32,
+    }
+    impl Default for TestStruct {
+        fn default() -> Self {
+            Self { a: 100, b: 200 }
+        }
+    }
+
+    assert_from_str("12", TestStruct { a: 12, b: 0 });
+}
+
+
+#[test]
 fn from_str_struct_field_default() {
     #[derive(FromStr, Debug, Eq, PartialEq, Default)]
     #[display("{a}")]
@@ -98,6 +119,14 @@ fn from_str_struct_field_default() {
         b: u32,
     }
     assert_from_str("12", TestStruct { a: 12, b: 0 });
+}
+
+#[test]
+fn from_str_tuple_field_default() {
+    #[derive(FromStr, Debug, Eq, PartialEq, Default)]
+    #[display("{0}")]
+    struct TestStruct(u32, #[from_str(default)] u32);
+    assert_from_str("12", TestStruct(12, 0));
 }
 
 
