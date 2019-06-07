@@ -45,19 +45,14 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream 
         let variant_ident = &variant.ident;
         let fields = match &variant.fields {
             Fields::Named(fields) => {
-                let fields = fields.named.iter().map(|f| {
-                    let field_ident = f.ident.as_ref().unwrap();
-                    let var_ident = binding_var_from_ident(field_ident);
-                    quote! { #field_ident : #var_ident }
+                let fields = FieldKey::from_fields_named(fields).map(|key| {
+                    let var = key.binding_var();
+                    quote! { #key : #var }
                 });
                 quote! { { #(#fields,)* } }
             }
             Fields::Unnamed(fields) => {
-                let len = fields.unnamed.iter().count();
-                let fields = (0..len).map(|idx| {
-                    let ident = binding_var_from_idx(idx);
-                    quote! { #ident }
-                });
+                let fields = FieldKey::from_fields_unnamed(fields).map(|key| key.binding_var());
                 quote! { ( #(#fields,)* ) }
             }
             Fields::Unit => {
@@ -153,18 +148,14 @@ fn build_from_str_body_by_struct(data: &DataStruct, mut tree: FieldTree) -> Toke
         }
         let ps = match &data.fields {
             Fields::Named(fields) => {
-                let fields = fields.named.iter().map(|field| {
-                    let key = FieldKey::from_ident(field.ident.as_ref().unwrap());
+                let fields = FieldKey::from_fields_named(fields).map(|key| {
                     let expr = to_expr(root, &key);
                     quote! { #key : #expr }
                 });
                 quote! { { #(#fields,)* } }
             }
             Fields::Unnamed(fields) => {
-                let fields = fields.unnamed.iter().enumerate().map(|(idx, _)| {
-                    let key = FieldKey::Unnamed(idx);
-                    to_expr(root, &key)
-                });
+                let fields = FieldKey::from_fields_unnamed(fields).map(|key| to_expr(root, &key));
                 quote! { ( #(#fields,)* ) }
             }
             Fields::Unit => quote! {},
@@ -768,7 +759,7 @@ impl<'a> DisplayContext<'a> {
         for key in keys {
             if is_match_binding {
                 is_match_binding = false;
-                let ident = binding_var_from_key(&key);
+                let ident = key.binding_var();
                 expr.extend(quote! { #ident });
             } else {
                 expr.extend(quote! { .#key });
@@ -779,26 +770,26 @@ impl<'a> DisplayContext<'a> {
 }
 
 
-fn binding_var_from_key(key: &FieldKey) -> Ident {
-    let ident = format!("_value_{}", key);
-    parse_str(&ident).unwrap()
-}
+// fn binding_var_from_key(key: &FieldKey) -> Ident {
+//     let ident = format!("_value_{}", key);
+//     parse_str(&ident).unwrap()
+// }
 
-fn binding_var_from_str(s: &str) -> Ident {
-    let ident = if let Ok(idx) = s.parse::<usize>() {
-        format!("_value_{}", idx)
-    } else {
-        let s = s.trim_start_matches("r#");
-        format!("_value_{}", s)
-    };
-    parse_str(&ident).unwrap()
-}
-fn binding_var_from_idx(idx: usize) -> Ident {
-    parse_str(&format!("_value_{}", idx)).unwrap()
-}
-fn binding_var_from_ident(ident: &Ident) -> Ident {
-    binding_var_from_str(&ident.to_string())
-}
+// fn binding_var_from_str(s: &str) -> Ident {
+//     let ident = if let Ok(idx) = s.parse::<usize>() {
+//         format!("_value_{}", idx)
+//     } else {
+//         let s = s.trim_start_matches("r#");
+//         format!("_value_{}", s)
+//     };
+//     parse_str(&ident).unwrap()
+// }
+// fn binding_var_from_idx(idx: usize) -> Ident {
+//     parse_str(&format!("_value_{}", idx)).unwrap()
+// }
+// fn binding_var_from_ident(ident: &Ident) -> Ident {
+//     binding_var_from_str(&ident.to_string())
+// }
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 enum FieldKey {
@@ -828,8 +819,6 @@ impl FieldKey {
     fn from_ident(ident: &Ident) -> FieldKey {
         Self::from_string(ident.to_string())
     }
-
-
     fn from_str_deep(s: &str) -> Vec<FieldKey> {
         if s.is_empty() {
             Vec::new()
@@ -837,11 +826,25 @@ impl FieldKey {
             s.split('.').map(Self::from_str).collect()
         }
     }
+    fn from_fields_named<'a>(fields: &'a FieldsNamed) -> impl Iterator<Item = FieldKey> + 'a {
+        fields
+            .named
+            .iter()
+            .map(|field| Self::from_ident(field.ident.as_ref().unwrap()))
+    }
+    fn from_fields_unnamed(fields: &FieldsUnnamed) -> impl Iterator<Item = FieldKey> {
+        let len = fields.unnamed.len();
+        (0..len).map(|idx| FieldKey::Unnamed(idx))
+    }
+
     fn to_member(&self) -> Member {
         match self {
             FieldKey::Named(s) => Member::Named(parse_str(&format!("r#{}", &s)).unwrap()),
             FieldKey::Unnamed(idx) => Member::Unnamed(parse_str(&format!("{}", idx)).unwrap()),
         }
+    }
+    fn binding_var(&self) -> Ident {
+        parse_str(&format!("_value_{}", self)).unwrap()
     }
 }
 impl std::fmt::Display for FieldKey {
