@@ -47,6 +47,7 @@ fn from_str_struct_regex() {
     assert_from_str_err::<TestStruct>("aa,50");
 }
 
+
 #[test]
 fn from_str_struct_regex_keyword() {
     #[derive(FromStr, Debug, Eq, PartialEq)]
