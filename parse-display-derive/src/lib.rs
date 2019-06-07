@@ -9,7 +9,6 @@ use regex::*;
 use regex_syntax::hir::Hir;
 use std::borrow::Cow;
 use std::collections::HashMap;
-use std::collections::HashSet;
 use syn::*;
 
 macro_rules! expect {
@@ -728,7 +727,7 @@ enum DisplayFormatPart {
 
 enum DisplayContext<'a> {
     Struct(&'a DataStruct),
-    Field(&'a Member),
+    Field(&'a FieldKey),
     Variant {
         variant: &'a Variant,
         style: DisplayStyle,
@@ -737,16 +736,17 @@ enum DisplayContext<'a> {
 
 impl<'a> DisplayContext<'a> {
     fn build_arg(&self, name: &str) -> TokenStream {
-        fn build_arg_from_field(field: &Field, member: &Member) -> TokenStream {
+        fn build_arg_from_field(field: &Field, key: &FieldKey) -> TokenStream {
             let has = HelperAttributes::from(&field.attrs);
             if let Some(format) = has.format {
-                let args = format.to_format_args(DisplayContext::Field(member));
+                let args = format.to_format_args(DisplayContext::Field(key));
                 quote! { format_args!(#args) }
             } else {
-                quote! { &self.#member }
+                quote! { &self.#key }
             }
         }
-        if name.is_empty() {
+        let keys = FieldKey::from_str_deep(name);
+        if keys.is_empty() {
             return match self {
                 DisplayContext::Struct(_) => panic!("{} is not allowd in struct format."),
                 DisplayContext::Field(member) => quote! { &self.#member },
@@ -757,49 +757,31 @@ impl<'a> DisplayContext<'a> {
             };
         }
 
-        let names: Vec<_> = name.split('.').collect();
         if let DisplayContext::Struct(data) = self {
-            if names.len() == 1 {
-                let name_idx = name.parse::<usize>();
-                let name_raw = format!("r#{}", name);
-                let mut idx = 0;
-                for field in &data.fields {
-                    if let Some(ident) = &field.ident {
-                        if ident == name || ident == &name_raw {
-                            return build_arg_from_field(
-                                field,
-                                &parse2(quote! { #ident }).unwrap(),
-                            );
-                        }
-                    } else {
-                        if name_idx == Ok(idx) {
-                            let idx = Index::from(idx);
-                            return build_arg_from_field(field, &parse2(quote! { #idx }).unwrap());
-                        }
-                    }
-                    idx += 1;
-                }
-                panic!("Unknown field '{}'.", name);
+            if keys.len() == 1 {
+                let key = &keys[0];
+                let m = field_map(&data.fields);
+                let field = m.get(key).expect(&format!("unknown field '{}'.", key));
+                return build_arg_from_field(field, key);
             }
         }
         let mut is_match_binding = false;
 
         let mut expr = match self {
             DisplayContext::Struct(_) => quote! { self },
-            DisplayContext::Field(member) => quote! { self.#member },
+            DisplayContext::Field(key) => quote! { self.#key },
             DisplayContext::Variant { .. } => {
                 is_match_binding = true;
                 quote! {}
             }
         };
-        for name in names {
+        for key in keys {
             if is_match_binding {
                 is_match_binding = false;
-                let ident = binding_var_from_str(&name);
+                let ident = binding_var_from_key(&key);
                 expr.extend(quote! { #ident });
             } else {
-                let member = to_member(&name);
-                expr.extend(quote! { .#member });
+                expr.extend(quote! { .#key });
             }
         }
         quote! { &#expr }
@@ -807,16 +789,11 @@ impl<'a> DisplayContext<'a> {
 }
 
 
-fn to_member(s: &str) -> Member {
-    let s_raw;
-    let s_new = if !s.parse::<usize>().is_ok() {
-        s_raw = format!("r#{}", s);
-        &s_raw
-    } else {
-        s
-    };
-    expect!(parse_str(&s_new), "Parse failed '{}'", &s)
+fn binding_var_from_key(key: &FieldKey) -> Ident {
+    let ident = format!("_value_{}", key);
+    parse_str(&ident).unwrap()
 }
+
 fn binding_var_from_str(s: &str) -> Ident {
     let ident = if let Ok(idx) = s.parse::<usize>() {
         format!("_value_{}", idx)
