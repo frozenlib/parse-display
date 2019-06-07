@@ -20,6 +20,7 @@ fn from_str_struct_format() {
         b: u32,
     }
     assert_from_str("12,50", TestStruct { a: 12, b: 50 });
+    assert_from_str_err::<TestStruct>("aa,50");
 }
 
 #[test]
@@ -30,6 +31,7 @@ fn from_str_struct_format_keyword() {
         r#fn: u32,
     }
     assert_from_str("12", TestStruct { r#fn: 12 });
+    assert_from_str_err::<TestStruct>("aa");
 }
 
 
@@ -42,6 +44,7 @@ fn from_str_struct_regex() {
         bc: u32,
     }
     assert_from_str("12,50", TestStruct { a: 12, bc: 50 });
+    assert_from_str_err::<TestStruct>("aa,50");
 }
 
 #[test]
