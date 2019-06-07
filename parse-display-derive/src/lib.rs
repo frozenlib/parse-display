@@ -138,7 +138,7 @@ fn derive_from_str_for_struct(input: &DeriveInput, data: &DataStruct) -> TokenSt
 fn build_from_str_body_by_struct(data: &DataStruct, mut tree: FieldTree) -> TokenStream {
     let regex = tree.build_regex();
     let root = &tree.root;
-    if root.use_default {
+    let code = if root.use_default {
         let mut setters = Vec::new();
         root.visit(|keys, node| {
             if let Some(c) = node.capture {
@@ -153,15 +153,9 @@ fn build_from_str_body_by_struct(data: &DataStruct, mut tree: FieldTree) -> Toke
             }
         });
         quote! {
-            lazy_static::lazy_static! {
-                static ref RE: regex::Regex = regex::Regex::new(#regex).unwrap();
-            }
-            if let Some(c) = RE.captures(&s) {
-                let mut value = <Self as std::default::Default>::default();
-                #(#setters)*
-                return Ok(value);
-            }
-            Err(parse_display::ParseError { message : "invalid format." } )
+            let mut value = <Self as std::default::Default>::default();
+            #(#setters)*
+            return Ok(value);
         }
     } else {
         if root.capture.is_some() {
@@ -205,17 +199,17 @@ fn build_from_str_body_by_struct(data: &DataStruct, mut tree: FieldTree) -> Toke
             }
             Fields::Unit => quote! {},
         };
-        quote! {
-            lazy_static::lazy_static! {
-                static ref RE: regex::Regex = regex::Regex::new(#regex).unwrap();
-            }
-            if let Some(c) = RE.captures(&s) {
-                 return Ok(Self #ps);
-            }
-            Err(parse_display::ParseError { message : "invalid format." } )
+        quote! { return Ok(Self #ps); }
+    };
+    quote! {
+        lazy_static::lazy_static! {
+            static ref RE: regex::Regex = regex::Regex::new(#regex).unwrap();
         }
+        if let Some(c) = RE.captures(&s) {
+             #code
+        }
+        Err(parse_display::ParseError { message : "invalid format." } )
     }
-
 }
 fn derive_from_str_for_enum(input: &DeriveInput, _data: &DataEnum) -> TokenStream {
     // let has = HelperAttributes::from(&input.attrs);
