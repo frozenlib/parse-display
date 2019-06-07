@@ -138,56 +138,84 @@ fn derive_from_str_for_struct(input: &DeriveInput, data: &DataStruct) -> TokenSt
 fn build_from_str_body_by_struct(data: &DataStruct, mut tree: FieldTree) -> TokenStream {
     let regex = tree.build_regex();
     let root = &tree.root;
-    if root.capture.is_some() {
-        panic!("`(?P<>)` (empty capture name) is not allowd in struct's regex.")
-    }
-    let ps = match &data.fields {
-        Fields::Named(fields) => {
-            let fields = fields.named.iter().map(|field| {
-                let ident = &field.ident.as_ref().unwrap();
-                let key = FieldKey::from_ident(ident);
-                if let Some(e) = root.fields.get(&key) {
-                    if let Some(c) = e.capture {
-                        let msg = format!("field `{}` parse failed.", ident);
-                        return quote! { #ident : c.get(#c)
-                            .map(|m| m.as_str()).unwrap_or("")
-                            .parse()
-                            .expect(#msg)
-                        };
+    if root.use_default {
+        let mut setters = Vec::new();
+        root.visit(|keys, node| {
+            if let Some(c) = node.capture {
+                let msg = format!("field `{}` parse failed.", join(keys, "."));
+                let setter = quote! {
+                    value #(.#keys)* = c.get(#c)
+                        .map(|m| m.as_str()).unwrap_or("")
+                        .parse()
+                        .expect(#msg);
+                };
+                setters.push(setter);
+            }
+        });
+        quote! {
+            lazy_static::lazy_static! {
+                static ref RE: regex::Regex = regex::Regex::new(#regex).unwrap();
+            }
+            if let Some(c) = RE.captures(&s) {
+                let mut value = <Self as std::default::Default>::default();
+                #(#setters)*
+                return Ok(value);
+            }
+            Err(parse_display::ParseError { message : "invalid format." } )
+        }
+    } else {
+        if root.capture.is_some() {
+            panic!("`(?P<>)` (empty capture name) is not allowd in struct's regex.")
+        }
+        let ps = match &data.fields {
+            Fields::Named(fields) => {
+                let fields = fields.named.iter().map(|field| {
+                    let ident = &field.ident.as_ref().unwrap();
+                    let key = FieldKey::from_ident(ident);
+                    if let Some(e) = root.fields.get(&key) {
+                        if let Some(c) = e.capture {
+                            let msg = format!("field `{}` parse failed.", ident);
+                            return quote! { #ident : c.get(#c)
+                                .map(|m| m.as_str()).unwrap_or("")
+                                .parse()
+                                .expect(#msg)
+                            };
+                        }
                     }
-                }
-                panic!("`{}` is not appear in format.", ident)
-            });
-            quote! { { #(#fields,)* } }
-        }
-        Fields::Unnamed(fields) => {
-            let fields = fields.unnamed.iter().enumerate().map(|(idx, _)| {
-                let key = FieldKey::Unnamed(idx);
-                if let Some(e) = root.fields.get(&key) {
-                    if let Some(c) = e.capture {
-                        let msg = format!("field `{}` parse failed.", idx);
-                        return quote! { c.get(#c)
-                            .map(|m| m.as_str()).unwrap_or("")
-                            .parse()
-                            .expect(#msg)
-                        };
+                    panic!("`{}` is not appear in format.", ident)
+                });
+                quote! { { #(#fields,)* } }
+            }
+            Fields::Unnamed(fields) => {
+                let fields = fields.unnamed.iter().enumerate().map(|(idx, _)| {
+                    let key = FieldKey::Unnamed(idx);
+                    if let Some(e) = root.fields.get(&key) {
+                        if let Some(c) = e.capture {
+                            let msg = format!("field `{}` parse failed.", idx);
+                            return quote! { c.get(#c)
+                                .map(|m| m.as_str()).unwrap_or("")
+                                .parse()
+                                .expect(#msg)
+                            };
+                        }
                     }
-                }
-                panic!("`{}` is not appear in format.", idx)
-            });
-            quote! { ( #(#fields,)* ) }
+                    panic!("`{}` is not appear in format.", idx)
+                });
+                quote! { ( #(#fields,)* ) }
+            }
+            Fields::Unit => quote! {},
+        };
+        quote! {
+            lazy_static::lazy_static! {
+                static ref RE: regex::Regex = regex::Regex::new(#regex).unwrap();
+            }
+            if let Some(c) = RE.captures(&s) {
+                 return Ok(Self #ps);
+            }
+            Err(parse_display::ParseError { message : "invalid format." } )
         }
-        Fields::Unit => quote! {},
-    };
-    quote! {
-        lazy_static::lazy_static! {
-            static ref RE: regex::Regex = regex::Regex::new(#regex).unwrap();
-        }
-        if let Some(c) = RE.captures(&s) {
-             return Ok(Self #ps );
-        }
-        Err(parse_display::ParseError { message : "invalid format." } )
     }
+
 }
 fn derive_from_str_for_enum(input: &DeriveInput, _data: &DataEnum) -> TokenStream {
     // let has = HelperAttributes::from(&input.attrs);
@@ -206,6 +234,7 @@ struct FieldTree {
 struct FieldEntry {
     fields: HashMap<FieldKey, FieldEntry>,
     capture: Option<usize>,
+    use_default: bool,
 }
 
 impl FieldTree {
@@ -220,6 +249,12 @@ impl FieldTree {
         let has = HelperAttributes::from(&input.attrs);
         let mut s = Self::new();
         s.push_attrs(&has, &FromStrContext::Struct(data));
+        s.root.set_default(&has);
+        let m = field_map(&data.fields);
+        for (key, field) in m {
+            let has = HelperAttributes::from(&field.attrs);
+            s.root.field(key).set_default(&has);
+        }
         s
     }
 
@@ -303,9 +338,10 @@ impl FieldTree {
 }
 impl FieldEntry {
     fn new() -> Self {
-        FieldEntry {
+        Self {
             fields: HashMap::new(),
             capture: None,
+            use_default: false,
         }
     }
     fn field(&mut self, key: FieldKey) -> &mut Self {
@@ -334,6 +370,30 @@ impl FieldEntry {
             c
         };
         format!("value_{}", c)
+    }
+    fn set_default(&mut self, has: &HelperAttributes) {
+        if has.default_self {
+            self.use_default = true;
+        }
+        for field in &has.default_fields {
+            self.field(FieldKey::from_str(field.as_str())).use_default = true;
+        }
+    }
+    fn visit(&self, mut visitor: impl FnMut(&[FieldKey], &Self)) {
+        fn visit_with(
+            keys: &mut Vec<FieldKey>,
+            e: &FieldEntry,
+            visitor: &mut impl FnMut(&[FieldKey], &FieldEntry),
+        ) {
+            visitor(&keys, e);
+            for (key, e) in e.fields.iter() {
+                keys.push(key.clone());
+                visit_with(keys, e, visitor);
+                keys.pop();
+            }
+        }
+        let mut keys = Vec::new();
+        visit_with(&mut keys, self, &mut visitor)
     }
 }
 enum FromStrContext<'a> {
@@ -819,6 +879,12 @@ impl FieldKey {
             s.split('.').map(Self::from_str).collect()
         }
     }
+    fn to_member(&self) -> Member {
+        match self {
+            FieldKey::Named(s) => Member::Named(parse_str(&format!("r#{}", &s)).unwrap()),
+            FieldKey::Unnamed(idx) => Member::Unnamed(parse_str(&format!("{}", idx)).unwrap()),
+        }
+    }
 }
 impl std::fmt::Display for FieldKey {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -826,6 +892,11 @@ impl std::fmt::Display for FieldKey {
             FieldKey::Named(s) => write!(f, "{}", s),
             FieldKey::Unnamed(idx) => write!(f, "{}", idx),
         }
+    }
+}
+impl quote::ToTokens for FieldKey {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        self.to_member().to_tokens(tokens)
     }
 }
 
@@ -840,4 +911,15 @@ fn field_map(fields: &Fields) -> HashMap<FieldKey, &Field> {
         m.insert(key, field);
     }
     m
+}
+
+fn join<T: std::fmt::Display>(s: impl IntoIterator<Item = T>, sep: &str) -> String {
+    use std::fmt::*;
+    let mut sep_current = "";
+    let mut buf = String::new();
+    for i in s.into_iter() {
+        write!(&mut buf, "{},{}", sep_current, i).unwrap();
+        sep_current = sep;
+    }
+    buf
 }

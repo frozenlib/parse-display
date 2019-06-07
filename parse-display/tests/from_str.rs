@@ -75,6 +75,18 @@ fn from_str_struct_regex() {
     assert_from_str("12,50", TestStruct { a: 12, b: 50 });
 }
 
+#[test]
+fn from_str_struct_default() {
+    #[derive(FromStr, Debug, Eq, PartialEq, Default)]
+    #[display("{a}")]
+    #[from_str(default)]
+    struct TestStruct {
+        a: u32,
+        b: u32,
+    }
+    assert_from_str("12", TestStruct { a: 12, b: 0 });
+}
+
 
 #[test]
 fn from_str_tuple_struct() {
