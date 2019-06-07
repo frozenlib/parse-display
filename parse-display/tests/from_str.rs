@@ -22,14 +22,35 @@ fn from_str_struct_format() {
 }
 
 #[test]
+fn from_str_struct_format_keyword() {
+    #[derive(FromStr, Debug, Eq, PartialEq)]
+    #[display("{fn}")]
+    struct TestStruct {
+        r#fn: u32,
+    }
+    assert_from_str("12", TestStruct { r#fn: 12 });
+}
+
+
+#[test]
 fn from_str_struct_regex() {
     #[derive(FromStr, Debug, Eq, PartialEq)]
-    #[from_str(regex = "(?P<a>.*),(?P<b>.*)")]
+    #[from_str(regex = "(?P<a>.*),(?P<bc>.*)")]
     struct TestStruct {
         a: u32,
-        b: u32,
+        bc: u32,
     }
-    assert_from_str("12,50", TestStruct { a: 12, b: 50 });
+    assert_from_str("12,50", TestStruct { a: 12, bc: 50 });
+}
+
+#[test]
+fn from_str_struct_regex_keyword() {
+    #[derive(FromStr, Debug, Eq, PartialEq)]
+    #[from_str(regex = "(?P<fn>.*)")]
+    struct TestStruct {
+        r#fn: u32,
+    }
+    assert_from_str("12", TestStruct { r#fn: 12 });
 }
 
 
