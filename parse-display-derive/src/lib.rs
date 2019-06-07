@@ -37,7 +37,7 @@ fn derive_display_for_struct(input: &DeriveInput, data: &DataStruct) -> TokenStr
         .format
         .or_else(|| DisplayFormat::from_newtype_struct(data))
         .expect("`#[display(\"format\")]` is required except newtype pattern.")
-        .to_format_args(DisplayFormatContext::Struct(&data));
+        .to_format_args(DisplayContext::Struct(&data));
 
     make_trait_impl(
         input,
@@ -87,7 +87,7 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream 
             .or(has.style)
             .unwrap_or(DisplayStyle::None);
 
-        let args = format.to_format_args(DisplayFormatContext::Variant { variant, style });
+        let args = format.to_format_args(DisplayContext::Variant { variant, style });
 
         quote! {
             #enum_ident::#variant_ident #fields => {
@@ -121,20 +121,8 @@ pub fn derive_from_str(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
     }
 }
 fn derive_from_str_for_struct(input: &DeriveInput, data: &DataStruct) -> TokenStream {
-    let has = HelperAttributes::from(&input.attrs);
-    let body = if let Some(regex) = &has.regex {
-        let mut tree = FieldTree::new();
-        tree.push_regex(&regex);
-        build_from_str_body_by_struct(data, tree)
-    } else {
-        let format = has
-            .format
-            .or_else(|| DisplayFormat::from_newtype_struct(data))
-            .expect("`#[display(\"format\")]` or `#[display(regex = \"regex\")]` is required except newtype pattern.");
-        let mut tree = FieldTree::new();
-        tree.push_format(&format);
-        build_from_str_body_by_struct(data, tree)
-    };
+    let tree = FieldTree::from_struct(input, data);
+    let body = build_from_str_body_by_struct(data, tree);
     make_trait_impl(
         input,
         quote! { std::str::FromStr },
@@ -227,17 +215,25 @@ impl FieldTree {
             hirs: vec![Hir::anchor(regex_syntax::hir::Anchor::StartText)],
         }
     }
-    fn push_regex(&mut self, s: &str) {
+    fn from_struct(input: &DeriveInput, data: &DataStruct) -> Self {
+        let has = HelperAttributes::from(&input.attrs);
+        let mut s = Self::new();
+        s.push_attrs(&has, &FromStrContext::Struct(data));
+        s
+    }
+
+    fn push_regex(&mut self, s: &str, context: &FromStrContext) {
         lazy_static! {
             static ref REGEX_CAPTURE: Regex = Regex::new(r"\(\?P<([_0-9a-zA-Z.]*)>").unwrap();
         }
         let s = REGEX_CAPTURE.replace_all(s, |c: &Captures| {
-            let node = self.root.field_deep(c.get(1).unwrap().as_str());
+            let keys = FieldKey::from_str_deep(c.get(1).unwrap().as_str());
+            let node = self.root.field_by_context(context).field_deep(keys);
             format!("(?P<{}>", node.set_capture(&mut self.capture_next))
         });
         self.hirs.push(to_hir(&s));
     }
-    fn push_format(&mut self, format: &DisplayFormat) {
+    fn push_format(&mut self, format: &DisplayFormat, context: &FromStrContext) {
         use regex_syntax::hir::*;
         for p in &format.0 {
             match p {
@@ -253,15 +249,42 @@ impl FieldTree {
                     self.hirs.push(Hir::literal(Literal::Unicode('}')));
                 }
                 DisplayFormatPart::Var { name, .. } => {
-                    let node = self.root.field_deep(&name);
+                    let keys = FieldKey::from_str_deep(&name);
+                    if keys.len() == 1 {
+                        if let FromStrContext::Struct(data) = context {
+                            let m = field_map(&data.fields);
+                            let key = keys.into_iter().next().unwrap();
+                            if let Some(field) = m.get(&key) {
+                                self.push_field(key, field);
+                                continue;
+                            }
+                            panic!("field `{}` not found.", &key);
+                        }
+                    }
+
+                    let node = self.root.field_by_context(context).field_deep(keys);
                     let c = node.set_capture(&mut self.capture_next);
                     self.hirs.push(to_hir(&format!("(?P<{}>.**)", c)));
                 }
-
             }
         }
-
     }
+    fn push_field(&mut self, key: FieldKey, field: &Field) {
+        self.push_attrs(
+            &HelperAttributes::from(&field.attrs),
+            &FromStrContext::Field(key),
+        );
+    }
+    fn push_attrs(&mut self, has: &HelperAttributes, context: &FromStrContext) {
+        if let Some(regex) = &has.regex {
+            self.push_regex(&regex, context);
+        } else {
+            let format = has.format.clone();
+            let format = format.unwrap_or_else(|| context.default_from_str_format());
+            self.push_format(&format, context);
+        }
+    }
+
     fn build_regex(&mut self) -> String {
         let mut hirs = self.hirs.clone();
         hirs.push(Hir::anchor(regex_syntax::hir::Anchor::EndText));
@@ -278,14 +301,18 @@ impl FieldEntry {
     fn field(&mut self, key: FieldKey) -> &mut Self {
         self.fields.entry(key).or_insert(Self::new())
     }
-    fn field_deep(&mut self, names: &str) -> &mut Self {
+    fn field_deep(&mut self, keys: Vec<FieldKey>) -> &mut Self {
         let mut node = self;
-        if !names.is_empty() {
-            for name in names.split('.') {
-                node = node.field(FieldKey::from_str(name));
-            }
+        for key in keys {
+            node = node.field(key);
         }
         node
+    }
+    fn field_by_context(&mut self, context: &FromStrContext) -> &mut Self {
+        match context {
+            FromStrContext::Struct(_) | FromStrContext::Variant(_) => self,
+            FromStrContext::Field(field) => self.field(field.clone()),
+        }
     }
     fn set_capture(&mut self, capture_next: &mut usize) -> String {
         let c = if let Some(c) = self.capture {
@@ -299,6 +326,26 @@ impl FieldEntry {
         format!("value_{}", c)
     }
 }
+enum FromStrContext<'a> {
+    Struct(&'a DataStruct),
+    Variant(&'a Variant),
+    Field(FieldKey),
+}
+impl<'a> FromStrContext<'a> {
+    fn default_from_str_format(&self) -> DisplayFormat {
+        match self {
+            FromStrContext::Struct(data) => {
+                let format = DisplayFormat::from_newtype_struct(data);
+                format.expect("`#[display(\"format\")]` or `#[display(regex = \"regex\")]` is required except newtype pattern.")
+            }
+            FromStrContext::Field(..) => DisplayFormat::from("{}"),
+            _ => unimplemented!(),
+        }
+    }
+
+}
+
+
 fn to_hir(s: &str) -> Hir {
     let a = regex_syntax::ast::parse::Parser::new().parse(s).unwrap();
     regex_syntax::hir::translate::Translator::new()
@@ -589,7 +636,7 @@ impl DisplayFormat {
         }
     }
 
-    fn to_format_args(&self, context: DisplayFormatContext) -> TokenStream {
+    fn to_format_args(&self, context: DisplayContext) -> TokenStream {
         let mut format_str = String::new();
         let mut format_args = Vec::new();
         for p in &self.0 {
@@ -618,7 +665,7 @@ enum DisplayFormatPart {
     Var { name: String, parameters: String },
 }
 
-enum DisplayFormatContext<'a> {
+enum DisplayContext<'a> {
     Struct(&'a DataStruct),
     Field(&'a Member),
     Variant {
@@ -627,12 +674,12 @@ enum DisplayFormatContext<'a> {
     },
 }
 
-impl<'a> DisplayFormatContext<'a> {
+impl<'a> DisplayContext<'a> {
     fn build_arg(&self, name: &str) -> TokenStream {
         fn build_arg_from_field(field: &Field, member: &Member) -> TokenStream {
             let has = HelperAttributes::from(&field.attrs);
             if let Some(format) = has.format {
-                let args = format.to_format_args(DisplayFormatContext::Field(member));
+                let args = format.to_format_args(DisplayContext::Field(member));
                 quote! { format_args!(#args) }
             } else {
                 quote! { &self.#member }
@@ -640,9 +687,9 @@ impl<'a> DisplayFormatContext<'a> {
         }
         if name.is_empty() {
             return match self {
-                DisplayFormatContext::Struct(_) => panic!("{} is not allowd in struct format."),
-                DisplayFormatContext::Field(member) => quote! { &self.#member },
-                DisplayFormatContext::Variant { variant, style } => {
+                DisplayContext::Struct(_) => panic!("{} is not allowd in struct format."),
+                DisplayContext::Field(member) => quote! { &self.#member },
+                DisplayContext::Variant { variant, style } => {
                     let s = ident_to_string(&variant.ident, *style);
                     quote! { #s }
                 }
@@ -650,7 +697,7 @@ impl<'a> DisplayFormatContext<'a> {
         }
 
         let names: Vec<_> = name.split('.').collect();
-        if let DisplayFormatContext::Struct(data) = self {
+        if let DisplayContext::Struct(data) = self {
             if names.len() == 1 {
                 let name_idx = name.parse::<usize>();
                 let name_raw = format!("r#{}", name);
@@ -677,9 +724,9 @@ impl<'a> DisplayFormatContext<'a> {
         let mut is_match_binding = false;
 
         let mut expr = match self {
-            DisplayFormatContext::Struct(_) => quote! { self },
-            DisplayFormatContext::Field(member) => quote! { self.#member },
-            DisplayFormatContext::Variant { .. } => {
+            DisplayContext::Struct(_) => quote! { self },
+            DisplayContext::Field(member) => quote! { self.#member },
+            DisplayContext::Variant { .. } => {
                 is_match_binding = true;
                 quote! {}
             }
@@ -697,6 +744,8 @@ impl<'a> DisplayFormatContext<'a> {
         quote! { &#expr }
     }
 }
+
+
 fn to_member(s: &str) -> Member {
     let s_raw;
     let s_new = if !s.parse::<usize>().is_ok() {
@@ -751,5 +800,34 @@ impl FieldKey {
     fn from_ident(ident: &Ident) -> FieldKey {
         Self::from_string(ident.to_string())
     }
+
+
+    fn from_str_deep(s: &str) -> Vec<FieldKey> {
+        if s.is_empty() {
+            Vec::new()
+        } else {
+            s.split('.').map(Self::from_str).collect()
+        }
+    }
+}
+impl std::fmt::Display for FieldKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            FieldKey::Named(s) => write!(f, "{}", s),
+            FieldKey::Unnamed(idx) => write!(f, "{}", idx),
+        }
+    }
 }
 
+fn field_map(fields: &Fields) -> HashMap<FieldKey, &Field> {
+    let mut m = HashMap::new();
+    for (idx, field) in fields.iter().enumerate() {
+        let key = if let Some(ident) = &field.ident {
+            FieldKey::from_ident(ident)
+        } else {
+            FieldKey::Unnamed(idx)
+        };
+        m.insert(key, field);
+    }
+    m
+}
