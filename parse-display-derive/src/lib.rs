@@ -127,6 +127,13 @@ fn build_from_str_body_by_struct(data: &DataStruct, mut tree: FieldTree) -> Toke
     }
 
     let root = &tree.root;
+    let m = field_map(&data.fields);
+    for (key, _) in &root.fields {
+        if !m.contains_key(key) {
+            panic!("field `{}` not found.", key);
+        }
+    }
+
     let code = if root.use_default {
         let mut setters = Vec::new();
         root.visit(|keys, node| {
