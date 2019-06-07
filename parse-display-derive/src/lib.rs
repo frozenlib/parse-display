@@ -514,12 +514,19 @@ impl HelperAttributes {
                     if let NestedMeta::Literal(Lit::Str(s)) = m {
                         self.default_fields.push(s.value());
                     } else {
-                        panic!("{:?} is not allowed in `#[from_str(default(..))]`.", m);
+                        panic!(
+                            "{} is not allowed in `#[from_str(default(..))]`.",
+                            quote!(m)
+                        );
                     }
                 }
             }
             m => {
-                panic!("`{:?}` is not allowed. ({})", m, FROM_STR_HELPER_USAGE);
+                panic!(
+                    "`{}` is not allowed. ({})",
+                    quote!(m),
+                    FROM_STR_HELPER_USAGE
+                );
             }
         }
     }
