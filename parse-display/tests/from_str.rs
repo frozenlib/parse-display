@@ -36,13 +36,19 @@ fn from_str_struct_field_format() {
 #[test]
 fn from_str_struct_field_regex_all() {
     #[derive(FromStr, Debug, Eq, PartialEq)]
-    #[display("{a},{b}")]
+    #[display("{a}{b}")]
     struct TestStruct {
         #[from_str(regex = "[0-9]+")]
         a: u32,
-        b: u32,
+        b: String,
     }
-    assert_from_str("12,50", TestStruct { a: 12, b: 50 });
+    assert_from_str(
+        "12abc",
+        TestStruct {
+            a: 12,
+            b: "abc".into(),
+        },
+    );
 }
 
 #[test]

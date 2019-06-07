@@ -228,7 +228,7 @@ impl FieldTree {
             static ref REGEX_CAPTURE: Regex = Regex::new(r"\(\?P<([_0-9a-zA-Z.]*)>").unwrap();
         }
         let node = self.root.field_by_context(context);
-        let mut capture_next = &mut self.capture_next;
+        let capture_next = &mut self.capture_next;
         let mut has_capture = false;
         let mut s = REGEX_CAPTURE.replace_all(s, |c: &Captures| {
             has_capture = true;
