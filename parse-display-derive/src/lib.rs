@@ -793,28 +793,6 @@ impl<'a> DisplayContext<'a> {
     }
 }
 
-
-// fn binding_var_from_key(key: &FieldKey) -> Ident {
-//     let ident = format!("_value_{}", key);
-//     parse_str(&ident).unwrap()
-// }
-
-// fn binding_var_from_str(s: &str) -> Ident {
-//     let ident = if let Ok(idx) = s.parse::<usize>() {
-//         format!("_value_{}", idx)
-//     } else {
-//         let s = s.trim_start_matches("r#");
-//         format!("_value_{}", s)
-//     };
-//     parse_str(&ident).unwrap()
-// }
-// fn binding_var_from_idx(idx: usize) -> Ident {
-//     parse_str(&format!("_value_{}", idx)).unwrap()
-// }
-// fn binding_var_from_ident(ident: &Ident) -> Ident {
-//     binding_var_from_str(&ident.to_string())
-// }
-
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 enum FieldKey {
     Named(String),
