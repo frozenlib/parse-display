@@ -144,7 +144,7 @@ fn build_from_str_body_by_struct(data: &DataStruct, mut tree: FieldTree) -> Toke
                 let msg = format!("field `{}` parse failed.", join(keys, "."));
                 let setter = quote! {
                     value #(.#keys)* = c.get(#c)
-                        .map(|m| m.as_str()).unwrap_or("")
+                        .map_or("", |m| m.as_str())
                         .parse()
                         .expect(#msg);
                 };
@@ -169,7 +169,7 @@ fn build_from_str_body_by_struct(data: &DataStruct, mut tree: FieldTree) -> Toke
                         if let Some(c) = e.capture {
                             let msg = format!("field `{}` parse failed.", ident);
                             return quote! { #ident : c.get(#c)
-                                .map(|m| m.as_str()).unwrap_or("")
+                                .map_or("", |m| m.as_str())
                                 .parse()
                                 .expect(#msg)
                             };
@@ -188,7 +188,7 @@ fn build_from_str_body_by_struct(data: &DataStruct, mut tree: FieldTree) -> Toke
                         if let Some(c) = e.capture {
                             let msg = format!("field `{}` parse failed.", idx);
                             return quote! { c.get(#c)
-                                .map(|m| m.as_str()).unwrap_or("")
+                                .map_or("", |m| m.as_str())
                                 .parse()
                                 .expect(#msg)
                             };
