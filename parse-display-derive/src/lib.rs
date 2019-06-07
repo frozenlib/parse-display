@@ -218,7 +218,13 @@ impl FieldTree {
         let node = self.root.field_by_context(context);
         let capture_next = &mut self.capture_next;
         let s_debug = REGEX_CAPTURE.replace_all(s, |c: &Captures| {
-            format!("(?P<{}>", c.get(1).unwrap().as_str().replace(".", "-"))
+            let s = c.get(1).unwrap().as_str();
+            let s = if s.is_empty() {
+                "self".into()
+            } else {
+                s.replace(".", "_")
+            };
+            format!("(?P<{}>", s)
         });
         if let Err(e) = regex_syntax::ast::parse::Parser::new().parse(&s_debug) {
             panic!("{}", e);
