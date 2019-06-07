@@ -148,7 +148,7 @@ fn build_from_str_body_by_struct(data: &DataStruct, mut tree: FieldTree) -> Toke
         }
     } else {
         if root.capture.is_some() {
-            panic!("`(?P<>)` (empty capture name) is not allowd in struct's regex.")
+            panic!("`(?P<>)` (empty capture name) is not allowed in struct's regex.")
         }
         let ps = match &data.fields {
             Fields::Named(fields) => {
@@ -445,9 +445,13 @@ struct HelperAttributes {
     default_self: bool,
     default_fields: Vec<String>,
 }
-const DISPLAY_HELPER_USAGE: &str =
-    "available syntax is `#[display(\"format\", style = \"style\")]`";
-const FROM_STR_HELPER_USAGE: &str = "available syntax is `#[from_str(regex = \"regex\")]`";
+const DISPLAY_HELPER_USAGE: &str = "The following syntax are available.
+#[display(\"format\")]
+#[display(style = \"style\")]";
+const FROM_STR_HELPER_USAGE: &str = "The following syntax are available.
+#[from_str(regex = \"regex\")]
+#[from_str(default)]
+#[from_str(default(\"field\", \"field\", ...))]";
 impl HelperAttributes {
     fn from(attrs: &[Attribute]) -> Self {
         let mut has = Self {
@@ -467,7 +471,7 @@ impl HelperAttributes {
                 }
                 Meta::NameValue(nv) if nv.ident == "display" => {
                     panic!(
-                        "`#[display = ..]` is not allowed. ({}).",
+                        "`#[display = ..]` is not allowed. \n{}",
                         DISPLAY_HELPER_USAGE
                     );
                 }
@@ -478,7 +482,7 @@ impl HelperAttributes {
                 }
                 Meta::NameValue(nv) if nv.ident == "from_str" => {
                     panic!(
-                        "`#[from_str = ..]` is not allowed. ({}).",
+                        "`#[from_str = ..]` is not allowed. \n{}",
                         FROM_STR_HELPER_USAGE
                     );
                 }
@@ -507,7 +511,7 @@ impl HelperAttributes {
             }
             m => {
                 panic!(
-                    "`{}` is not allowed. ({})",
+                    "`{}` is not allowed. \n{}",
                     quote! { #m },
                     DISPLAY_HELPER_USAGE
                 );
@@ -536,15 +540,15 @@ impl HelperAttributes {
                     } else {
                         panic!(
                             "{} is not allowed in `#[from_str(default(..))]`.",
-                            quote!(m)
+                            quote!(#m)
                         );
                     }
                 }
             }
             m => {
                 panic!(
-                    "`{}` is not allowed. ({})",
-                    quote!(m),
+                    "`{}` is not allowed. \n{}",
+                    quote!(#m),
                     FROM_STR_HELPER_USAGE
                 );
             }
@@ -753,7 +757,7 @@ impl<'a> DisplayContext<'a> {
         let keys = FieldKey::from_str_deep(name);
         if keys.is_empty() {
             return match self {
-                DisplayContext::Struct(_) => panic!("{} is not allowd in struct format."),
+                DisplayContext::Struct(_) => panic!("{} is not allowed in struct format."),
                 DisplayContext::Field(member) => quote! { &self.#member },
                 DisplayContext::Variant { variant, style } => {
                     let s = ident_to_string(&variant.ident, *style);
