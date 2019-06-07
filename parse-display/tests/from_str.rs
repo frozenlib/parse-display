@@ -87,6 +87,19 @@ fn from_str_struct_default() {
     assert_from_str("12", TestStruct { a: 12, b: 0 });
 }
 
+#[test]
+fn from_str_struct_field_default() {
+    #[derive(FromStr, Debug, Eq, PartialEq, Default)]
+    #[display("{a}")]
+    struct TestStruct {
+        a: u32,
+
+        #[from_str(default)]
+        b: u32,
+    }
+    assert_from_str("12", TestStruct { a: 12, b: 0 });
+}
+
 
 #[test]
 fn from_str_tuple_struct() {

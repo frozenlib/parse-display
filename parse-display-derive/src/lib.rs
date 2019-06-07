@@ -136,7 +136,6 @@ fn derive_from_str_for_struct(input: &DeriveInput, data: &DataStruct) -> TokenSt
     )
 }
 fn build_from_str_body_by_struct(data: &DataStruct, mut tree: FieldTree) -> TokenStream {
-    let regex = tree.build_regex();
     let root = &tree.root;
     let code = if root.use_default {
         let mut setters = Vec::new();
@@ -174,6 +173,8 @@ fn build_from_str_body_by_struct(data: &DataStruct, mut tree: FieldTree) -> Toke
                                 .parse()
                                 .expect(#msg)
                             };
+                        } else if e.use_default {
+                            return quote! { #ident : std::default::Default::default() };
                         }
                     }
                     panic!("`{}` is not appear in format.", ident)
@@ -201,6 +202,7 @@ fn build_from_str_body_by_struct(data: &DataStruct, mut tree: FieldTree) -> Toke
         };
         quote! { return Ok(Self #ps); }
     };
+    let regex = tree.build_regex();
     quote! {
         lazy_static::lazy_static! {
             static ref RE: regex::Regex = regex::Regex::new(#regex).unwrap();
