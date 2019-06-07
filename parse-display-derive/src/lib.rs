@@ -7,6 +7,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use regex::*;
 use regex_syntax::hir::Hir;
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use syn::*;
@@ -226,11 +227,20 @@ impl FieldTree {
         lazy_static! {
             static ref REGEX_CAPTURE: Regex = Regex::new(r"\(\?P<([_0-9a-zA-Z.]*)>").unwrap();
         }
-        let s = REGEX_CAPTURE.replace_all(s, |c: &Captures| {
+        let node = self.root.field_by_context(context);
+        let mut capture_next = &mut self.capture_next;
+        let mut has_capture = false;
+        let mut s = REGEX_CAPTURE.replace_all(s, |c: &Captures| {
+            has_capture = true;
             let keys = FieldKey::from_str_deep(c.get(1).unwrap().as_str());
-            let node = self.root.field_by_context(context).field_deep(keys);
-            format!("(?P<{}>", node.set_capture(&mut self.capture_next))
+            let node = node.field_deep(keys);
+            format!("(?P<{}>", node.set_capture(capture_next))
         });
+        if let FromStrContext::Field(_) = context {
+            if !has_capture {
+                s = Cow::Owned(format!("(?P<{}>{})", node.set_capture(capture_next), &s));
+            }
+        }
         self.hirs.push(to_hir(&s));
     }
     fn push_format(&mut self, format: &DisplayFormat, context: &FromStrContext) {

@@ -22,7 +22,7 @@ fn from_str_struct_format() {
 }
 
 #[test]
-fn from_str_struct_nested_field_format() {
+fn from_str_struct_field_format() {
     #[derive(FromStr, Debug, Eq, PartialEq)]
     #[display("{a},{b}")]
     struct TestStruct {
@@ -31,6 +31,30 @@ fn from_str_struct_nested_field_format() {
         b: u32,
     }
     assert_from_str("--12--,50", TestStruct { a: 12, b: 50 });
+}
+
+#[test]
+fn from_str_struct_field_regex_all() {
+    #[derive(FromStr, Debug, Eq, PartialEq)]
+    #[display("{a},{b}")]
+    struct TestStruct {
+        #[from_str(regex = "[0-9]+")]
+        a: u32,
+        b: u32,
+    }
+    assert_from_str("12,50", TestStruct { a: 12, b: 50 });
+}
+
+#[test]
+fn from_str_struct_field_regex_capture_self() {
+    #[derive(FromStr, Debug, Eq, PartialEq)]
+    #[display("{a},{b}")]
+    struct TestStruct {
+        #[from_str(regex = "---(?P<>[0-9]+)---")]
+        a: u32,
+        b: u32,
+    }
+    assert_from_str("---12---,50", TestStruct { a: 12, b: 50 });
 }
 
 
