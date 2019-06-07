@@ -252,6 +252,7 @@ impl FieldTree {
                 s = Cow::Owned(format!("(?P<{}>{})", node.set_capture(capture_next), &s));
             }
         }
+
         self.hirs.push(to_hir(&s));
     }
     fn push_format(&mut self, format: &DisplayFormat, context: &FromStrContext) {
@@ -285,7 +286,7 @@ impl FieldTree {
 
                     let node = self.root.field_by_context(context).field_deep(keys);
                     let c = node.set_capture(&mut self.capture_next);
-                    self.hirs.push(to_hir(&format!("(?P<{}>.**)", c)));
+                    self.hirs.push(to_hir(&format!("(?P<{}>.*?)", c)));
                 }
             }
         }
