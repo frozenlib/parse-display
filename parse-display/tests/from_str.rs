@@ -8,6 +8,7 @@ fn from_str_newtype() {
     struct TestStruct(u32);
 
     assert_from_str("12", TestStruct(12));
+    assert_from_str_err::<TestStruct>("abc");
 }
 
 #[test]
@@ -293,5 +294,13 @@ fn assert_from_str<T: FromStr + Debug + Eq>(s: &str, value: T) {
         assert_eq!(a, value);
     } else {
         panic!("parse failed.");
+    }
+}
+fn assert_from_str_err<T: FromStr + Debug>(s: &str) {
+    if let Ok(a) = s.parse::<T>() {
+        panic!(
+            "from_str(\"{}\" should return Err. but return `{:?}`.)",
+            s, a
+        );
     }
 }

@@ -167,7 +167,7 @@ fn build_from_str_body_by_struct(data: &DataStruct, mut tree: FieldTree) -> Toke
         if let Some(c) = RE.captures(&s) {
              #code
         }
-        Err(parse_display::ParseError { message : "invalid format." } )
+        Err(parse_display::ParseError::new())
     }
 }
 fn derive_from_str_for_enum(input: &DeriveInput, _data: &DataEnum) -> TokenStream {
@@ -339,7 +339,7 @@ impl FieldEntry {
             Some(quote! { c.get(#c)
                 .map_or("", |m| m.as_str())
                 .parse()
-                .expect(#msg)
+                .map_err(|e| parse_display::ParseError::with_message(#msg))?
             })
         } else if self.use_default {
             Some(quote! { std::default::Default::default() })

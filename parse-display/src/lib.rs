@@ -7,14 +7,28 @@ use std::str::FromStr;
 pub use parse_display_derive::{Display, FromStr};
 
 #[derive(Debug)]
-pub struct ParseError {
-    pub message: &'static str,
-}
-impl Display for ParseError {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "{}", &self.message)
+pub struct ParseError(&'static str);
+impl ParseError {
+    pub fn with_message(message: &'static str) -> Self {
+        Self(message)
+    }
+    pub fn new() -> Self {
+        Self::with_message("parse failed.")
     }
 }
+
+impl Display for ParseError {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+impl std::error::Error for ParseError {
+    fn description(&self) -> &str {
+        self.0
+    }
+}
+
+
 pub fn deserialize_from_str<'de, D, T>(d: D) -> Result<T, D::Error>
 where
     T: FromStr,
