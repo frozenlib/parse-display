@@ -11,16 +11,6 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use syn::*;
 
-macro_rules! expect {
-    ($e:expr, $($arg:tt)*) => {
-        if let Ok(x) = $e {
-            x
-        } else {
-            panic!($($arg)*);
-        }
-    };
-}
-
 #[proc_macro_derive(Display, attributes(display))]
 pub fn derive_display(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
