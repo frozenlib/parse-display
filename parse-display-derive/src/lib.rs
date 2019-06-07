@@ -41,8 +41,6 @@ fn derive_display_for_struct(input: &DeriveInput, data: &DataStruct) -> TokenStr
 }
 fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream {
     fn make_arm(input: &DeriveInput, has: &HelperAttributes, variant: &Variant) -> TokenStream {
-        let enum_ident = &input.ident;
-        let variant_ident = &variant.ident;
         let fields = match &variant.fields {
             Fields::Named(fields) => {
                 let fields = FieldKey::from_fields_named(fields).map(|key| {
@@ -55,9 +53,7 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream 
                 let fields = FieldKey::from_fields_unnamed(fields).map(|key| key.binding_var());
                 quote! { ( #(#fields,)* ) }
             }
-            Fields::Unit => {
-                quote! {}
-            }
+            Fields::Unit => quote! {},
         };
         let has_variant = HelperAttributes::from(&variant.attrs);
 
@@ -72,8 +68,9 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream 
             .or(has.style)
             .unwrap_or(DisplayStyle::None);
 
+        let enum_ident = &input.ident;
+        let variant_ident = &variant.ident;
         let args = format.to_format_args(DisplayContext::Variant { variant, style });
-
         quote! {
             #enum_ident::#variant_ident #fields => {
                 std::write!(f, #args)
@@ -759,8 +756,8 @@ impl<'a> DisplayContext<'a> {
         for key in keys {
             if is_match_binding {
                 is_match_binding = false;
-                let ident = key.binding_var();
-                expr.extend(quote! { #ident });
+                let var = key.binding_var();
+                expr.extend(quote! { #var });
             } else {
                 expr.extend(quote! { .#key });
             }
