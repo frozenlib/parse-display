@@ -284,7 +284,7 @@ fn from_str_unit() {
 #[test]
 fn from_str_enum_unit() {
     #[derive(FromStr, Debug, Eq, PartialEq)]
-    enum TestEnum{
+    enum TestEnum {
         A,
         Bc,
     }
