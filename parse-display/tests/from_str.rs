@@ -281,6 +281,17 @@ fn from_str_unit() {
 }
 
 
+#[test]
+fn from_str_enum_unit() {
+    #[derive(FromStr, Debug, Eq, PartialEq)]
+    enum TestEnum{
+        A,
+        Bc,
+    }
+    assert_from_str("A", TestEnum::A);
+    assert_from_str("Bc", TestEnum::Bc);
+}
+
 fn assert_from_str<T: FromStr + Debug + Eq>(s: &str, value: T) {
     if let Ok(a) = s.parse::<T>() {
         assert_eq!(a, value);

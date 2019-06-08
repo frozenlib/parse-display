@@ -40,7 +40,11 @@ fn derive_display_for_struct(input: &DeriveInput, data: &DataStruct) -> TokenStr
     )
 }
 fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream {
-    fn make_arm(input: &DeriveInput, has: &HelperAttributes, variant: &Variant) -> TokenStream {
+    fn make_arm(
+        input: &DeriveInput,
+        has_enum: &HelperAttributes,
+        variant: &Variant,
+    ) -> TokenStream {
         let fields = match &variant.fields {
             Fields::Named(fields) => {
                 let fields = FieldKey::from_fields_named(fields).map(|key| {
@@ -56,17 +60,12 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream 
             Fields::Unit => quote! {},
         };
         let has_variant = HelperAttributes::from(&variant.attrs);
-
+        let style = DisplayStyle::from_helper_attributes(has_enum, &has_variant);
         let format = has_variant
             .format
-            .or_else(|| has.format.clone())
+            .or_else(|| has_enum.format.clone())
             .or_else(|| DisplayFormat::from_unit_variant(&variant))
             .expect("`#[display(\"format\")]` is required except unit variant.");
-
-        let style = has_variant
-            .style
-            .or(has.style)
-            .unwrap_or(DisplayStyle::None);
 
         let enum_ident = &input.ident;
         let variant_ident = &variant.ident;
@@ -103,8 +102,7 @@ pub fn derive_from_str(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
     }
 }
 fn derive_from_str_for_struct(input: &DeriveInput, data: &DataStruct) -> TokenStream {
-    let tree = FieldTree::from_struct(input, data);
-    let body = build_from_str_body_by_struct(data, tree);
+    let body = FieldTree::from_struct(input, data).build_from_str_body(&data.fields, quote!(Self));
     make_trait_impl(
         input,
         quote! { std::str::FromStr },
@@ -112,77 +110,34 @@ fn derive_from_str_for_struct(input: &DeriveInput, data: &DataStruct) -> TokenSt
             type Err = parse_display::ParseError;
             fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
                 #body
+                Err(parse_display::ParseError::new())
             }
         },
     )
 }
-fn build_from_str_body_by_struct(data: &DataStruct, mut tree: FieldTree) -> TokenStream {
-    fn to_expr(root: &FieldEntry, key: &FieldKey) -> TokenStream {
-        if let Some(e) = root.fields.get(&key) {
-            if let Some(expr) = e.to_expr(std::slice::from_ref(key)) {
-                return expr;
-            }
-        }
-        panic!("field `{}` is not appear in format.", key);
+fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream {
+    let mut body = Vec::new();
+    let has_enum = HelperAttributes::from(&input.attrs);
+    for variant in &data.variants {
+        let enum_ident = &input.ident;
+        let variant_ident = &variant.ident;
+        let ctor = quote! { #enum_ident::#variant_ident };
+        body.push(
+            FieldTree::from_variant(&has_enum, variant).build_from_str_body(&variant.fields, ctor),
+        );
     }
-
-    let root = &tree.root;
-    let m = field_map(&data.fields);
-    for (key, _) in &root.fields {
-        if !m.contains_key(key) {
-            panic!("field `{}` not found.", key);
-        }
-    }
-
-    let code = if root.use_default {
-        let mut setters = Vec::new();
-        root.visit(|keys, node| {
-            if let Some(expr) = node.to_expr(&keys) {
-                setters.push(quote! { value #(.#keys)* = #expr; });
-            }
-        });
+    make_trait_impl(
+        input,
+        quote! { std::str::FromStr },
         quote! {
-            let mut value = <Self as std::default::Default>::default();
-            #(#setters)*
-            return Ok(value);
-        }
-    } else {
-        if root.capture.is_some() {
-            panic!("`(?P<>)` (empty capture name) is not allowed in struct's regex.")
-        }
-        let ps = match &data.fields {
-            Fields::Named(fields) => {
-                let fields = FieldKey::from_fields_named(fields).map(|key| {
-                    let expr = to_expr(root, &key);
-                    quote! { #key : #expr }
-                });
-                quote! { { #(#fields,)* } }
+            type Err = parse_display::ParseError;
+            fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+                #({ #body })*
+                Err(parse_display::ParseError::new())
             }
-            Fields::Unnamed(fields) => {
-                let fields = FieldKey::from_fields_unnamed(fields).map(|key| to_expr(root, &key));
-                quote! { ( #(#fields,)* ) }
-            }
-            Fields::Unit => quote! {},
-        };
-        quote! { return Ok(Self #ps); }
-    };
-    let regex = tree.build_regex();
-    quote! {
-        lazy_static::lazy_static! {
-            static ref RE: regex::Regex = regex::Regex::new(#regex).unwrap();
-        }
-        if let Some(c) = RE.captures(&s) {
-             #code
-        }
-        Err(parse_display::ParseError::new())
-    }
+        },
+    )
 }
-fn derive_from_str_for_enum(input: &DeriveInput, _data: &DataEnum) -> TokenStream {
-    // let has = HelperAttributes::from(&input.attrs);
-
-    unimplemented!()
-}
-
 
 #[derive(Debug)]
 struct FieldTree {
@@ -210,11 +165,20 @@ impl FieldTree {
         let mut s = Self::new();
         s.push_attrs(&has, &FromStrContext::Struct(data));
         s.root.set_default(&has);
-        let m = field_map(&data.fields);
-        for (key, field) in m {
-            let has = HelperAttributes::from(&field.attrs);
-            s.root.field(key).set_default(&has);
+        s.root.set_default_by_fields(&data.fields);
+        s
+    }
+    fn from_variant(has_enum: &HelperAttributes, variant: &Variant) -> Self {
+        let has_variant = &HelperAttributes::from(&variant.attrs);
+        let mut s = Self::new();
+        let style = DisplayStyle::from_helper_attributes(has_enum, has_variant);
+        let context = FromStrContext::Variant { variant, style };
+        if !s.try_push_attrs(has_variant, &context) {
+            s.push_attrs(has_enum, &context);
         }
+        s.root.set_default(has_enum);
+        s.root.set_default(has_variant);
+        s.root.set_default_by_fields(&variant.fields);
         s
     }
 
@@ -253,22 +217,19 @@ impl FieldTree {
         self.hirs.push(to_hir(&s));
     }
     fn push_format(&mut self, format: &DisplayFormat, context: &FromStrContext) {
-        use regex_syntax::hir::*;
         for p in &format.0 {
             match p {
-                DisplayFormatPart::Str(s) => {
-                    for c in s.chars() {
-                        self.hirs.push(Hir::literal(Literal::Unicode(c)));
-                    }
-                }
-                DisplayFormatPart::EscapedBeginBraket => {
-                    self.hirs.push(Hir::literal(Literal::Unicode('{')));
-                }
-                DisplayFormatPart::EscapedEndBraket => {
-                    self.hirs.push(Hir::literal(Literal::Unicode('}')));
-                }
+                DisplayFormatPart::Str(s) => self.push_str(s),
+                DisplayFormatPart::EscapedBeginBraket => self.push_str("{"),
+                DisplayFormatPart::EscapedEndBraket => self.push_str("}"),
                 DisplayFormatPart::Var { name, .. } => {
                     let keys = FieldKey::from_str_deep(&name);
+                    if let FromStrContext::Variant { variant, style } = context {
+                        if keys.is_empty() {
+                            self.push_str(&style.apply(&variant.ident));
+                            continue;
+                        }
+                    }
                     if keys.len() == 1 {
                         if let FromStrContext::Struct(data) = context {
                             let m = field_map(&data.fields);
@@ -288,6 +249,12 @@ impl FieldTree {
             }
         }
     }
+    fn push_str(&mut self, s: &str) {
+        for c in s.chars() {
+            self.hirs
+                .push(Hir::literal(regex_syntax::hir::Literal::Unicode(c)));
+        }
+    }
     fn push_field(&mut self, key: FieldKey, field: &Field) {
         self.push_attrs(
             &HelperAttributes::from(&field.attrs),
@@ -295,19 +262,86 @@ impl FieldTree {
         );
     }
     fn push_attrs(&mut self, has: &HelperAttributes, context: &FromStrContext) {
+        if !self.try_push_attrs(has, context) {
+            self.push_format(&context.default_from_str_format(), context);
+        }
+    }
+    fn try_push_attrs(&mut self, has: &HelperAttributes, context: &FromStrContext) -> bool {
         if let Some(regex) = &has.regex {
             self.push_regex(&regex, context);
-        } else {
-            let format = has.format.clone();
-            let format = format.unwrap_or_else(|| context.default_from_str_format());
+            true
+        } else if let Some(format) = &has.format {
             self.push_format(&format, context);
+            true
+        } else {
+            false
         }
     }
 
-    fn build_regex(&mut self) -> String {
+    fn build_regex(&self) -> String {
         let mut hirs = self.hirs.clone();
         hirs.push(Hir::anchor(regex_syntax::hir::Anchor::EndText));
         Hir::concat(hirs).to_string()
+    }
+    fn build_from_str_body(&self, fields: &Fields, constructor: TokenStream) -> TokenStream {
+        fn to_expr(root: &FieldEntry, key: &FieldKey) -> TokenStream {
+            if let Some(e) = root.fields.get(&key) {
+                if let Some(expr) = e.to_expr(std::slice::from_ref(key)) {
+                    return expr;
+                }
+            }
+            panic!("field `{}` is not appear in format.", key);
+        }
+
+        let root = &self.root;
+        let m = field_map(&fields);
+        for (key, _) in &root.fields {
+            if !m.contains_key(key) {
+                panic!("field `{}` not found.", key);
+            }
+        }
+        let code = if root.use_default {
+            let mut setters = Vec::new();
+            root.visit(|keys, node| {
+                if let Some(expr) = node.to_expr(&keys) {
+                    setters.push(quote! { value #(.#keys)* = #expr; });
+                }
+            });
+            quote! {
+                let mut value = <Self as std::default::Default>::default();
+                #(#setters)*
+                return Ok(value);
+            }
+        } else {
+            if root.capture.is_some() {
+                panic!("`(?P<>)` (empty capture name) is not allowed in struct's regex.")
+            }
+            let ps = match &fields {
+                Fields::Named(fields) => {
+                    let fields = FieldKey::from_fields_named(fields).map(|key| {
+                        let expr = to_expr(root, &key);
+                        quote! { #key : #expr }
+                    });
+                    quote! { { #(#fields,)* } }
+                }
+                Fields::Unnamed(fields) => {
+                    let fields =
+                        FieldKey::from_fields_unnamed(fields).map(|key| to_expr(root, &key));
+                    quote! { ( #(#fields,)* ) }
+                }
+                Fields::Unit => quote! {},
+            };
+            quote! { return Ok(#constructor #ps); }
+        };
+        let regex = self.build_regex();
+        quote! {
+            lazy_static::lazy_static! {
+                static ref RE: regex::Regex = regex::Regex::new(#regex).unwrap();
+            }
+            if let Some(c) = RE.captures(&s) {
+                 #code
+            }
+        }
     }
 }
 impl FieldEntry {
@@ -330,7 +364,7 @@ impl FieldEntry {
     }
     fn field_by_context(&mut self, context: &FromStrContext) -> &mut Self {
         match context {
-            FromStrContext::Struct(_) | FromStrContext::Variant(_) => self,
+            FromStrContext::Struct(_) | FromStrContext::Variant { .. } => self,
             FromStrContext::Field(field) => self.field(field.clone()),
         }
     }
@@ -353,6 +387,14 @@ impl FieldEntry {
             self.field(FieldKey::from_str(field.as_str())).use_default = true;
         }
     }
+    fn set_default_by_fields(&mut self, fields: &Fields) {
+        let m = field_map(fields);
+        for (key, field) in m {
+            let has = HelperAttributes::from(&field.attrs);
+            self.field(key).set_default(&has);
+        }
+    }
+
     fn to_expr(&self, keys: &[FieldKey]) -> Option<TokenStream> {
         if let Some(c) = self.capture {
             let msg = format!("field `{}` parse failed.", join(keys, "."));
@@ -386,18 +428,24 @@ impl FieldEntry {
 }
 enum FromStrContext<'a> {
     Struct(&'a DataStruct),
-    Variant(&'a Variant),
+    Variant {
+        variant: &'a Variant,
+        style: DisplayStyle,
+    },
     Field(FieldKey),
 }
 impl<'a> FromStrContext<'a> {
     fn default_from_str_format(&self) -> DisplayFormat {
+        const ERROR_MESSAGE_FOR_STRUCT:&str="`#[display(\"format\")]` or `#[display(regex = \"regex\")]` is required except newtype pattern.";
+        const ERROR_MESSAGE_FOR_VARIANT:&str="`#[display(\"format\")]` or `#[display(regex = \"regex\")]` is required except unit variant.";
         match self {
             FromStrContext::Struct(data) => {
-                let format = DisplayFormat::from_newtype_struct(data);
-                format.expect("`#[display(\"format\")]` or `#[display(regex = \"regex\")]` is required except newtype pattern.")
+                DisplayFormat::from_newtype_struct(data).expect(ERROR_MESSAGE_FOR_STRUCT)
             }
             FromStrContext::Field(..) => DisplayFormat::from("{}"),
-            _ => unimplemented!(),
+            FromStrContext::Variant { variant, .. } => {
+                DisplayFormat::from_unit_variant(variant).expect(ERROR_MESSAGE_FOR_VARIANT)
+            }
         }
     }
 
@@ -599,58 +647,64 @@ impl DisplayStyle {
             }
         }
     }
-}
-fn ident_to_string(ident: &Ident, style: DisplayStyle) -> String {
-    fn convert_case(c: char, to_upper: bool) -> char {
-        if to_upper {
-            c.to_ascii_uppercase()
-        } else {
-            c.to_ascii_lowercase()
-        }
+    fn from_helper_attributes(has_enum: &HelperAttributes, has_variant: &HelperAttributes) -> Self {
+        has_variant
+            .style
+            .or(has_enum.style)
+            .unwrap_or(DisplayStyle::None)
     }
-
-    let s = ident.to_string();
-    let (line_head, word_head, normal, sep) = match style {
-        DisplayStyle::None => {
-            return s;
-        }
-        DisplayStyle::LowerCase => (false, false, false, ""),
-        DisplayStyle::UpperCase => (true, true, true, ""),
-        DisplayStyle::LowerSnakeCase => (false, false, false, "_"),
-        DisplayStyle::UpperSnakeCase => (true, true, true, "_"),
-        DisplayStyle::LowerCamelCase => (false, true, false, ""),
-        DisplayStyle::UpperCamelCase => (true, true, false, ""),
-        DisplayStyle::LowerKebabCase => (false, false, false, "-"),
-        DisplayStyle::UpperKebabCase => (true, true, true, "-"),
-    };
-    let mut is_line_head = true;
-    let mut is_word_head = true;
-    let mut last = '\0';
-
-    let mut r = String::new();
-
-    for c in s.chars() {
-        if !c.is_alphanumeric() && !c.is_digit(10) {
-            is_word_head = true;
-            continue;
-        }
-        if !is_word_head {
-            if !last.is_ascii_uppercase() && c.is_ascii_uppercase() {
-                is_word_head = true;
+    fn apply(self, ident: &Ident) -> String {
+        fn convert_case(c: char, to_upper: bool) -> char {
+            if to_upper {
+                c.to_ascii_uppercase()
+            } else {
+                c.to_ascii_lowercase()
             }
         }
-        last = c;
-        let (to_upper, sep) = match (is_line_head, is_word_head) {
-            (true, _) => (line_head, ""),
-            (false, true) => (word_head, sep),
-            (false, false) => (normal, ""),
+
+
+        let s = ident.to_string();
+        let (line_head, word_head, normal, sep) = match self {
+            DisplayStyle::None => {
+                return s;
+            }
+            DisplayStyle::LowerCase => (false, false, false, ""),
+            DisplayStyle::UpperCase => (true, true, true, ""),
+            DisplayStyle::LowerSnakeCase => (false, false, false, "_"),
+            DisplayStyle::UpperSnakeCase => (true, true, true, "_"),
+            DisplayStyle::LowerCamelCase => (false, true, false, ""),
+            DisplayStyle::UpperCamelCase => (true, true, false, ""),
+            DisplayStyle::LowerKebabCase => (false, false, false, "-"),
+            DisplayStyle::UpperKebabCase => (true, true, true, "-"),
         };
-        r.push_str(sep);
-        r.push(convert_case(c, to_upper));
-        is_word_head = false;
-        is_line_head = false;
+        let mut is_line_head = true;
+        let mut is_word_head = true;
+        let mut last = '\0';
+
+        let mut r = String::new();
+        for c in s.chars() {
+            if !c.is_alphanumeric() && !c.is_digit(10) {
+                is_word_head = true;
+                continue;
+            }
+            if !is_word_head {
+                if !last.is_ascii_uppercase() && c.is_ascii_uppercase() {
+                    is_word_head = true;
+                }
+            }
+            last = c;
+            let (to_upper, sep) = match (is_line_head, is_word_head) {
+                (true, _) => (line_head, ""),
+                (false, true) => (word_head, sep),
+                (false, false) => (normal, ""),
+            };
+            r.push_str(sep);
+            r.push(convert_case(c, to_upper));
+            is_word_head = false;
+            is_line_head = false;
+        }
+        r
     }
-    r
 }
 
 
@@ -760,7 +814,7 @@ impl<'a> DisplayContext<'a> {
                 DisplayContext::Struct(_) => panic!("{} is not allowed in struct format."),
                 DisplayContext::Field(member) => quote! { &self.#member },
                 DisplayContext::Variant { variant, style } => {
-                    let s = ident_to_string(&variant.ident, *style);
+                    let s = style.apply(&variant.ident);
                     quote! { #s }
                 }
             };

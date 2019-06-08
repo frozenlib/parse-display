@@ -30,6 +30,7 @@ fn display_struct_field() {
     assert_display(TestStruct { a: 1, b: 2 }, "1 --- 2");
 }
 
+
 #[test]
 fn display_struct_field_raw() {
     #[derive(Display)]
