@@ -292,6 +292,44 @@ fn from_str_enum_unit() {
     assert_from_str("Bc", TestEnum::Bc);
 }
 
+#[test]
+fn from_str_enum_style() {
+    #[derive(FromStr, Debug, Eq, PartialEq)]
+    #[display(style = "snake_case")]
+    enum TestEnum {
+        AaaBbb,
+        XyzXyz,
+    }
+    assert_from_str("aaa_bbb", TestEnum::AaaBbb);
+    assert_from_str("xyz_xyz", TestEnum::XyzXyz);
+}
+
+
+#[test]
+fn from_str_enum_format() {
+    #[derive(FromStr, Debug, Eq, PartialEq)]
+    #[display("{}--")]
+    enum TestEnum {
+        A,
+        Bc,
+    }
+    assert_from_str("A--", TestEnum::A);
+    assert_from_str("Bc--", TestEnum::Bc);
+}
+
+#[test]
+fn from_str_enum_regex() {
+    #[derive(FromStr, Debug, Eq, PartialEq)]
+    #[from_str(regex = "(?P<>)--")]
+    enum TestEnum {
+        A,
+        Bc,
+    }
+    assert_from_str("A--", TestEnum::A);
+    assert_from_str("Bc--", TestEnum::Bc);
+}
+
+
 fn assert_from_str<T: FromStr + Debug + Eq>(s: &str, value: T) {
     if let Ok(a) = s.parse::<T>() {
         assert_eq!(a, value);

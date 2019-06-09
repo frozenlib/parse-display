@@ -2,14 +2,18 @@
 
 extern crate proc_macro;
 
+mod regex_utils;
+
 use lazy_static::lazy_static;
 use proc_macro2::TokenStream;
 use quote::quote;
 use regex::*;
 use regex_syntax::hir::Hir;
+use regex_utils::*;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use syn::*;
+
 
 #[proc_macro_derive(Display, attributes(display))]
 pub fn derive_display(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
@@ -208,6 +212,15 @@ impl FieldTree {
             let node = node.field_deep(keys);
             format!("(?P<{}>", node.set_capture(capture_next))
         });
+
+        if let FromStrContext::Variant { variant, style } = context {
+            if let Some(c) = node.capture() {
+                node.capture = None;
+                let value = style.apply(&variant.ident);
+                self.hirs.push(to_hir_with_expand(&s, &c, &value));
+                return;
+            }
+        }
         if let FromStrContext::Field(_) = context {
             if !has_capture {
                 s = Cow::Owned(format!("(?P<{}>{})", node.set_capture(capture_next), &s));
@@ -379,6 +392,10 @@ impl FieldEntry {
         };
         format!("value_{}", c)
     }
+    fn capture(&self) -> Option<String> {
+        self.capture.map(|c| format!("value_{}", c))
+    }
+
     fn set_default(&mut self, has: &HelperAttributes) {
         if has.default_self {
             self.use_default = true;
@@ -451,13 +468,6 @@ impl<'a> FromStrContext<'a> {
 
 }
 
-
-fn to_hir(s: &str) -> Hir {
-    let a = regex_syntax::ast::parse::Parser::new().parse(s).unwrap();
-    regex_syntax::hir::translate::Translator::new()
-        .translate(s, &a)
-        .unwrap()
-}
 
 fn get_newtype_field(data: &DataStruct) -> Option<String> {
     let fields: Vec<_> = data.fields.iter().collect();
