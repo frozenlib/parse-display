@@ -114,7 +114,6 @@ fn derive_from_str_for_struct(input: &DeriveInput, data: &DataStruct) -> TokenSt
             type Err = parse_display::ParseError;
             fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
                 #body
-                Err(parse_display::ParseError::new())
             }
         },
     )
@@ -134,7 +133,6 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream
         let body = quote! {
             let #fn_ident = |s: &str| -> std::result::Result<Self, parse_display::ParseError> {
                 #body
-                Err(parse_display::ParseError::new())
             };
             if let Ok(value) = #fn_ident(s) {
                 return Ok(value);
@@ -367,6 +365,7 @@ impl FieldTree {
             if let Some(c) = RE.captures(&s) {
                  #code
             }
+            Err(parse_display::ParseError::new())
         }
     }
 }
