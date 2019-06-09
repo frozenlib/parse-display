@@ -945,7 +945,7 @@ fn join<T: std::fmt::Display>(s: impl IntoIterator<Item = T>, sep: &str) -> Stri
     let mut sep_current = "";
     let mut buf = String::new();
     for i in s.into_iter() {
-        write!(&mut buf, "{},{}", sep_current, i).unwrap();
+        write!(&mut buf, "{}{}", sep_current, i).unwrap();
         sep_current = sep;
     }
     buf

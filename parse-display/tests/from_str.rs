@@ -1,5 +1,6 @@
 use parse_display::*;
 use std::fmt::Debug;
+use std::fmt::Display;
 use std::str::FromStr;
 
 #[test]
@@ -366,18 +367,30 @@ fn from_str_enum_regex_struct_var() {
     assert_from_str("Bc--20", TestEnum::Bc { x: 20 });
 }
 
+#[test]
+fn from_str_enum_var_failed() {
+    #[derive(FromStr, Debug, PartialEq)]
+    #[display("{0}")]
+    enum TestEnum {
+        A(u32),
+        B(f64),
+    }
+    assert_from_str("1.5", TestEnum::B(1.5));
+}
 
-fn assert_from_str<T: FromStr + Debug + Eq>(s: &str, value: T) {
-    if let Ok(a) = s.parse::<T>() {
-        assert_eq!(a, value);
-    } else {
-        panic!("parse failed.");
+fn assert_from_str<T: FromStr + Debug + PartialEq>(s: &str, value: T)
+where
+    <T as FromStr>::Err: Display,
+{
+    match s.parse::<T>() {
+        Ok(a) => assert_eq!(a, value),
+        Err(e) => panic!("parse failed. ({})", e),
     }
 }
 fn assert_from_str_err<T: FromStr + Debug>(s: &str) {
     if let Ok(a) = s.parse::<T>() {
         panic!(
-            "from_str(\"{}\" should return Err. but return `{:?}`.)",
+            "from_str(\"{}\") should return Err. but return `{:?}`.",
             s, a
         );
     }
