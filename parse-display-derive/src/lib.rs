@@ -120,15 +120,28 @@ fn derive_from_str_for_struct(input: &DeriveInput, data: &DataStruct) -> TokenSt
     )
 }
 fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream {
-    let mut body = Vec::new();
+    let mut bodys = Vec::new();
     let has_enum = HelperAttributes::from(&input.attrs);
+    let mut idx = 0;
     for variant in &data.variants {
         let enum_ident = &input.ident;
         let variant_ident = &variant.ident;
         let ctor = quote! { #enum_ident::#variant_ident };
-        body.push(
-            FieldTree::from_variant(&has_enum, variant).build_from_str_body(&variant.fields, ctor),
-        );
+
+        let body =
+            FieldTree::from_variant(&has_enum, variant).build_from_str_body(&variant.fields, ctor);
+        let fn_ident: Ident = parse_str(&format!("parse_{}", idx)).unwrap();
+        let body = quote! {
+            let #fn_ident = |s: &str| -> std::result::Result<Self, parse_display::ParseError> {
+                #body
+                Err(parse_display::ParseError::new())
+            };
+            if let Ok(value) = #fn_ident(s) {
+                return Ok(value);
+            }
+        };
+        bodys.push(body);
+        idx += 1;
     }
     make_trait_impl(
         input,
@@ -136,7 +149,7 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream
         quote! {
             type Err = parse_display::ParseError;
             fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-                #({ #body })*
+                #({ #bodys })*
                 Err(parse_display::ParseError::new())
             }
         },
