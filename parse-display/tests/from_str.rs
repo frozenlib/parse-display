@@ -318,6 +318,31 @@ fn from_str_enum_format() {
 }
 
 #[test]
+fn from_str_enum_format_struct_var() {
+    #[derive(FromStr, Debug, Eq, PartialEq)]
+    #[display("{}--{x}")]
+    enum TestEnum {
+        A { x: u32 },
+        Bc { x: u32 },
+    }
+    assert_from_str("A--10", TestEnum::A { x: 10 });
+    assert_from_str("Bc--20", TestEnum::Bc { x: 20 });
+}
+
+#[test]
+fn from_str_enum_format_tuple_var() {
+    #[derive(FromStr, Debug, Eq, PartialEq)]
+    #[display("{}--{0}")]
+    enum TestEnum {
+        A(u32),
+        Bc(u32),
+    }
+    assert_from_str("A--10", TestEnum::A(10));
+    assert_from_str("Bc--20", TestEnum::Bc(20));
+}
+
+
+#[test]
 fn from_str_enum_regex() {
     #[derive(FromStr, Debug, Eq, PartialEq)]
     #[from_str(regex = "(?P<>)--")]
@@ -327,6 +352,18 @@ fn from_str_enum_regex() {
     }
     assert_from_str("A--", TestEnum::A);
     assert_from_str("Bc--", TestEnum::Bc);
+}
+
+#[test]
+fn from_str_enum_regex_struct_var() {
+    #[derive(FromStr, Debug, Eq, PartialEq)]
+    #[from_str(regex = "(?P<>)--(?P<x>.*)")]
+    enum TestEnum {
+        A { x: u32 },
+        Bc { x: u32 },
+    }
+    assert_from_str("A--10", TestEnum::A { x: 10 });
+    assert_from_str("Bc--20", TestEnum::Bc { x: 20 });
 }
 
 

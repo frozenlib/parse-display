@@ -382,15 +382,11 @@ impl FieldEntry {
         }
     }
     fn set_capture(&mut self, capture_next: &mut usize) -> String {
-        let c = if let Some(c) = self.capture {
-            c
-        } else {
-            let c = *capture_next;
-            self.capture = Some(c);
+        if self.capture.is_none() {
+            self.capture = Some(*capture_next);
             *capture_next += 1;
-            c
-        };
-        format!("value_{}", c)
+        }
+        format!("value_{}", self.capture.unwrap())
     }
     fn capture(&self) -> Option<String> {
         self.capture.map(|c| format!("value_{}", c))
@@ -413,9 +409,9 @@ impl FieldEntry {
     }
 
     fn to_expr(&self, keys: &[FieldKey]) -> Option<TokenStream> {
-        if let Some(c) = self.capture {
+        if let Some(c) = self.capture() {
             let msg = format!("field `{}` parse failed.", join(keys, "."));
-            Some(quote! { c.get(#c)
+            Some(quote! { c.name(#c)
                 .map_or("", |m| m.as_str())
                 .parse()
                 .map_err(|e| parse_display::ParseError::with_message(#msg))?
