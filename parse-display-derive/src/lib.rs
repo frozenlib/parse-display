@@ -257,15 +257,28 @@ impl FieldTree {
                         }
                     }
                     if keys.len() == 1 {
-                        if let FromStrContext::Struct(data) = context {
-                            let m = field_map(&data.fields);
-                            let key = keys.into_iter().next().unwrap();
-                            if let Some(field) = m.get(&key) {
-                                self.push_field(key, field);
-                                continue;
+                        match context {
+                            FromStrContext::Struct(data) => {
+                                let m = field_map(&data.fields);
+                                let key = keys.into_iter().next().unwrap();
+                                if let Some(field) = m.get(&key) {
+                                    self.push_field(key, field);
+                                    continue;
+                                }
+                                panic!("field `{}` not found.", &key);
                             }
-                            panic!("field `{}` not found.", &key);
+                            FromStrContext::Variant { variant, .. } => {
+                                let m = field_map(&variant.fields);
+                                let key = keys.into_iter().next().unwrap();
+                                if let Some(field) = m.get(&key) {
+                                    self.push_field(key, field);
+                                    continue;
+                                }
+                                panic!("field `{}` not found.", &key);
+                            }
+                            _ => {}
                         }
+
                     }
 
                     let node = self.root.field_by_context(context).field_deep(keys);
