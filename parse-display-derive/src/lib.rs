@@ -257,28 +257,15 @@ impl FieldTree {
                         }
                     }
                     if keys.len() == 1 {
-                        match context {
-                            FromStrContext::Struct(data) => {
-                                let m = field_map(&data.fields);
-                                let key = keys.into_iter().next().unwrap();
-                                if let Some(field) = m.get(&key) {
-                                    self.push_field(key, field);
-                                    continue;
-                                }
-                                panic!("field `{}` not found.", &key);
+                        if let Some(fields) = context.fields() {
+                            let m = field_map(fields);
+                            let key = keys.into_iter().next().unwrap();
+                            if let Some(field) = m.get(&key) {
+                                self.push_field(key, field);
+                                continue;
                             }
-                            FromStrContext::Variant { variant, .. } => {
-                                let m = field_map(&variant.fields);
-                                let key = keys.into_iter().next().unwrap();
-                                if let Some(field) = m.get(&key) {
-                                    self.push_field(key, field);
-                                    continue;
-                                }
-                                panic!("field `{}` not found.", &key);
-                            }
-                            _ => {}
+                            panic!("field `{}` not found.", &key);
                         }
-
                     }
 
                     let node = self.root.field_by_context(context).field_deep(keys);
@@ -486,6 +473,13 @@ impl<'a> FromStrContext<'a> {
             FromStrContext::Variant { variant, .. } => {
                 DisplayFormat::from_unit_variant(variant).expect(ERROR_MESSAGE_FOR_VARIANT)
             }
+        }
+    }
+    fn fields(&self) -> Option<&Fields> {
+        match self {
+            FromStrContext::Struct(data) => Some(&data.fields),
+            FromStrContext::Variant { variant, .. } => Some(&variant.fields),
+            FromStrContext::Field(_) => None,
         }
     }
 
