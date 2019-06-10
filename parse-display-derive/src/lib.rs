@@ -839,7 +839,7 @@ impl<'a> DisplayContext<'a> {
     }
     fn field_expr(&self, key: &FieldKey) -> TokenStream {
         match self {
-            DisplayContext::Struct(_) => quote! { &self.#key },
+            DisplayContext::Struct(_) => quote! { self.#key },
             DisplayContext::Variant { .. } => {
                 let var = key.binding_var();
                 quote! { #var }
