@@ -200,6 +200,7 @@ impl FieldTree {
     fn push_regex(&mut self, s: &str, context: &FromStrContext) {
         lazy_static! {
             static ref REGEX_CAPTURE: Regex = Regex::new(r"\(\?P<([_0-9a-zA-Z.]*)>").unwrap();
+            static ref REGEX_NUMBER: Regex = Regex::new("^[0-9]+$").unwrap();
         }
         let node = self.root.field_by_context(context);
         let capture_next = &mut self.capture_next;
@@ -210,6 +211,7 @@ impl FieldTree {
             } else {
                 s.replace(".", "_")
             };
+            let s = REGEX_NUMBER.replace(&s, "_$0");
             format!("(?P<{}>", s)
         });
         if let Err(e) = regex_syntax::ast::parse::Parser::new().parse(&s_debug) {
