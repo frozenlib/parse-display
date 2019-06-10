@@ -178,7 +178,7 @@ impl FieldTree {
     fn from_struct(input: &DeriveInput, data: &DataStruct) -> Self {
         let has = HelperAttributes::from(&input.attrs);
         let mut s = Self::new();
-        s.push_attrs(&has, &FromStrContext::Struct(data));
+        s.push_attrs(&has, &DisplayContext::Struct(data));
         s.root.set_default(&has);
         s.root.set_default_by_fields(&data.fields);
         s
@@ -187,7 +187,7 @@ impl FieldTree {
         let has_variant = &HelperAttributes::from(&variant.attrs);
         let mut s = Self::new();
         let style = DisplayStyle::from_helper_attributes(has_enum, has_variant);
-        let context = FromStrContext::Variant { variant, style };
+        let context = DisplayContext::Variant { variant, style };
         if !s.try_push_attrs(has_variant, &context) {
             s.push_attrs(has_enum, &context);
         }
@@ -197,7 +197,7 @@ impl FieldTree {
         s
     }
 
-    fn push_regex(&mut self, s: &str, context: &FromStrContext) {
+    fn push_regex(&mut self, s: &str, context: &DisplayContext) {
         lazy_static! {
             static ref REGEX_CAPTURE: Regex = Regex::new(r"\(\?P<([_0-9a-zA-Z.]*)>").unwrap();
             static ref REGEX_NUMBER: Regex = Regex::new("^[0-9]+$").unwrap();
@@ -226,7 +226,7 @@ impl FieldTree {
             format!("(?P<{}>", node.set_capture(capture_next))
         });
 
-        if let FromStrContext::Variant { variant, style } = context {
+        if let DisplayContext::Variant { variant, style } = context {
             if let Some(c) = node.capture() {
                 node.capture = None;
                 let value = style.apply(&variant.ident);
@@ -234,7 +234,7 @@ impl FieldTree {
                 return;
             }
         }
-        if let FromStrContext::Field(_) = context {
+        if let DisplayContext::Field(_) = context {
             if !has_capture {
                 s = Cow::Owned(format!("(?P<{}>{})", node.set_capture(capture_next), &s));
             }
@@ -242,7 +242,7 @@ impl FieldTree {
 
         self.hirs.push(to_hir(&s));
     }
-    fn push_format(&mut self, format: &DisplayFormat, context: &FromStrContext) {
+    fn push_format(&mut self, format: &DisplayFormat, context: &DisplayContext) {
         for p in &format.0 {
             match p {
                 DisplayFormatPart::Str(s) => self.push_str(s),
@@ -250,7 +250,7 @@ impl FieldTree {
                 DisplayFormatPart::EscapedEndBraket => self.push_str("}"),
                 DisplayFormatPart::Var { name, .. } => {
                     let keys = FieldKey::from_str_deep(&name);
-                    if let FromStrContext::Variant { variant, style } = context {
+                    if let DisplayContext::Variant { variant, style } = context {
                         if keys.is_empty() {
                             self.push_str(&style.apply(&variant.ident));
                             continue;
@@ -284,15 +284,15 @@ impl FieldTree {
     fn push_field(&mut self, key: FieldKey, field: &Field) {
         self.push_attrs(
             &HelperAttributes::from(&field.attrs),
-            &FromStrContext::Field(key),
+            &DisplayContext::Field(&key),
         );
     }
-    fn push_attrs(&mut self, has: &HelperAttributes, context: &FromStrContext) {
+    fn push_attrs(&mut self, has: &HelperAttributes, context: &DisplayContext) {
         if !self.try_push_attrs(has, context) {
             self.push_format(&context.default_from_str_format(), context);
         }
     }
-    fn try_push_attrs(&mut self, has: &HelperAttributes, context: &FromStrContext) -> bool {
+    fn try_push_attrs(&mut self, has: &HelperAttributes, context: &DisplayContext) -> bool {
         if let Some(regex) = &has.regex {
             self.push_regex(&regex, context);
             true
@@ -389,10 +389,10 @@ impl FieldEntry {
         }
         node
     }
-    fn field_by_context(&mut self, context: &FromStrContext) -> &mut Self {
+    fn field_by_context(&mut self, context: &DisplayContext) -> &mut Self {
         match context {
-            FromStrContext::Struct(_) | FromStrContext::Variant { .. } => self,
-            FromStrContext::Field(field) => self.field(field.clone()),
+            DisplayContext::Struct(_) | DisplayContext::Variant { .. } => self,
+            DisplayContext::Field(field) => self.field((*field).clone()),
         }
     }
     fn set_capture(&mut self, capture_next: &mut usize) -> String {
@@ -452,37 +452,6 @@ impl FieldEntry {
         let mut keys = Vec::new();
         visit_with(&mut keys, self, &mut visitor)
     }
-}
-enum FromStrContext<'a> {
-    Struct(&'a DataStruct),
-    Variant {
-        variant: &'a Variant,
-        style: DisplayStyle,
-    },
-    Field(FieldKey),
-}
-impl<'a> FromStrContext<'a> {
-    fn default_from_str_format(&self) -> DisplayFormat {
-        const ERROR_MESSAGE_FOR_STRUCT:&str="`#[display(\"format\")]` or `#[display(regex = \"regex\")]` is required except newtype pattern.";
-        const ERROR_MESSAGE_FOR_VARIANT:&str="`#[display(\"format\")]` or `#[display(regex = \"regex\")]` is required except unit variant.";
-        match self {
-            FromStrContext::Struct(data) => {
-                DisplayFormat::from_newtype_struct(data).expect(ERROR_MESSAGE_FOR_STRUCT)
-            }
-            FromStrContext::Field(..) => DisplayFormat::from("{}"),
-            FromStrContext::Variant { variant, .. } => {
-                DisplayFormat::from_unit_variant(variant).expect(ERROR_MESSAGE_FOR_VARIANT)
-            }
-        }
-    }
-    fn fields(&self) -> Option<&Fields> {
-        match self {
-            FromStrContext::Struct(data) => Some(&data.fields),
-            FromStrContext::Variant { variant, .. } => Some(&variant.fields),
-            FromStrContext::Field(_) => None,
-        }
-    }
-
 }
 
 
@@ -817,12 +786,13 @@ enum DisplayFormatPart {
 
 enum DisplayContext<'a> {
     Struct(&'a DataStruct),
-    Field(&'a FieldKey),
     Variant {
         variant: &'a Variant,
         style: DisplayStyle,
     },
+    Field(&'a FieldKey),
 }
+
 
 impl<'a> DisplayContext<'a> {
     fn build_arg(&self, name: &str) -> TokenStream {
@@ -875,6 +845,26 @@ impl<'a> DisplayContext<'a> {
             }
         }
         quote! { &#expr }
+    }
+    fn default_from_str_format(&self) -> DisplayFormat {
+        const ERROR_MESSAGE_FOR_STRUCT:&str="`#[display(\"format\")]` or `#[display(regex = \"regex\")]` is required except newtype pattern.";
+        const ERROR_MESSAGE_FOR_VARIANT:&str="`#[display(\"format\")]` or `#[display(regex = \"regex\")]` is required except unit variant.";
+        match self {
+            DisplayContext::Struct(data) => {
+                DisplayFormat::from_newtype_struct(data).expect(ERROR_MESSAGE_FOR_STRUCT)
+            }
+            DisplayContext::Field(..) => DisplayFormat::from("{}"),
+            DisplayContext::Variant { variant, .. } => {
+                DisplayFormat::from_unit_variant(variant).expect(ERROR_MESSAGE_FOR_VARIANT)
+            }
+        }
+    }
+    fn fields(&self) -> Option<&Fields> {
+        match self {
+            DisplayContext::Struct(data) => Some(&data.fields),
+            DisplayContext::Variant { variant, .. } => Some(&variant.fields),
+            DisplayContext::Field(_) => None,
+        }
     }
 }
 
