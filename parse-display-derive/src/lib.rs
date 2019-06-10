@@ -771,7 +771,7 @@ impl DisplayFormat {
                     format_str.push_str("{:");
                     format_str.push_str(&parameters);
                     format_str.push_str("}");
-                    format_args.push(context.build_format_arg(&name));
+                    format_args.push(context.format_arg(&name));
                 }
             }
         }
@@ -801,7 +801,7 @@ enum DisplayContext<'a> {
 
 
 impl<'a> DisplayContext<'a> {
-    fn build_format_arg(&self, name: &str) -> TokenStream {
+    fn format_arg(&self, name: &str) -> TokenStream {
         let keys = FieldKey::from_str_deep(name);
         if keys.is_empty() {
             return match self {
@@ -819,7 +819,7 @@ impl<'a> DisplayContext<'a> {
                 let key = &keys[0];
                 let m = field_map(fields);
                 let field = m.get(key).expect(&format!("unknown field '{}'.", key));
-                return self.build_format_arg_from_field(field, key);
+                return self.format_arg_of_field(key, field);
             }
         }
         let mut expr = self.field_expr(&keys[0]);
@@ -828,7 +828,7 @@ impl<'a> DisplayContext<'a> {
         }
         expr
     }
-    fn build_format_arg_from_field(&self, field: &Field, key: &FieldKey) -> TokenStream {
+    fn format_arg_of_field(&self, key: &FieldKey, field: &Field) -> TokenStream {
         let has = HelperAttributes::from(&field.attrs);
         if let Some(format) = has.format {
             let args = format.to_format_args(DisplayContext::Field { parent: self, key });
