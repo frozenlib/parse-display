@@ -443,7 +443,9 @@ fn from_str_enum_format_variant_format() {
     enum TestEnum {
         #[display("{} - {0}")]
         A(u32),
-        Bc { x: u32 },
+        Bc {
+            x: u32,
+        },
     }
     assert_from_str("A - 10", TestEnum::A(10));
     assert_from_str("yyy + 50", TestEnum::Bc { x: 50 });
@@ -458,7 +460,9 @@ fn from_str_enum_format_variant_regex() {
         #[from_str(regex = "(?P<>) - (?P<0>.*)")]
         A(u32),
 
-        Bc { x: u32 },
+        Bc {
+            x: u32,
+        },
     }
     assert_from_str("A - 10", TestEnum::A(10));
     assert_from_str("yyy + 50", TestEnum::Bc { x: 50 });
@@ -473,7 +477,9 @@ fn from_str_enum_regex_variant_format() {
         #[display("{} - {0}")]
         A(u32),
 
-        Bc { x: u32 },
+        Bc {
+            x: u32,
+        },
     }
     assert_from_str("A - 10", TestEnum::A(10));
     assert_from_str("yyy + 50", TestEnum::Bc { x: 50 });
@@ -487,7 +493,9 @@ fn from_str_enum_regex_variant_regex() {
         A(u32),
 
         #[from_str(regex = r"yyy \+ (?P<x>.*)")]
-        Bc { x: u32 },
+        Bc {
+            x: u32,
+        },
     }
     assert_from_str("A - 10", TestEnum::A(10));
     assert_from_str("yyy + 50", TestEnum::Bc { x: 50 });
@@ -497,33 +505,38 @@ fn from_str_enum_regex_variant_regex() {
 }
 
 #[test]
-fn from_str_enum_field_format(){
+fn from_str_enum_field_format() {
     #[derive(FromStr, Debug, Eq, PartialEq)]
     enum TestEnum {
         #[display("{} - {0}")]
-        A(#[display("nnn{}")]u32),
+        A(#[display("nnn{}")] u32),
 
         #[display("yyy + {x}")]
-        Bc { #[display("mmm{}")]x: u32 },
+        Bc {
+            #[display("mmm{}")]
+            x: u32,
+        },
     }
     assert_from_str("A - nnn10", TestEnum::A(10));
     assert_from_str("yyy + mmm50", TestEnum::Bc { x: 50 });
 }
 
 #[test]
-fn from_str_enum_field_regex(){
+fn from_str_enum_field_regex() {
     #[derive(FromStr, Debug, Eq, PartialEq)]
     enum TestEnum {
         #[display("{} - {0}")]
-        A(#[from_str(regex = "nnn(?P<>.*)")]u32),
+        A(#[from_str(regex = "nnn(?P<>.*)")] u32),
 
         #[display("yyy + {x}")]
-        Bc { #[from_str(regex = "mmm(?P<>.*)")]x: u32 },
+        Bc {
+            #[from_str(regex = "mmm(?P<>.*)")]
+            x: u32,
+        },
     }
     assert_from_str("A - nnn10", TestEnum::A(10));
     assert_from_str("yyy + mmm50", TestEnum::Bc { x: 50 });
 }
-
 
 
 fn assert_from_str<T: FromStr + Debug + PartialEq>(s: &str, value: T)
@@ -531,7 +544,7 @@ where
     <T as FromStr>::Err: Display,
 {
     match s.parse::<T>() {
-        Ok(a) => assert_eq!(a, value,"input = \"{}\"", s),
+        Ok(a) => assert_eq!(a, value, "input = \"{}\"", s),
         Err(e) => panic!("\"{}\" parse failed. ({})", s, e),
     }
 }

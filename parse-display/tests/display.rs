@@ -508,7 +508,7 @@ fn display_enum_variant_format_record_var_keyword() {
     assert_display(TestEnum::A { r#fn: 10 }, "fn=10");
 }
 
-//#[test]
+#[test]
 fn display_enum_field_format() {
     #[derive(Display)]
     enum TestEnum {
@@ -520,6 +520,7 @@ fn display_enum_field_format() {
     }
     assert_display(TestEnum::A { x: 10 }, "A = ---10");
 }
+
 
 
 fn assert_display<T: Display>(value: T, display: &str) {

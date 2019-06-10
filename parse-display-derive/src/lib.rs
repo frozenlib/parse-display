@@ -234,7 +234,7 @@ impl FieldTree {
                 return;
             }
         }
-        if let DisplayContext::Field(_) = context {
+        if let DisplayContext::Field { .. } = context {
             if !has_capture {
                 s = Cow::Owned(format!("(?P<{}>{})", node.set_capture(capture_next), &s));
             }
@@ -259,12 +259,12 @@ impl FieldTree {
                     if keys.len() == 1 {
                         if let Some(fields) = context.fields() {
                             let m = field_map(fields);
-                            let key = keys.into_iter().next().unwrap();
-                            if let Some(field) = m.get(&key) {
-                                self.push_field(key, field);
+                            let key = &keys[0];
+                            if let Some(field) = m.get(key) {
+                                self.push_field(context, key, field);
                                 continue;
                             }
-                            panic!("field `{}` not found.", &key);
+                            panic!("field `{}` not found.", key);
                         }
                     }
 
@@ -281,10 +281,13 @@ impl FieldTree {
                 .push(Hir::literal(regex_syntax::hir::Literal::Unicode(c)));
         }
     }
-    fn push_field(&mut self, key: FieldKey, field: &Field) {
+    fn push_field(&mut self, context: &DisplayContext, key: &FieldKey, field: &Field) {
         self.push_attrs(
             &HelperAttributes::from(&field.attrs),
-            &DisplayContext::Field(&key),
+            &DisplayContext::Field {
+                parent: context,
+                key,
+            },
         );
     }
     fn push_attrs(&mut self, has: &HelperAttributes, context: &DisplayContext) {
@@ -392,7 +395,7 @@ impl FieldEntry {
     fn field_by_context(&mut self, context: &DisplayContext) -> &mut Self {
         match context {
             DisplayContext::Struct(_) | DisplayContext::Variant { .. } => self,
-            DisplayContext::Field(field) => self.field((*field).clone()),
+            DisplayContext::Field { key, .. } => self.field((*key).clone()),
         }
     }
     fn set_capture(&mut self, capture_next: &mut usize) -> String {
@@ -790,26 +793,20 @@ enum DisplayContext<'a> {
         variant: &'a Variant,
         style: DisplayStyle,
     },
-    Field(&'a FieldKey),
+    Field {
+        parent: &'a DisplayContext<'a>,
+        key: &'a FieldKey,
+    },
 }
 
 
 impl<'a> DisplayContext<'a> {
     fn build_format_arg(&self, name: &str) -> TokenStream {
-        fn build_arg_from_field(field: &Field, key: &FieldKey) -> TokenStream {
-            let has = HelperAttributes::from(&field.attrs);
-            if let Some(format) = has.format {
-                let args = format.to_format_args(DisplayContext::Field(key));
-                quote! { format_args!(#args) }
-            } else {
-                quote! { &self.#key }
-            }
-        }
         let keys = FieldKey::from_str_deep(name);
         if keys.is_empty() {
             return match self {
                 DisplayContext::Struct(_) => panic!("{} is not allowed in struct format."),
-                DisplayContext::Field(member) => quote! { &self.#member },
+                DisplayContext::Field { parent, key } => parent.field_expr(key),
                 DisplayContext::Variant { variant, style } => {
                     let s = style.apply(&variant.ident);
                     quote! { #s }
@@ -817,19 +814,18 @@ impl<'a> DisplayContext<'a> {
             };
         }
 
-        if let DisplayContext::Struct(data) = self {
-            if keys.len() == 1 {
+        if keys.len() == 1 {
+            if let Some(fields) = self.fields() {
                 let key = &keys[0];
-                let m = field_map(&data.fields);
+                let m = field_map(fields);
                 let field = m.get(key).expect(&format!("unknown field '{}'.", key));
-                return build_arg_from_field(field, key);
+                return self.build_format_arg_from_field(field, key);
             }
         }
         let mut is_match_binding = false;
-
         let mut expr = match self {
             DisplayContext::Struct(_) => quote! { self },
-            DisplayContext::Field(key) => quote! { self.#key },
+            DisplayContext::Field { key, .. } => quote! { self.#key },
             DisplayContext::Variant { .. } => {
                 is_match_binding = true;
                 quote! {}
@@ -846,6 +842,33 @@ impl<'a> DisplayContext<'a> {
         }
         quote! { &#expr }
     }
+    fn build_format_arg_from_field(&self, field: &Field, key: &FieldKey) -> TokenStream {
+        let has = HelperAttributes::from(&field.attrs);
+        if let Some(format) = has.format {
+            let args = format.to_format_args(DisplayContext::Field { parent: self, key });
+            quote! { format_args!(#args) }
+        } else {
+            self.field_expr(key)
+        }
+    }
+    fn field_expr(&self, key: &FieldKey) -> TokenStream {
+        match self {
+            DisplayContext::Struct(_) => quote! { &self.#key },
+            DisplayContext::Variant { .. } => {
+                let var = key.binding_var();
+                quote! { #var }
+            }
+            DisplayContext::Field {
+                parent,
+                key: parent_key,
+            } => {
+                let expr = parent.field_expr(parent_key);
+                quote! { #expr.#key }
+            }
+        }
+    }
+
+
     fn default_from_str_format(&self) -> DisplayFormat {
         const ERROR_MESSAGE_FOR_STRUCT:&str="`#[display(\"format\")]` or `#[display(regex = \"regex\")]` is required except newtype pattern.";
         const ERROR_MESSAGE_FOR_VARIANT:&str="`#[display(\"format\")]` or `#[display(regex = \"regex\")]` is required except unit variant.";
@@ -853,17 +876,17 @@ impl<'a> DisplayContext<'a> {
             DisplayContext::Struct(data) => {
                 DisplayFormat::from_newtype_struct(data).expect(ERROR_MESSAGE_FOR_STRUCT)
             }
-            DisplayContext::Field(..) => DisplayFormat::from("{}"),
             DisplayContext::Variant { variant, .. } => {
                 DisplayFormat::from_unit_variant(variant).expect(ERROR_MESSAGE_FOR_VARIANT)
             }
+            DisplayContext::Field { .. } => DisplayFormat::from("{}"),
         }
     }
     fn fields(&self) -> Option<&Fields> {
         match self {
             DisplayContext::Struct(data) => Some(&data.fields),
             DisplayContext::Variant { variant, .. } => Some(&variant.fields),
-            DisplayContext::Field(_) => None,
+            DisplayContext::Field { .. } => None,
         }
     }
 }
