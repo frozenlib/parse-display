@@ -822,25 +822,11 @@ impl<'a> DisplayContext<'a> {
                 return self.build_format_arg_from_field(field, key);
             }
         }
-        let mut is_match_binding = false;
-        let mut expr = match self {
-            DisplayContext::Struct(_) => quote! { self },
-            DisplayContext::Field { key, .. } => quote! { self.#key },
-            DisplayContext::Variant { .. } => {
-                is_match_binding = true;
-                quote! {}
-            }
-        };
-        for key in keys {
-            if is_match_binding {
-                is_match_binding = false;
-                let var = key.binding_var();
-                expr.extend(quote! { #var });
-            } else {
-                expr.extend(quote! { .#key });
-            }
+        let mut expr = self.field_expr(&keys[0]);
+        for key in &keys[1..] {
+            expr.extend(quote! { .#key });
         }
-        quote! { &#expr }
+        expr
     }
     fn build_format_arg_from_field(&self, field: &Field, key: &FieldKey) -> TokenStream {
         let has = HelperAttributes::from(&field.attrs);

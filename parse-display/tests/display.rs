@@ -521,6 +521,50 @@ fn display_enum_field_format() {
     assert_display(TestEnum::A { x: 10 }, "A = ---10");
 }
 
+#[test]
+fn display_enum_field_format_deep() {
+    #[derive(Display)]
+    enum TestEnum {
+        #[display("{} = {x}")]
+        A {
+            #[display("---{l}")]
+            x: TestStruct,
+        },
+    }
+
+    struct TestStruct {
+        l: u32,
+    }
+
+    assert_display(
+        TestEnum::A {
+            x: TestStruct { l: 20 },
+        },
+        "A = ---20",
+    );
+}
+
+#[test]
+fn display_enum_field_format_deep_noncopy() {
+    #[derive(Display)]
+    enum TestEnum {
+        #[display("{} = {x}")]
+        A {
+            #[display("---{l}")]
+            x: TestStruct,
+        },
+    }
+
+    struct TestStruct {
+        l: String,
+    }
+    assert_display(
+        TestEnum::A {
+            x: TestStruct { l: "abc".into() },
+        },
+        "A = ---abc",
+    );
+}
 
 
 fn assert_display<T: Display>(value: T, display: &str) {
