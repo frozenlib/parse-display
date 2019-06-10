@@ -510,6 +510,20 @@ fn from_str_enum_field_format(){
     assert_from_str("yyy + mmm50", TestEnum::Bc { x: 50 });
 }
 
+#[test]
+fn from_str_enum_field_regex(){
+    #[derive(FromStr, Debug, Eq, PartialEq)]
+    enum TestEnum {
+        #[display("{} - {0}")]
+        A(#[from_str(regex = "nnn(?P<>.*)")]u32),
+
+        #[display("yyy + {x}")]
+        Bc { #[from_str(regex = "mmm(?P<>.*)")]x: u32 },
+    }
+    assert_from_str("A - nnn10", TestEnum::A(10));
+    assert_from_str("yyy + mmm50", TestEnum::Bc { x: 50 });
+}
+
 
 
 fn assert_from_str<T: FromStr + Debug + PartialEq>(s: &str, value: T)
