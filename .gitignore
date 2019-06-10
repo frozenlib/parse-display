@@ -1,3 +1,4 @@
 /target
+/parse-display-test/target
 **/*.rs.bk
 Cargo.lock

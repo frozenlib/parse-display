@@ -1,0 +1,8 @@
+[package]
+name = "parse-display-test"
+version = "0.1.0"
+authors = ["frozenlib <frozenlib@users.noreply.github.com>"]
+edition = "2018"
+
+[dependencies]
+parse-display = { version = "0.1.0", path = "../parse-display" }

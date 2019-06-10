@@ -364,8 +364,8 @@ impl FieldTree {
         };
         let regex = self.build_regex();
         quote! {
-            lazy_static::lazy_static! {
-                static ref RE: regex::Regex = regex::Regex::new(#regex).unwrap();
+            parse_display::helpers::lazy_static::lazy_static! {
+                static ref RE: parse_display::helpers::regex::Regex = parse_display::helpers::regex::Regex::new(#regex).unwrap();
             }
             if let Some(c) = RE.captures(&s) {
                  #code

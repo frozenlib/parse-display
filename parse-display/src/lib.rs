@@ -4,6 +4,11 @@ use std::fmt::{Display, Formatter};
 use std::marker::PhantomData;
 use std::str::FromStr;
 
+pub mod helpers {
+    pub use lazy_static;
+    pub use regex;
+}
+
 pub use parse_display_derive::{Display, FromStr};
 
 #[derive(Debug)]
