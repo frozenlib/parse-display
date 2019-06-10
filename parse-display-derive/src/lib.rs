@@ -768,7 +768,7 @@ impl DisplayFormat {
                     format_str.push_str("{:");
                     format_str.push_str(&parameters);
                     format_str.push_str("}");
-                    format_args.push(context.build_arg(&name));
+                    format_args.push(context.build_format_arg(&name));
                 }
             }
         }
@@ -795,7 +795,7 @@ enum DisplayContext<'a> {
 
 
 impl<'a> DisplayContext<'a> {
-    fn build_arg(&self, name: &str) -> TokenStream {
+    fn build_format_arg(&self, name: &str) -> TokenStream {
         fn build_arg_from_field(field: &Field, key: &FieldKey) -> TokenStream {
             let has = HelperAttributes::from(&field.attrs);
             if let Some(format) = has.format {
