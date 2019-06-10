@@ -856,8 +856,8 @@ impl<'a> DisplayContext<'a> {
 
 
     fn default_from_str_format(&self) -> DisplayFormat {
-        const ERROR_MESSAGE_FOR_STRUCT:&str="`#[display(\"format\")]` or `#[display(regex = \"regex\")]` is required except newtype pattern.";
-        const ERROR_MESSAGE_FOR_VARIANT:&str="`#[display(\"format\")]` or `#[display(regex = \"regex\")]` is required except unit variant.";
+        const ERROR_MESSAGE_FOR_STRUCT:&str="`#[display(\"format\")]` or `#[from_str(regex = \"regex\")]` is required except newtype pattern.";
+        const ERROR_MESSAGE_FOR_VARIANT:&str="`#[display(\"format\")]` or `#[from_str(regex = \"regex\")]` is required except unit variant.";
         match self {
             DisplayContext::Struct(data) => {
                 DisplayFormat::from_newtype_struct(data).expect(ERROR_MESSAGE_FOR_STRUCT)
