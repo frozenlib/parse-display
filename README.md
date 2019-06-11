@@ -51,7 +51,7 @@ Specifies the format using a syntax similar to `std::format!()`.
 However, unlike `std::format!()`, the field name is specified in `{}`.
 
 ### Struct format
-By specifying `#[display("..")]`, you can specify the format used by `Display` and `FromStr`.
+By using `#[display("..")]`, you can specify the format used by `Display` and `FromStr`.
 ```rust
 use parse_display::{Display, FromStr};
 
@@ -102,7 +102,7 @@ In enum, you can specify the format for each variant.
 use parse_display::{Display, FromStr};
 
 #[derive(Display, FromStr, PartialEq, Debug)]
-struct MyEnum {
+enum MyEnum {
   #[display("aaa")]
   VarA,
   #[display("bbb")]
@@ -121,7 +121,7 @@ Variant name style (e.g. snake_case, camelCase, ...)  can be specified by `#[fro
 use parse_display::{Display, FromStr};
 
 #[derive(Display, FromStr, PartialEq, Debug)]
-struct MyEnum {
+enum MyEnum {
   #[display("aaa-{}")]
   VarA,
   #[display("bbb-{}")]
@@ -134,7 +134,7 @@ assert_eq!("bbb-VarB".parse(), Ok(MyEnum::VarB));
 
 #[derive(Display, FromStr, PartialEq, Debug)]
 #[display(style = "snake_case")]
-struct MyEnumSnake {
+enum MyEnumSnake {
   #[display("{}")]
   VarA,
 }
@@ -148,7 +148,7 @@ use parse_display::{Display, FromStr};
 
 #[derive(Display, FromStr, PartialEq, Debug)]
 #[display("xxx-{}")]
-struct MyEnum {
+enum MyEnum {
   VarA,
   VarB,
 }
@@ -166,7 +166,7 @@ In this case, variant name is used.
 use parse_display::{Display, FromStr};
 
 #[derive(Display, FromStr, PartialEq, Debug)]
-struct MyEnum {
+enum MyEnum {
   VarA,
   VarB,
 }
