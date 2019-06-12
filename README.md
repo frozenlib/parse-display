@@ -34,6 +34,8 @@ assert_eq!("var_a".parse(), Ok(MyEnum::VarA));
 
 ## Helper attributes
 
+Helper attributes can be written in the following positions.
+
 |             attribute              | struct | enum | variant | field |
 | ---------------------------------- | ------ | ---- | ------- | ----- |
 | `#[display("...")]`                | ✔      | ✔    | ✔       | ✔     |
@@ -52,6 +54,7 @@ However, unlike `std::format!()`, field name is specified in `{}`.
 
 ### Struct format
 By writing `#[display("..")]`, you can specify the format used by `Display` and `FromStr`.
+
 ```rust
 use parse_display::{Display, FromStr};
 
@@ -73,8 +76,8 @@ assert_eq!("10+20".parse(), Ok(MyTuple(10, 20)));
 
 ### Newtype pattern
 
-If the struct has only one field, format can be omitted.
-In this case, that only field is used.
+If the struct has only one field, the format can be omitted.
+In this case, the only field is used.
 ```rust
 use parse_display::{Display, FromStr};
 
@@ -198,19 +201,25 @@ assert_eq!("this is A ___10___".parse(), Ok(MyEnum::VarA(10)));
 
 ### Field chain
 
-The following "field chain" can be used.
+You can use "field chain", e.g. `{x.a}` .
 ```rust
 use parse_display::{Display, FromStr};
 
+#[derive(PartialEq, Debug)]
+struct MyStruct {
+  a: u32,
+  b: u32,
+}
+
 #[derive(Display, PartialEq, Debug)]
 #[display("{x.a}")]
-struct MyNestedStruct {
+struct FieldChain {
   x: MyStruct,  
 }
-assert_eq!(MyNestedStruct { x:MyStruct { a:10, b:20 } }.to_string(), "10");
+assert_eq!(FieldChain { x:MyStruct { a:10, b:20 } }.to_string(), "10");
 ```
 But when using "field chain", you need to use `#[from_str(default)]` to implement `FromStr`. 
-See `#[from_str(default)]` section for detail.
+See `#[from_str(default)]` section for details.
 
 ### Format parameter
 Like `std::format!()`, format parameter can be specified.
@@ -224,6 +233,23 @@ assert_eq!(WithFormatParameter { a:5 }.to_string(), "0005");
 ```
 
 ## `#[display(style = "...")]`
+By writing `#[display(style = "..")]`, you can specify the variant name style.
+The following styles are available.
+
+- none
+- lowercase
+- UPPERCASE
+- snake_case
+- SNAKE_CASE
+- camelCase
+- CamelCase
+- kebab-case
+- KEBAB-CASE
+
+```rust
+// TODO
+```
+
 ## `#[from_str(regex = "...")]`
 ## `#[from_str(default)]`
 ## `#[from_str(default_fields)]`
