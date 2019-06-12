@@ -493,12 +493,12 @@ struct HelperAttributes {
     default_fields: Vec<String>,
 }
 const DISPLAY_HELPER_USAGE: &str = "The following syntax are available.
-#[display(\"format\")]
-#[display(style = \"style\")]";
+#[display(\"...\")]
+#[display(style = \"...\")]";
 const FROM_STR_HELPER_USAGE: &str = "The following syntax are available.
-#[from_str(regex = \"regex\")]
+#[from_str(regex = \"...\")]
 #[from_str(default)]
-#[from_str(default(\"field\", \"field\", ...))]";
+#[from_str(default_fields(...))]";
 impl HelperAttributes {
     fn from(attrs: &[Attribute]) -> Self {
         let mut has = Self {
@@ -580,7 +580,7 @@ impl HelperAttributes {
             NestedMeta::Meta(Meta::Word(ident)) if ident == "default" => {
                 self.default_self = true;
             }
-            NestedMeta::Meta(Meta::List(l)) if l.ident == "default" => {
+            NestedMeta::Meta(Meta::List(l)) if l.ident == "default_fields" => {
                 for m in l.nested.iter() {
                     if let NestedMeta::Literal(Lit::Str(s)) = m {
                         self.default_fields.push(s.value());
