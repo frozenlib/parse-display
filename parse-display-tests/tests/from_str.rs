@@ -284,9 +284,9 @@ fn from_str_struct_default_fields_many() {
     struct TestStruct {
         a: u32,
         b: u32,
-        c:u32
+        c: u32,
     }
-    assert_from_str("12", TestStruct { a: 12, b: 0,c:0 });
+    assert_from_str("12", TestStruct { a: 12, b: 0, c: 0 });
 }
 
 #[test]
@@ -312,7 +312,6 @@ fn from_str_struct_default_fields_ident_keyword() {
     }
     assert_from_str("12", TestStruct { r#fn: 12 });
 }
-
 
 
 #[test]
