@@ -275,6 +275,20 @@ fn from_str_struct_default_fields_str() {
     }
     assert_from_str("12", TestStruct { a: 12, b: 0 });
 }
+
+#[test]
+fn from_str_struct_default_fields_many() {
+    #[derive(FromStr, Debug, Eq, PartialEq, Default)]
+    #[display("{a}")]
+    #[from_str(default_fields(b, "c"))]
+    struct TestStruct {
+        a: u32,
+        b: u32,
+        c:u32
+    }
+    assert_from_str("12", TestStruct { a: 12, b: 0,c:0 });
+}
+
 #[test]
 fn from_str_struct_default_fields_ident() {
     #[derive(FromStr, Debug, Eq, PartialEq, Default)]
@@ -285,6 +299,18 @@ fn from_str_struct_default_fields_ident() {
         b: u32,
     }
     assert_from_str("12", TestStruct { a: 12, b: 0 });
+}
+
+#[test]
+fn from_str_struct_default_fields_ident_keyword() {
+    #[derive(FromStr, Debug, Eq, PartialEq, Default)]
+    #[display("{fn}")]
+    #[from_str(default_fields(fn))]
+    struct TestStruct {
+        r#fn: u32,
+
+    }
+    assert_from_str("12", TestStruct { r#fn: 12 });
 }
 
 
