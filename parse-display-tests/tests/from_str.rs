@@ -265,7 +265,7 @@ fn from_str_tuple_field_default() {
 }
 
 #[test]
-fn from_str_struct_default_fields() {
+fn from_str_struct_default_fields_str() {
     #[derive(FromStr, Debug, Eq, PartialEq, Default)]
     #[display("{a}")]
     #[from_str(default_fields("b"))]
@@ -275,6 +275,18 @@ fn from_str_struct_default_fields() {
     }
     assert_from_str("12", TestStruct { a: 12, b: 0 });
 }
+#[test]
+fn from_str_struct_default_fields_ident() {
+    #[derive(FromStr, Debug, Eq, PartialEq, Default)]
+    #[display("{a}")]
+    #[from_str(default_fields(b))]
+    struct TestStruct {
+        a: u32,
+        b: u32,
+    }
+    assert_from_str("12", TestStruct { a: 12, b: 0 });
+}
+
 
 
 #[test]

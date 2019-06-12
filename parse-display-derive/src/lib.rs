@@ -582,13 +582,20 @@ impl HelperAttributes {
             }
             NestedMeta::Meta(Meta::List(l)) if l.ident == "default_fields" => {
                 for m in l.nested.iter() {
-                    if let NestedMeta::Literal(Lit::Str(s)) = m {
-                        self.default_fields.push(s.value());
-                    } else {
-                        panic!(
-                            "{} is not allowed in `#[from_str(default(..))]`.",
-                            quote!(#m)
-                        );
+                    match m {
+                        NestedMeta::Literal(Lit::Str(s)) => {
+                            self.default_fields.push(s.value());
+                        }
+                        NestedMeta::Meta(Meta::Word(ident)) => {
+                            self.default_fields.push(ident.to_string());
+                        }
+                        _ => {
+                            panic!(
+                                "{} is not allowed in `#[from_str(default_fields(..))]`.",
+                                quote!(#m)
+                            );
+                        }
+
                     }
                 }
             }
@@ -888,8 +895,7 @@ impl FieldKey {
         if let Ok(idx) = s.parse() {
             FieldKey::Unnamed(idx)
         } else {
-            let s = if s.starts_with("r#") { &s[2..] } else { s };
-            FieldKey::Named(s.to_string())
+            FieldKey::Named(trim_raw(s).to_string())
         }
     }
     fn from_string(mut s: String) -> FieldKey {
@@ -969,4 +975,11 @@ fn join<T: std::fmt::Display>(s: impl IntoIterator<Item = T>, sep: &str) -> Stri
         sep_current = sep;
     }
     buf
+}
+fn trim_raw(s: &str) -> &str {
+    if s.starts_with("r#") {
+        &s[2..]
+    } else {
+        s
+    }
 }
