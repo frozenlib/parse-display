@@ -48,10 +48,10 @@ assert_eq!("var_a".parse(), Ok(MyEnum::VarA));
 ## `#[display("...")]`
 
 Specifies the format using a syntax similar to `std::format!()`.  
-However, unlike `std::format!()`, the field name is specified in `{}`.
+However, unlike `std::format!()`, field name is specified in `{}`.
 
 ### Struct format
-By using `#[display("..")]`, you can specify the format used by `Display` and `FromStr`.
+By writing `#[display("..")]`, you can specify the format used by `Display` and `FromStr`.
 ```rust
 use parse_display::{Display, FromStr};
 
@@ -74,7 +74,7 @@ assert_eq!("10+20".parse(), Ok(MyTuple(10, 20)));
 ### Newtype pattern
 
 If the struct has only one field, format can be omitted.
-In this case, that field is used.
+In this case, that only field is used.
 ```rust
 use parse_display::{Display, FromStr};
 
@@ -142,7 +142,7 @@ assert_eq!(MyEnumSnake::VarA.to_string(), "var_a");
 assert_eq!("var_a".parse(), Ok(MyEnumSnake::VarA));
 ```
 
-By specifying a format to enum instead of variant, you can specify the format common to multiple variants.
+By writing a format on enum instead of variant, you can specify the format common to multiple variants.
 ```rust
 use parse_display::{Display, FromStr};
 
@@ -178,6 +178,7 @@ assert_eq!("VarB".parse(), Ok(MyEnum::VarB));
 
 ### Field format
 You can specify the format of the field.
+In field format, `{}` means the field itself.
 ```rust
 use parse_display::{Display, FromStr};
 

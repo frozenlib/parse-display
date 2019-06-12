@@ -1,40 +1,46 @@
-//! This crate provides derive macro `Display` and `FromStr`.  
-//!
-//! # Example
-//!
-//! ```
-//! use parse_display::{Display, FromStr};
-//!
-//! #[derive(Display, FromStr, PartialEq, Debug)]
-//! #[display("{a}-{b}")]
-//! struct MyStruct {
-//!   a: u32,
-//!   b: u32,
-//! }
-//! assert_eq!(MyStruct { a:10, b:20 }.to_string(), "10-20");
-//! assert_eq!("10-20".parse(), Ok(MyStruct { a:10, b:20 }));
-//!
-//! #[derive(Display, FromStr, PartialEq, Debug)]
-//! enum MyEnum {
-//!   VarA,
-//!   VarB,
-//! }
-//! assert_eq!(MyEnum::VarA.to_string(), "VarA");
-//! assert_eq!("VarA".parse(), Ok(MyEnum::VarA));
-//! ```
-//!
-//! # Helper attributes
-//!
-//! |          attribute           | struct | enum | variant | field |
-//! | ---------------------------- | ------ | ---- | ------- | ----- |
-//! | `#[display("...")]`          | ✔      | ✔    | ✔       | ✔     |
-//! | `#[display(style = "...")]`  |        | ✔    | ✔       |       |
-//! | `#[from_str(regex = "...")]` | ✔      | ✔    | ✔       | ✔     |
-//! | `#[from_str(default)]`       | ✔      | ✔    | ✔       | ✔     |
-//!
-//! `#[derive(Display)]` use `#[display]`.  
-//! `#[derive(FromStr)]` use both `#[display]` and `#[from_str]`.
-//!
+/*!
+This crate provides derive macro `Display` and `FromStr`.
+These macros use common helper attributes to specify the format.
+
+# Example
+
+```rust
+use parse_display::{Display, FromStr};
+
+#[derive(Display, FromStr, PartialEq, Debug)]
+#[display("{a}-{b}")]
+struct MyStruct {
+  a: u32,
+  b: u32,
+}
+assert_eq!(MyStruct { a:10, b:20 }.to_string(), "10-20");
+assert_eq!("10-20".parse(), Ok(MyStruct { a:10, b:20 }));
+
+
+#[derive(Display, FromStr, PartialEq, Debug)]
+#[display(style = "snake_case")]
+enum MyEnum {
+  VarA,
+  VarB,
+}
+assert_eq!(MyEnum::VarA.to_string(), "var_a");
+assert_eq!("var_a".parse(), Ok(MyEnum::VarA));
+```
+
+# Helper attributes
+
+|             attribute              | struct | enum | variant | field |
+| ---------------------------------- | ------ | ---- | ------- | ----- |
+| `#[display("...")]`                | ✔      | ✔    | ✔       | ✔     |
+| `#[display(style = "...")]`        | ✔      | ✔    | ✔       |       |
+| `#[from_str(regex = "...")]`       | ✔      | ✔    | ✔       | ✔     |
+| `#[from_str(default)]`             | ✔      | ✔    |         | ✔     |
+| `#[from_str(default_fields(...))]` | ✔      | ✔    | ✔       |       |
+
+`#[derive(Display)]` use `#[display]`.
+`#[derive(FromStr)]` use both `#[display]` and `#[from_str]`.
+
+*/
 
 use std::fmt::{Display, Formatter, Result};
 
