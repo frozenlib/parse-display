@@ -37,7 +37,7 @@ assert_eq!("var_a".parse(), Ok(MyEnum::VarA));
 |             attribute              | struct | enum | variant | field |
 | ---------------------------------- | ------ | ---- | ------- | ----- |
 | `#[display("...")]`                | ✔      | ✔    | ✔       | ✔     |
-| `#[display(style = "...")]`        | ✔      | ✔    | ✔       |       |
+| `#[display(style = "...")]`        |        | ✔    | ✔       |       |
 | `#[from_str(regex = "...")]`       | ✔      | ✔    | ✔       | ✔     |
 | `#[from_str(default)]`             | ✔      | ✔    |         | ✔     |
 | `#[from_str(default_fields(...))]` | ✔      | ✔    | ✔       |       |
@@ -82,18 +82,6 @@ use parse_display::{Display, FromStr};
 struct NewType(u32);
 assert_eq!(NewType(10).to_string(), "10");
 assert_eq!("10".parse(), Ok(NewType(10)));
-```
-
-### Unit struct
-If the struct has no field, format can be omitted.
-In this case, struct name is used.
-```rust
-use parse_display::{Display, FromStr};
-
-#[derive(Display, FromStr, PartialEq, Debug)]
-struct MyUnit;
-assert_eq!(MyUnit.to_string(), "MyUnit");
-assert_eq!("MyUnit".parse(), Ok(MyUnit));
 ```
 
 ### Enum format
