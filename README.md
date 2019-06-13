@@ -7,6 +7,14 @@
 This crate provides derive macro `Display` and `FromStr`.  
 These macros use common helper attributes to specify the format.
 
+## Install 
+
+Add this to your Cargo.toml:
+```toml
+[dependencies]
+parse-display = "0.1"
+```
+
 ## Example
 
 ```rust
@@ -36,13 +44,15 @@ assert_eq!("var_a".parse(), Ok(MyEnum::VarA));
 
 Helper attributes can be written in the following positions.
 
-|             attribute              | struct | enum | variant | field |
-| ---------------------------------- | ------ | ---- | ------- | ----- |
-| `#[display("...")]`                | ✔      | ✔    | ✔       | ✔     |
-| `#[display(style = "...")]`        |        | ✔    | ✔       |       |
-| `#[from_str(regex = "...")]`       | ✔      | ✔    | ✔       | ✔     |
-| `#[from_str(default)]`             | ✔      | ✔    |         | ✔     |
-| `#[from_str(default_fields(...))]` | ✔      | ✔    | ✔       |       |
+|                  attribute                   | struct | enum | variant | field |
+| -------------------------------------------- | ------ | ---- | ------- | ----- |
+| `#[display("...")]`                          | ✔      | ✔    | ✔       | ✔     |
+| `#[display(style = "...")]`                  |        | ✔    | ✔       |       |
+| `#[display(bound = "...")]` (unimplemented)  | ✔      | ✔    |         |       |
+| `#[from_str(regex = "...")]`                 | ✔      | ✔    | ✔       | ✔     |
+| `#[from_str(default)]`                       | ✔      | ✔    |         | ✔     |
+| `#[from_str(default_fields(...))]`           | ✔      | ✔    | ✔       |       |
+| `#[from_str(bound = "...")]` (unimplemented) | ✔      | ✔    |         |       |
 
 `#[derive(Display)]` use `#[display]`.  
 `#[derive(FromStr)]` use both `#[display]` and `#[from_str]`.
@@ -247,12 +257,58 @@ The following styles are available.
 - KEBAB-CASE
 
 ```rust
-// TODO
+#[derive(Display, FromStr, PartialEq, Debug)]
+#[display(style = "snake_case")]
+enum MyEnum {
+  VarA,
+  VarB,
+}
+assert_eq!(MyEnum::VarA.to_string(), "var_a");
+assert_eq!("var_a".parse(), Ok(MyEnum::VarA));
+
+#[derive(Display, FromStr, PartialEq, Debug)]
+enum StyleExample {
+  #[display(style = "none")]
+  VarA1,
+  #[display(style = "none")]
+  varA2,
+  #[display(style = "lowercase")]
+  VarB,
+  #[display(style = "UPPERCASE")]
+  VarC,
+  #[display(style = "snake_case")]
+  VarD,
+  #[display(style = "SNAKE_CASE")]
+  VarE,
+  #[display(style = "camelCase")]
+  VarF,
+  #[display(style = "CamelCase")]
+  VarG1,
+  #[display(style = "CamelCase")]
+  varG2,
+  #[display(style = "kebab-case")]
+  VarH,
+  #[display(style = "KEBAB-CASE")]
+  VarI,
+}
+assert_eq!(StyleExample::VarA1.to_string(), "VarA1");
+assert_eq!(StyleExample::varA2.to_string(), "varA2");
+assert_eq!(StyleExample::VarB.to_string(), "varb");
+assert_eq!(StyleExample::VarC.to_string(), "VARC");
+assert_eq!(StyleExample::VarD.to_string(), "var_d");
+assert_eq!(StyleExample::VarE.to_string(), "VAR_E");
+assert_eq!(StyleExample::VarF.to_string(), "varF");
+assert_eq!(StyleExample::VarG1.to_string(), "VarG1");
+assert_eq!(StyleExample::varG2.to_string(), "VarG2");
+assert_eq!(StyleExample::VarH.to_string(), "var-h");
+assert_eq!(StyleExample::VarI.to_string(), "VAR-I");
 ```
 
 ## `#[from_str(regex = "...")]`
 ## `#[from_str(default)]`
 ## `#[from_str(default_fields)]`
+## `#[display(bound = "...")]` `#[from_str(bound = "...")]`
+TODO...
 
 
 ## License
