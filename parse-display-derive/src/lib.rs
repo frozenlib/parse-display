@@ -2,6 +2,7 @@
 
 extern crate proc_macro;
 
+mod format_syntax;
 mod regex_utils;
 
 use lazy_static::lazy_static;
