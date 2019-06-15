@@ -372,7 +372,19 @@ impl FieldTree {
                 }
                 Fields::Unit => quote! {},
             };
-            quote! { return Ok(#constructor #ps); }
+            let mut setters = Vec::new();
+            root.visit(|keys, node| {
+                if keys.len() >= 2 {
+                    if let Some(expr) = node.to_expr(&keys) {
+                        setters.push(quote! { value #(.#keys)* = #expr; });
+                    }
+                }
+            });
+            quote! {
+                let mut value = #constructor #ps;
+                #(#setters)*
+                return Ok(value);
+            }
         };
         let regex = self.build_regex();
         quote! {

@@ -102,7 +102,7 @@ fn from_str_struct_field_regex_self() {
 }
 
 #[test]
-fn from_str_struct_deep_format() {
+fn from_str_struct_format_chain() {
     #[derive(FromStr, Debug, Eq, PartialEq, Default)]
     #[display("{a.x},{a.y}")]
     #[from_str(default)]
@@ -124,8 +124,35 @@ fn from_str_struct_deep_format() {
         },
     );
 }
+
 #[test]
-fn from_str_struct_field_deep_format() {
+fn from_str_struct_format_chain_default_field() {
+    #[derive(FromStr, Debug, Eq, PartialEq)]
+    #[display("{a.x},{a.y}")]
+    struct TestStruct {
+        #[from_str(default)]
+        a: TestStruct2,
+        
+        #[from_str(default)]
+        b: TestStruct2,
+    }
+
+    #[derive(Debug, Eq, PartialEq, Default)]
+    struct TestStruct2 {
+        x: u32,
+        y: u32,
+    }
+    assert_from_str(
+        "10,50",
+        TestStruct {
+            a: TestStruct2 { x: 10, y: 50 },
+            b: TestStruct2 { x: 0, y: 0 },
+        },
+    );
+}
+
+#[test]
+fn from_str_struct_field_format_chain() {
     #[derive(FromStr, Debug, Eq, PartialEq, Default)]
     #[display("{a}")]
     #[from_str(default)]
@@ -588,7 +615,7 @@ fn from_str_enum_field_regex() {
 }
 
 #[test]
-fn auto_bound_newtype(){
+fn auto_bound_newtype() {
     #[derive(FromStr, Debug, Eq, PartialEq)]
     struct TestNewType<T>(T);
 
@@ -596,10 +623,10 @@ fn auto_bound_newtype(){
 }
 
 #[test]
-fn auto_bound_enum(){
+fn auto_bound_enum() {
     #[derive(FromStr, Debug, Eq, PartialEq)]
     #[display("{0}")]
-    enum TestEnum<T>{    
+    enum TestEnum<T> {
         VarA(T),
     }
 
