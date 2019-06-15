@@ -4,10 +4,10 @@
 [![Docs.rs](https://docs.rs/parse-display/badge.svg)](https://docs.rs/crate/parse-display)
 [![Build Status](https://travis-ci.org/frozenlib/parse-display.svg?branch=master)](https://travis-ci.org/frozenlib/parse-display)
 
-This crate provides derive macro `Display` and `FromStr`.  
+This crate provides derive macro `Display` and `FromStr`.
 These macros use common helper attributes to specify the format.
 
-## Install 
+## Install
 
 Add this to your Cargo.toml:
 ```toml
@@ -52,12 +52,12 @@ Helper attributes can be written in the following positions.
 | `#[from_str(default)]`             | ✔      | ✔    |         | ✔     |
 | `#[from_str(default_fields(...))]` | ✔      | ✔    | ✔       |       |
 
-`#[derive(Display)]` use `#[display]`.  
+`#[derive(Display)]` use `#[display]`.
 `#[derive(FromStr)]` use both `#[display]` and `#[from_str]`.
 
 ## `#[display("...")]`
 
-Specifies the format using a syntax similar to `std::format!()`.  
+Specifies the format using a syntax similar to `std::format!()`.
 However, unlike `std::format!()`, field name is specified in `{}`.
 
 ### Struct format
@@ -78,7 +78,7 @@ assert_eq!("10-20".parse(), Ok(MyStruct { a:10, b:20 }));
 #[derive(Display, FromStr, PartialEq, Debug)]
 #[display("{0}+{1}")]
 struct MyTuple(u32, u32);
-assert_eq!(MyTuple { a:10, b:20 }.to_string(), "10+20");
+assert_eq!(MyTuple(10, 20).to_string(), "10+20");
 assert_eq!("10+20".parse(), Ok(MyTuple(10, 20)));
 ```
 
@@ -113,7 +113,7 @@ assert_eq!("aaa".parse(), Ok(MyEnum::VarA));
 assert_eq!("bbb".parse(), Ok(MyEnum::VarB));
 ```
 
-In enum format, `{}` means variant name.  
+In enum format, `{}` means variant name.
 Variant name style (e.g. snake_case, camelCase, ...)  can be specified by `#[from_str(style = "...")]`. See `#[from_str(style = "...")]` section for details.
 
 ```rust
@@ -185,7 +185,7 @@ use parse_display::{Display, FromStr};
 #[display("{a}, {b}")]
 struct MyStruct {
   #[display("a is {}")]
-  a: u32,  
+  a: u32,
   #[display("b is {}")]
   b: u32,
 }
@@ -222,11 +222,11 @@ struct MyStruct {
 #[derive(Display, PartialEq, Debug)]
 #[display("{x.a}")]
 struct FieldChain {
-  x: MyStruct,  
+  x: MyStruct,
 }
 assert_eq!(FieldChain { x:MyStruct { a:10, b:20 } }.to_string(), "10");
 ```
-But when using "field chain", you need to use `#[from_str(default)]` to implement `FromStr`. 
+But when using "field chain", you need to use `#[from_str(default)]` to implement `FromStr`.
 See `#[from_str(default)]` section for details.
 
 ### Format parameter
@@ -235,7 +235,7 @@ Like `std::format!()`, format parameter can be specified.
 use parse_display::{Display, FromStr};
 
 #[derive(Display, PartialEq, Debug)]
-#[display("{a:04>}")]
+#[display("{a:>04}")]
 struct WithFormatParameter {
   a: u32,
 }
@@ -308,7 +308,7 @@ assert_eq!(StyleExample::VarI.to_string(), "VAR-I");
 
 ## `#[from_str(regex = "...")]`
 
-Specify the format of the string to be input with `FromStr`.  
+Specify the format of the string to be input with `FromStr`.
  `#[display("...")]` is ignored, when this attribute is specified.
 
 ### Capture name
@@ -346,7 +346,7 @@ struct MyStruct {
 assert_eq!("10__20".parse(), Ok(MyStruct { a:10, b:20 }));
 ```
 
-If `#[from_str(regex = "...")]` is not set to field , 
+If `#[from_str(regex = "...")]` is not set to field ,
 it operates in the same way as when `#[from_str(regex = ".*?")]` is set.
 
 
@@ -371,7 +371,7 @@ use parse_display::FromStr;
 
 #[derive(FromStr, PartialEq, Debug)]
 #[from_str(regex = "___(?P<>)___")]
-struct MyEnum {
+enum MyEnum {
   VarA,
 
   #[from_str(regex = "xxx(?P<>)xxx")]
@@ -388,17 +388,18 @@ You can use "field chain" in regex.
 ```rust
 use parse_display::FromStr;
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Default)]
 struct MyStruct {
   a: u32,
 }
 
-#[derive(Display, PartialEq, Debug)]
-#[regex("___(?P<x.a>[0-9]+)")]
+#[derive(FromStr, PartialEq, Debug)]
+#[from_str(regex = "___(?P<x.a>[0-9]+)")]
 struct FieldChain {
-  x: MyStruct,  
+  #[from_str(default)]
+  x: MyStruct,
 }
-assert_eq!(FieldChain { x:MyStruct { a:10 } }.to_string(), "10");
+assert_eq!("___10".parse(), Ok(FieldChain { x:MyStruct { a:10 } }));
 ```
 
 ## `#[from_str(default)]`
@@ -457,7 +458,7 @@ use parse_display::FromStr;
 #[derive(FromStr, PartialEq, Debug)]
 #[display("{}-{a}")]
 #[from_str(default_fields("b", "c"))]
-struct MyEnum {
+enum MyEnum {
   VarA { a:u8, b:u8, c:u8 },
   VarB { a:u8, b:u8, c:u8 },
 }
