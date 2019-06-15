@@ -570,11 +570,40 @@ fn display_enum_field_format_deep_noncopy() {
 fn auto_bound_newtype() {
     #[derive(Display)]
     struct TestNewType<T>(T);
-
     assert_display(TestNewType(10), "10");
-
 }
 
+#[test]
+fn auto_bound_newtype_debug() {
+    #[derive(Display)]
+    #[display("{0:?}")]
+    struct TestNewType<T>(T);
+    assert_display(TestNewType(10), "10");
+}
+
+#[test]
+fn auto_bound_newtype_lower_hex() {
+    #[derive(Display)]
+    #[display("{0:#x}")]
+    struct TestNewType<T>(T);
+    assert_display(TestNewType(10), "0xa");
+}
+
+#[test]
+fn auto_bound_newtype_upper_hex() {
+    #[derive(Display)]
+    #[display("{0:#X}")]
+    struct TestNewType<T>(T);
+    assert_display(TestNewType(10), "0xA");
+}
+
+#[test]
+fn auto_bound_newtype_binary() {
+    #[derive(Display)]
+    #[display("{0:#b}")]
+    struct TestNewType<T>(T);
+    assert_display(TestNewType(10), "0b1010");
+}
 
 fn assert_display<T: Display>(value: T, display: &str) {
     let value_display = format!("{}", value);
