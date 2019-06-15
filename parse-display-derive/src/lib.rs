@@ -1,5 +1,7 @@
 #![recursion_limit = "128"]
 
+//! The documentation for this crate is found in the parse-display crate.
+
 extern crate proc_macro;
 
 mod format_syntax;
