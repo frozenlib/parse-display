@@ -44,15 +44,13 @@ assert_eq!("var_a".parse(), Ok(MyEnum::VarA));
 
 Helper attributes can be written in the following positions.
 
-|                  attribute                   | struct | enum | variant | field |
-| -------------------------------------------- | ------ | ---- | ------- | ----- |
-| `#[display("...")]`                          | ✔      | ✔    | ✔       | ✔     |
-| `#[display(style = "...")]`                  |        | ✔    | ✔       |       |
-| `#[display(bound = "...")]` (unimplemented)  | ✔      | ✔    |         |       |
-| `#[from_str(regex = "...")]`                 | ✔      | ✔    | ✔       | ✔     |
-| `#[from_str(default)]`                       | ✔      | ✔    |         | ✔     |
-| `#[from_str(default_fields(...))]`           | ✔      | ✔    | ✔       |       |
-| `#[from_str(bound = "...")]` (unimplemented) | ✔      | ✔    |         |       |
+|             attribute              | struct | enum | variant | field |
+| ---------------------------------- | ------ | ---- | ------- | ----- |
+| `#[display("...")]`                | ✔      | ✔    | ✔       | ✔     |
+| `#[display(style = "...")]`        |        | ✔    | ✔       |       |
+| `#[from_str(regex = "...")]`       | ✔      | ✔    | ✔       | ✔     |
+| `#[from_str(default)]`             | ✔      | ✔    |         | ✔     |
+| `#[from_str(default_fields(...))]` | ✔      | ✔    | ✔       |       |
 
 `#[derive(Display)]` use `#[display]`.  
 `#[derive(FromStr)]` use both `#[display]` and `#[from_str]`.
@@ -234,6 +232,8 @@ See `#[from_str(default)]` section for details.
 ### Format parameter
 Like `std::format!()`, format parameter can be specified.
 ```rust
+use parse_display::{Display, FromStr};
+
 #[derive(Display, PartialEq, Debug)]
 #[display("{a:04>}")]
 struct WithFormatParameter {
@@ -257,6 +257,8 @@ The following styles are available.
 - KEBAB-CASE
 
 ```rust
+use parse_display::{Display, FromStr};
+
 #[derive(Display, FromStr, PartialEq, Debug)]
 #[display(style = "snake_case")]
 enum MyEnum {
@@ -305,11 +307,164 @@ assert_eq!(StyleExample::VarI.to_string(), "VAR-I");
 ```
 
 ## `#[from_str(regex = "...")]`
-## `#[from_str(default)]`
-## `#[from_str(default_fields)]`
-## `#[display(bound = "...")]` `#[from_str(bound = "...")]`
-TODO...
 
+Specify the format of the string to be input with `FromStr`.  
+ `#[display("...")]` is ignored, when this attribute is specified.
+
+### Capture name
+
+The capture name corresponds to the field name.
+```rust
+use parse_display::FromStr;
+
+#[derive(FromStr, PartialEq, Debug)]
+#[from_str(regex = "(?P<a>[0-9]+)__(?P<b>[0-9]+)")]
+struct MyStruct {
+  a: u8,
+  b: u8,
+}
+
+assert_eq!("10__20".parse(), Ok(MyStruct { a:10, b:20 }));
+```
+
+### Field regex
+
+Set `#[display("...")]` to struct and set `#[from_str(regex = "...")]` to field, regex is used in the position where field name is specified in `#[display("...")]`.
+
+```rust
+use parse_display::FromStr;
+
+#[derive(FromStr, PartialEq, Debug)]
+#[display("{a}__{b}")]
+struct MyStruct {
+  #[from_str(regex = "[0-9]+")]
+  a: u8,
+
+  #[from_str(regex = "[0-9]+")]
+  b: u8,
+}
+assert_eq!("10__20".parse(), Ok(MyStruct { a:10, b:20 }));
+```
+
+If `#[from_str(regex = "...")]` is not set to field , 
+it operates in the same way as when `#[from_str(regex = ".*?")]` is set.
+
+
+```rust
+use parse_display::FromStr;
+
+#[derive(FromStr, PartialEq, Debug)]
+#[display("{a}{b}")]
+struct MyStruct {
+  a: String,
+  b: String,
+}
+assert_eq!("abcdef".parse(), Ok(MyStruct { a:"".into(), b:"abcdef".into() }));
+```
+
+### Variant name
+
+In the regex speficied for enum or variant, empty name capture means variant name.
+
+```rust
+use parse_display::FromStr;
+
+#[derive(FromStr, PartialEq, Debug)]
+#[from_str(regex = "___(?P<>)___")]
+struct MyEnum {
+  VarA,
+
+  #[from_str(regex = "xxx(?P<>)xxx")]
+  VarB,
+}
+assert_eq!("___VarA___".parse(), Ok(MyEnum::VarA));
+assert_eq!("xxxVarBxxx".parse(), Ok(MyEnum::VarB));
+```
+
+### Field chain
+
+You can use "field chain" in regex.
+
+```rust
+use parse_display::FromStr;
+
+#[derive(PartialEq, Debug)]
+struct MyStruct {
+  a: u32,
+}
+
+#[derive(Display, PartialEq, Debug)]
+#[regex("___(?P<x.a>[0-9]+)")]
+struct FieldChain {
+  x: MyStruct,  
+}
+assert_eq!(FieldChain { x:MyStruct { a:10 } }.to_string(), "10");
+```
+
+## `#[from_str(default)]`
+
+If this attribute is specified, the default value is used for fields not included in the input.
+
+If an attribute is specified for struct, the struct's default value is used.
+
+```rust
+use parse_display::FromStr;
+
+#[derive(FromStr, PartialEq, Debug)]
+#[display("{b}")]
+#[from_str(default)]
+struct MyStruct {
+  a: u32,
+  b: u32,
+}
+
+impl Default for MyStruct {
+  fn default() -> Self {
+    Self { a:99, b:99 }
+  }
+}
+assert_eq!("10".parse(), Ok(MyStruct { a:99, b:10 }));
+```
+
+If an attribute is specified for field, the field type's default value is used.
+
+```rust
+use parse_display::FromStr;
+
+#[derive(FromStr, PartialEq, Debug)]
+#[display("{b}")]
+struct MyStruct {
+  #[from_str(default)]
+  a: u32,
+  b: u32,
+}
+
+impl Default for MyStruct {
+  fn default() -> Self {
+    Self { a:99, b:99 }
+  }
+}
+assert_eq!("10".parse(), Ok(MyStruct { a:0, b:10 }));
+```
+
+## `#[from_str(default_fields(...))]`
+
+You can use `#[from_str(default_fields(...))]` if you want to set default values for the same-named fields of multiple variants.
+
+```rust
+use parse_display::FromStr;
+
+#[derive(FromStr, PartialEq, Debug)]
+#[display("{}-{a}")]
+#[from_str(default_fields("b", "c"))]
+struct MyEnum {
+  VarA { a:u8, b:u8, c:u8 },
+  VarB { a:u8, b:u8, c:u8 },
+}
+
+assert_eq!("VarA-10".parse(), Ok(MyEnum::VarA { a:10, b:0, c:0 }));
+assert_eq!("VarB-10".parse(), Ok(MyEnum::VarB { a:10, b:0, c:0 }));
+```
 
 ## License
 This project is dual licensed under Apache-2.0/MIT. See the two LICENSE-* files for details.
