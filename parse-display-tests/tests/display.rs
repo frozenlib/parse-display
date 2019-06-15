@@ -606,22 +606,22 @@ fn auto_bound_newtype_binary() {
 }
 
 #[test]
-fn auto_bound_field(){
+fn auto_bound_field() {
     #[derive(Display)]
     #[display("{a}")]
-    struct TestStruct<T>{
+    struct TestStruct<T> {
         #[display("___{}___")]
-        a:T,
+        a: T,
     }
-    assert_display(TestStruct{a:10}, "___10___");
+    assert_display(TestStruct { a: 10 }, "___10___");
 }
 
 #[test]
-fn auto_bound_enum(){
+fn auto_bound_enum() {
     #[derive(Display)]
     #[display("{0}")]
-    enum TestEnum<T>{
-        VarA(T)
+    enum TestEnum<T> {
+        VarA(T),
     }
     assert_display(TestEnum::VarA(10), "10");
 }
