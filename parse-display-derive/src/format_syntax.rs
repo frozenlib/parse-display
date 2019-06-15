@@ -173,7 +173,6 @@ impl<'a> FormatParameters<'a> {
 impl FromStr for Align {
     type Err = FormatParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        println!("align fromstr input is {}", s);
         Ok(match s {
             "<" => Align::Left,
             ">" => Align::Right,
