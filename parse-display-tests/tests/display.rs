@@ -605,6 +605,27 @@ fn auto_bound_newtype_binary() {
     assert_display(TestNewType(10), "0b1010");
 }
 
+#[test]
+fn auto_bound_field(){
+    #[derive(Display)]
+    #[display("{a}")]
+    struct TestStruct<T>{
+        #[display("___{}___")]
+        a:T,
+    }
+    assert_display(TestStruct{a:10}, "___10___");
+}
+
+#[test]
+fn auto_bound_enum(){
+    #[derive(Display)]
+    #[display("{0}")]
+    enum TestEnum<T>{
+        VarA(T)
+    }
+    assert_display(TestEnum::VarA(10), "10");
+}
+
 fn assert_display<T: Display>(value: T, display: &str) {
     let value_display = format!("{}", value);
     assert_eq!(value_display, display);
