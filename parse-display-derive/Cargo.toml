@@ -1,7 +1,14 @@
 [package]
 name = "parse-display-derive"
 version = "0.1.0"
-authors = ["frozenlib <frozenlib@users.noreply.github.com>"]
+authors = ["frozenlib"]
+license = "MIT/Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/frozenlib/parse-display"
+documentation = "https://docs.rs/parse-display/"
+keywords = ["derive", "enum", "from_str", "display", "regex"]
+categories = ["parsing"]
+description = "Procedural macro to implement Display and FromStr using common settings."
 edition = "2018"
 
 [lib]
