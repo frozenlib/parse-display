@@ -120,7 +120,7 @@
                 "lib"
             ],
             "options": {
-                "cwd": "${workspaceFolder}/parse-display"
+                "cwd": "${workspaceFolder}/parse-display-tests"
             },
             "problemMatcher": [
                 "$rustc"

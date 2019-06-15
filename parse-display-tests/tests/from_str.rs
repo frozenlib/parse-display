@@ -587,6 +587,25 @@ fn from_str_enum_field_regex() {
     assert_from_str("yyy + mmm50", TestEnum::Bc { x: 50 });
 }
 
+#[test]
+fn auto_bound_newtype(){
+    #[derive(FromStr, Debug, Eq, PartialEq)]
+    struct TestNewType<T>(T);
+
+    assert_from_str("10", TestNewType(10));
+}
+
+#[test]
+fn auto_bound_enum(){
+    #[derive(FromStr, Debug, Eq, PartialEq)]
+    #[display("{0}")]
+    enum TestEnum<T>{    
+        VarA(T),
+    }
+
+    assert_from_str("10", TestEnum::VarA(10));
+}
+
 
 fn assert_from_str<T: FromStr + Debug + PartialEq>(s: &str, value: T)
 where

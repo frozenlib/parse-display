@@ -24,7 +24,6 @@ fn to_ast(s: &str) -> Ast {
     regex_syntax::ast::parse::Parser::new().parse(s).unwrap()
 }
 
-
 fn replace_ast(ast: &mut Ast, f: &mut impl FnMut(&mut Ast) -> bool) {
     if !f(ast) {
         return;
@@ -63,4 +62,3 @@ fn expand_capture(ast: &mut Ast, mut f: impl FnMut(&str) -> Option<Ast>) {
         true
     })
 }
-

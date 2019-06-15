@@ -16,7 +16,6 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use syn::*;
 
-
 #[proc_macro_derive(Display, attributes(display))]
 pub fn derive_display(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
@@ -101,7 +100,6 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream 
     make_trait_impl(input, quote! { std::fmt::Display }, wheres, contents)
 }
 
-
 #[proc_macro_derive(FromStr, attributes(display, from_str))]
 pub fn derive_from_str(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
@@ -112,11 +110,14 @@ pub fn derive_from_str(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
     }
 }
 fn derive_from_str_for_struct(input: &DeriveInput, data: &DataStruct) -> TokenStream {
-    let body = FieldTree::from_struct(input, data).build_from_str_body(&data.fields, quote!(Self));
+    let tree = FieldTree::from_struct(input, data);
+    let body = tree.build_from_str_body(&data.fields, quote!(Self));
+    let wheres = tree.build_wheres(&data.fields);
+
     make_trait_impl(
         input,
         quote! { std::str::FromStr },
-        Vec::new(),
+        wheres,
         quote! {
             type Err = parse_display::ParseError;
             fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
@@ -128,14 +129,16 @@ fn derive_from_str_for_struct(input: &DeriveInput, data: &DataStruct) -> TokenSt
 fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream {
     let mut bodys = Vec::new();
     let has_enum = HelperAttributes::from(&input.attrs);
+    let mut wheres = Vec::new();
     let mut idx = 0;
     for variant in &data.variants {
         let enum_ident = &input.ident;
         let variant_ident = &variant.ident;
         let ctor = quote! { #enum_ident::#variant_ident };
 
-        let body =
-            FieldTree::from_variant(&has_enum, variant).build_from_str_body(&variant.fields, ctor);
+        let tree = FieldTree::from_variant(&has_enum, variant);
+        let body = tree.build_from_str_body(&variant.fields, ctor);
+        wheres.extend(tree.build_wheres(&variant.fields));
         let fn_ident: Ident = parse_str(&format!("parse_{}", idx)).unwrap();
         let body = quote! {
             let #fn_ident = |s: &str| -> std::result::Result<Self, parse_display::ParseError> {
@@ -151,7 +154,7 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream
     make_trait_impl(
         input,
         quote! { std::str::FromStr },
-        Vec::new(),
+        wheres,
         quote! {
             type Err = parse_display::ParseError;
             fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
@@ -382,6 +385,19 @@ impl FieldTree {
             Err(parse_display::ParseError::new())
         }
     }
+    fn build_wheres(&self, fields: &Fields) -> Vec<WherePredicate> {
+        let m = field_map(&fields);
+        let mut wheres = Vec::new();
+        for (key, field) in &m {
+            if let Some(e) = self.root.fields.get(&key) {
+                if e.capture.is_some() {
+                    let ty = &field.ty;
+                    wheres.push(parse2(quote!( #ty : std::str::FromStr )).unwrap());
+                }
+            }
+        }
+        wheres
+    }
 }
 impl FieldEntry {
     fn new() -> Self {
@@ -465,7 +481,6 @@ impl FieldEntry {
         visit_with(&mut keys, self, &mut visitor)
     }
 }
-
 
 fn get_newtype_field(data: &DataStruct) -> Option<String> {
     let fields: Vec<_> = data.fields.iter().collect();
@@ -617,7 +632,6 @@ impl HelperAttributes {
                                 quote!(#m)
                             );
                         }
-
                     }
                 }
             }
@@ -690,7 +704,6 @@ impl DisplayStyle {
             }
         }
 
-
         let s = ident.to_string();
         let (line_head, word_head, normal, sep) = match self {
             DisplayStyle::None => {
@@ -734,7 +747,6 @@ impl DisplayStyle {
         r
     }
 }
-
 
 #[derive(Clone)]
 struct DisplayFormat(Vec<DisplayFormatPart>);
@@ -833,7 +845,6 @@ enum DisplayContext<'a> {
     },
 }
 
-
 impl<'a> DisplayContext<'a> {
     fn format_arg(
         &self,
@@ -923,7 +934,6 @@ impl<'a> DisplayContext<'a> {
             }
         }
     }
-
 
     fn default_from_str_format(&self) -> DisplayFormat {
         const ERROR_MESSAGE_FOR_STRUCT:&str="`#[display(\"format\")]` or `#[from_str(regex = \"regex\")]` is required except newtype pattern.";

@@ -52,18 +52,18 @@ pub enum FormatType {
     LowerExp,
     UpperExp,
 }
-impl FormatType{
-    pub fn trait_name(&self)->&str{
-        match self{
-            FormatType::Display=>"Display",
-            FormatType::Debug | FormatType::DebugUpperHex | FormatType::DebugLowerHex=>"Debug",
-            FormatType::Octal=>"Octal",
-            FormatType::LowerHex=>"LowerHex",
-    FormatType::UpperHex=>"UpperHex",
-    FormatType::Pointer=>"Pointer",
-    FormatType::Binary=>"Binary",
-    FormatType::LowerExp=>"LowerExp",
-    FormatType::UpperExp=>"UpperExp",
+impl FormatType {
+    pub fn trait_name(&self) -> &str {
+        match self {
+            FormatType::Display => "Display",
+            FormatType::Debug | FormatType::DebugUpperHex | FormatType::DebugLowerHex => "Debug",
+            FormatType::Octal => "Octal",
+            FormatType::LowerHex => "LowerHex",
+            FormatType::UpperHex => "UpperHex",
+            FormatType::Pointer => "Pointer",
+            FormatType::Binary => "Binary",
+            FormatType::LowerExp => "LowerExp",
+            FormatType::UpperExp => "UpperExp",
         }
     }
 }
@@ -202,7 +202,6 @@ impl FromStr for FormatType {
         })
     }
 }
-
 
 #[cfg(test)]
 mod tests {
