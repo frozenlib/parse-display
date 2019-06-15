@@ -44,13 +44,13 @@ assert_eq!("var_a".parse(), Ok(MyEnum::VarA));
 
 Helper attributes can be written in the following positions.
 
-|             attribute              | struct | enum | variant | field |
-| ---------------------------------- | ------ | ---- | ------- | ----- |
-| `#[display("...")]`                | ✔      | ✔    | ✔       | ✔     |
-| `#[display(style = "...")]`        |        | ✔    | ✔       |       |
-| `#[from_str(regex = "...")]`       | ✔      | ✔    | ✔       | ✔     |
-| `#[from_str(default)]`             | ✔      | ✔    |         | ✔     |
-| `#[from_str(default_fields(...))]` | ✔      | ✔    | ✔       |       |
+|                           attribute                           | struct | enum | variant | field |
+| ------------------------------------------------------------- | ------ | ---- | ------- | ----- |
+| [`#[display("...")]`](#display)                               | ✔      | ✔    | ✔       | ✔     |
+| [`#[display(style = "...")]`](#displaystyle--)                |        | ✔    | ✔       |       |
+| [`#[from_str(regex = "...")]`](#from_strregex--)              | ✔      | ✔    | ✔       | ✔     |
+| [`#[from_str(default)]`](#from_strdefault)                    | ✔      | ✔    |         | ✔     |
+| [`#[from_str(default_fields(...))]`](#from_strdefault_fields) | ✔      | ✔    | ✔       |       |
 
 `#[derive(Display)]` use `#[display]`.
 `#[derive(FromStr)]` use both `#[display]` and `#[from_str]`.
@@ -114,7 +114,7 @@ assert_eq!("bbb".parse(), Ok(MyEnum::VarB));
 ```
 
 In enum format, `{}` means variant name.
-Variant name style (e.g. snake_case, camelCase, ...)  can be specified by `#[from_str(style = "...")]`. See `#[from_str(style = "...")]` section for details.
+Variant name style (e.g. snake_case, camelCase, ...)  can be specified by [`#[from_str(style = "...")]`](#displaystyle--).
 
 ```rust
 use parse_display::{Display, FromStr};
@@ -213,21 +213,23 @@ You can use "field chain", e.g. `{x.a}` .
 ```rust
 use parse_display::{Display, FromStr};
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Default)]
 struct MyStruct {
   a: u32,
   b: u32,
 }
 
-#[derive(Display, PartialEq, Debug)]
+#[derive(FromStr, Display, PartialEq, Debug)]
 #[display("{x.a}")]
 struct FieldChain {
+  #[from_str(default)]
   x: MyStruct,
 }
 assert_eq!(FieldChain { x:MyStruct { a:10, b:20 } }.to_string(), "10");
+assert_eq!("10".parse(), Ok(FieldChain { x:MyStruct { a:10, b:0 } }));
 ```
-But when using "field chain", you need to use `#[from_str(default)]` to implement `FromStr`.
-See `#[from_str(default)]` section for details.
+When using "field chain", you need to use [`#[from_str(default)]`](#from_strdefault) to implement `FromStr`.
+
 
 ### Format parameter
 Like `std::format!()`, format parameter can be specified.
@@ -401,6 +403,8 @@ struct FieldChain {
 }
 assert_eq!("___10".parse(), Ok(FieldChain { x:MyStruct { a:10 } }));
 ```
+
+When using "field chain", you need to use [`#[from_str(default)]`](#from_strdefault).
 
 ## `#[from_str(default)]`
 
