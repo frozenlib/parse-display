@@ -5,12 +5,13 @@ extern crate proc_macro;
 mod format_syntax;
 mod regex_utils;
 
+use crate::format_syntax::*;
+use crate::regex_utils::*;
 use lazy_static::lazy_static;
 use proc_macro2::TokenStream;
 use quote::quote;
 use regex::*;
 use regex_syntax::hir::Hir;
-use regex_utils::*;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use syn::*;
@@ -28,15 +29,17 @@ pub fn derive_display(input: proc_macro::TokenStream) -> proc_macro::TokenStream
 
 fn derive_display_for_struct(input: &DeriveInput, data: &DataStruct) -> TokenStream {
     let has = HelperAttributes::from(&input.attrs);
+    let mut wheres = Vec::new();
     let args = has
         .format
         .or_else(|| DisplayFormat::from_newtype_struct(data))
         .expect("`#[display(\"format\")]` is required except newtype pattern.")
-        .to_format_args(DisplayContext::Struct(&data));
+        .format_args(DisplayContext::Struct(&data), &mut wheres);
 
     make_trait_impl(
         input,
         quote! { std::fmt::Display },
+        wheres,
         quote! {
             fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
                 std::write!(f, #args)
@@ -49,6 +52,7 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream 
         input: &DeriveInput,
         has_enum: &HelperAttributes,
         variant: &Variant,
+        wheres: &mut Vec<WherePredicate>,
     ) -> TokenStream {
         let fields = match &variant.fields {
             Fields::Named(fields) => {
@@ -74,7 +78,7 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream 
 
         let enum_ident = &input.ident;
         let variant_ident = &variant.ident;
-        let args = format.to_format_args(DisplayContext::Variant { variant, style });
+        let args = format.format_args(DisplayContext::Variant { variant, style }, wheres);
         quote! {
             #enum_ident::#variant_ident #fields => {
                 std::write!(f, #args)
@@ -82,18 +86,19 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream 
         }
     }
     let has = HelperAttributes::from(&input.attrs);
-    let arms = data.variants.iter().map(|v| make_arm(input, &has, v));
-    make_trait_impl(
-        input,
-        quote! { std::fmt::Display },
-        quote! {
-            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-                match self {
-                    #(#arms)*
-                }
+    let mut wheres = Vec::new();
+    let arms = data
+        .variants
+        .iter()
+        .map(|v| make_arm(input, &has, v, &mut wheres));
+    let contents = quote! {
+        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            match self {
+                #(#arms)*
             }
-        },
-    )
+        }
+    };
+    make_trait_impl(input, quote! { std::fmt::Display }, wheres, contents)
 }
 
 
@@ -111,6 +116,7 @@ fn derive_from_str_for_struct(input: &DeriveInput, data: &DataStruct) -> TokenSt
     make_trait_impl(
         input,
         quote! { std::str::FromStr },
+        Vec::new(),
         quote! {
             type Err = parse_display::ParseError;
             fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
@@ -145,6 +151,7 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream
     make_trait_impl(
         input,
         quote! { std::str::FromStr },
+        Vec::new(),
         quote! {
             type Err = parse_display::ParseError;
             fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
@@ -288,6 +295,7 @@ impl FieldTree {
             &DisplayContext::Field {
                 parent: context,
                 key,
+                field,
             },
         );
     }
@@ -475,10 +483,23 @@ fn get_newtype_field(data: &DataStruct) -> Option<String> {
 fn make_trait_impl(
     input: &DeriveInput,
     trait_path: TokenStream,
+    mut wheres: Vec<WherePredicate>,
     cotnents: TokenStream,
 ) -> TokenStream {
     let self_id = &input.ident;
     let (impl_g, self_g, impl_where) = input.generics.split_for_impl();
+
+    if let Some(impl_where) = impl_where {
+        for w in impl_where.predicates.iter() {
+            wheres.push(w.clone());
+        }
+    }
+    let impl_where = if wheres.is_empty() {
+        quote! {}
+    } else {
+        quote! { where #(#wheres,)*}
+    };
+
     quote! {
         impl #impl_g #trait_path for #self_id #self_g #impl_where {
             #cotnents
@@ -766,7 +787,11 @@ impl DisplayFormat {
         }
     }
 
-    fn to_format_args(&self, context: DisplayContext) -> TokenStream {
+    fn format_args(
+        &self,
+        context: DisplayContext,
+        wheres: &mut Vec<WherePredicate>,
+    ) -> TokenStream {
         let mut format_str = String::new();
         let mut format_args = Vec::new();
         for p in &self.0 {
@@ -779,7 +804,7 @@ impl DisplayFormat {
                     format_str.push_str("{:");
                     format_str.push_str(&parameters);
                     format_str.push_str("}");
-                    format_args.push(context.format_arg(&name));
+                    format_args.push(context.format_arg(&name, &parameters, wheres));
                 }
             }
         }
@@ -803,18 +828,26 @@ enum DisplayContext<'a> {
     },
     Field {
         parent: &'a DisplayContext<'a>,
+        field: &'a Field,
         key: &'a FieldKey,
     },
 }
 
 
 impl<'a> DisplayContext<'a> {
-    fn format_arg(&self, name: &str) -> TokenStream {
+    fn format_arg(
+        &self,
+        name: &str,
+        parameters: &str,
+        wheres: &mut Vec<WherePredicate>,
+    ) -> TokenStream {
         let keys = FieldKey::from_str_deep(name);
         if keys.is_empty() {
             return match self {
                 DisplayContext::Struct(_) => panic!("{} is not allowed in struct format."),
-                DisplayContext::Field { parent, key } => parent.field_expr(key),
+                DisplayContext::Field { parent, field, key } => {
+                    parent.format_arg_by_field_expr(key, field, parameters, wheres)
+                }
                 DisplayContext::Variant { variant, style } => {
                     let s = style.apply(&variant.ident);
                     quote! { #s }
@@ -827,7 +860,7 @@ impl<'a> DisplayContext<'a> {
                 let key = &keys[0];
                 let m = field_map(fields);
                 let field = m.get(key).expect(&format!("unknown field '{}'.", key));
-                return self.format_arg_of_field(key, field);
+                return self.format_arg_of_field(key, field, parameters, wheres);
             }
         }
         let mut expr = self.field_expr(&keys[0]);
@@ -836,15 +869,43 @@ impl<'a> DisplayContext<'a> {
         }
         expr
     }
-    fn format_arg_of_field(&self, key: &FieldKey, field: &Field) -> TokenStream {
+    fn format_arg_of_field(
+        &self,
+        key: &FieldKey,
+        field: &Field,
+        parameters: &str,
+        wheres: &mut Vec<WherePredicate>,
+    ) -> TokenStream {
         let has = HelperAttributes::from(&field.attrs);
         if let Some(format) = has.format {
-            let args = format.to_format_args(DisplayContext::Field { parent: self, key });
+            let args = format.format_args(
+                DisplayContext::Field {
+                    parent: self,
+                    field,
+                    key,
+                },
+                wheres,
+            );
             quote! { format_args!(#args) }
         } else {
-            self.field_expr(key)
+            self.format_arg_by_field_expr(key, field, parameters, wheres)
         }
     }
+    fn format_arg_by_field_expr(
+        &self,
+        key: &FieldKey,
+        field: &Field,
+        parameters: &str,
+        wheres: &mut Vec<WherePredicate>,
+    ) -> TokenStream {
+        let ty = &field.ty;
+        let ps = FormatParameters::from(&parameters).expect("invalid format parameters.");
+        let tr = ps.format_type.trait_name();
+        let tr: Ident = parse_str(tr).unwrap();
+        wheres.push(parse2(quote!(#ty : std::fmt::#tr)).unwrap());
+        self.field_expr(key)
+    }
+
     fn field_expr(&self, key: &FieldKey) -> TokenStream {
         match self {
             DisplayContext::Struct(_) => quote! { self.#key },
@@ -855,6 +916,7 @@ impl<'a> DisplayContext<'a> {
             DisplayContext::Field {
                 parent,
                 key: parent_key,
+                ..
             } => {
                 let expr = parent.field_expr(parent_key);
                 quote! { #expr.#key }

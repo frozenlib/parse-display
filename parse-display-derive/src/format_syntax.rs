@@ -20,14 +20,14 @@ pub enum Align {
 
 #[derive(Debug, PartialEq, Eq, Default)]
 pub struct FormatParameters<'a> {
-    fill: Option<char>,
-    align: Option<Align>,
-    sign: Option<Sign>,
-    is_alternate: bool,
-    is_zero: bool,
-    width: Option<SubArg<'a, usize>>,
-    precision: Option<SubArg<'a, usize>>,
-    format_type: FormatType,
+    pub fill: Option<char>,
+    pub align: Option<Align>,
+    pub sign: Option<Sign>,
+    pub is_alternate: bool,
+    pub is_zero: bool,
+    pub width: Option<SubArg<'a, usize>>,
+    pub precision: Option<SubArg<'a, usize>>,
+    pub format_type: FormatType,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -52,6 +52,22 @@ pub enum FormatType {
     LowerExp,
     UpperExp,
 }
+impl FormatType{
+    pub fn trait_name(&self)->&str{
+        match self{
+            FormatType::Display=>"Display",
+            FormatType::Debug | FormatType::DebugUpperHex | FormatType::DebugLowerHex=>"Debug",
+            FormatType::Octal=>"Octal",
+            FormatType::LowerHex=>"LowerHex",
+    FormatType::UpperHex=>"UpperHex",
+    FormatType::Pointer=>"Pointer",
+    FormatType::Binary=>"Binary",
+    FormatType::LowerExp=>"LowerExp",
+    FormatType::UpperExp=>"UpperExp",
+        }
+    }
+}
+
 impl Default for FormatType {
     fn default() -> Self {
         FormatType::Display
