@@ -528,6 +528,7 @@ fn make_trait_impl(
     };
 
     quote! {
+        #[automatically_derived]
         impl #impl_g #trait_path for #self_id #self_g #impl_where {
             #cotnents
         }
