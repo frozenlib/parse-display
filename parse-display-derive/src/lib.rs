@@ -132,8 +132,7 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream
     let mut bodys = Vec::new();
     let has_enum = HelperAttributes::from(&input.attrs);
     let mut wheres = Vec::new();
-    let mut idx = 0;
-    for variant in &data.variants {
+    for (idx, variant) in data.variants.iter().enumerate() {
         let enum_ident = &input.ident;
         let variant_ident = &variant.ident;
         let ctor = quote! { #enum_ident::#variant_ident };
@@ -151,7 +150,6 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream
             }
         };
         bodys.push(body);
-        idx += 1;
     }
     make_trait_impl(
         input,
@@ -338,7 +336,7 @@ impl FieldTree {
 
         let root = &self.root;
         let m = field_map(&fields);
-        for (key, _) in &root.fields {
+        for key in root.fields.keys() {
             if !m.contains_key(key) {
                 panic!("field `{}` not found.", key);
             }
@@ -422,7 +420,7 @@ impl FieldEntry {
         }
     }
     fn field(&mut self, key: FieldKey) -> &mut Self {
-        self.fields.entry(key).or_insert(Self::new())
+        self.fields.entry(key).or_insert_with(Self::new)
     }
     fn field_deep(&mut self, keys: Vec<FieldKey>) -> &mut Self {
         let mut node = self;
@@ -742,11 +740,7 @@ impl DisplayStyle {
                 is_word_head = true;
                 continue;
             }
-            if !is_word_head {
-                if !last.is_ascii_uppercase() && c.is_ascii_uppercase() {
-                    is_word_head = true;
-                }
-            }
+            is_word_head = is_word_head || (!last.is_ascii_uppercase() && c.is_ascii_uppercase());
             last = c;
             let (to_upper, sep) = match (is_line_head, is_word_head) {
                 (true, _) => (line_head, ""),
@@ -869,7 +863,7 @@ impl<'a> DisplayContext<'a> {
         let keys = FieldKey::from_str_deep(name);
         if keys.is_empty() {
             return match self {
-                DisplayContext::Struct(_) => panic!("{} is not allowed in struct format."),
+                DisplayContext::Struct(_) => panic!("{{}} is not allowed in struct format."),
                 DisplayContext::Field { parent, field, key } => {
                     parent.format_arg_by_field_expr(key, field, parameters, wheres)
                 }
@@ -884,7 +878,9 @@ impl<'a> DisplayContext<'a> {
             if let Some(fields) = self.fields() {
                 let key = &keys[0];
                 let m = field_map(fields);
-                let field = m.get(key).expect(&format!("unknown field '{}'.", key));
+                let field = m
+                    .get(key)
+                    .unwrap_or_else(|| panic!("unknown field '{}'.", key));
                 return self.format_arg_of_field(key, field, parameters, wheres);
             }
         }
@@ -1013,7 +1009,7 @@ impl FieldKey {
     }
     fn from_fields_unnamed(fields: &FieldsUnnamed) -> impl Iterator<Item = FieldKey> {
         let len = fields.unnamed.len();
-        (0..len).map(|idx| FieldKey::Unnamed(idx))
+        (0..len).map(FieldKey::Unnamed)
     }
 
     fn to_member(&self) -> Member {
