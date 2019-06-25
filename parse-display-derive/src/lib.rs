@@ -462,20 +462,6 @@ impl FieldEntry {
         }
     }
 
-    fn to_expr(&self, keys: &[FieldKey]) -> Option<TokenStream> {
-        if let Some(c) = self.capture() {
-            let msg = format!("field `{}` parse failed.", join(keys, "."));
-            Some(quote! { c.name(#c)
-                .map_or("", |m| m.as_str())
-                .parse()
-                .map_err(|e| parse_display::ParseError::with_message(#msg))?
-            })
-        } else if self.use_default {
-            Some(quote! { std::default::Default::default() })
-        } else {
-            None
-        }
-    }
     fn visit(&self, mut visitor: impl FnMut(&[FieldKey], &Self)) {
         fn visit_with(
             keys: &mut Vec<FieldKey>,
@@ -491,6 +477,20 @@ impl FieldEntry {
         }
         let mut keys = Vec::new();
         visit_with(&mut keys, self, &mut visitor)
+    }
+    fn to_expr(&self, keys: &[FieldKey]) -> Option<TokenStream> {
+        if let Some(c) = self.capture() {
+            let msg = format!("field `{}` parse failed.", join(keys, "."));
+            Some(quote! { c.name(#c)
+                .map_or("", |m| m.as_str())
+                .parse()
+                .map_err(|e| parse_display::ParseError::with_message(#msg))?
+            })
+        } else if self.use_default {
+            Some(quote! { std::default::Default::default() })
+        } else {
+            None
+        }
     }
 }
 
@@ -511,14 +511,14 @@ fn make_trait_impl(
     input: &DeriveInput,
     trait_path: TokenStream,
     mut wheres: Vec<WherePredicate>,
-    cotnents: TokenStream,
+    contents: TokenStream,
 ) -> TokenStream {
     let self_id = &input.ident;
     let (impl_g, self_g, impl_where) = input.generics.split_for_impl();
 
     if let Some(impl_where) = impl_where {
         for w in impl_where.predicates.iter() {
-            wheres.push(w.clone());
+            wheres.push(WherePredicate::clone(w));
         }
     }
     let impl_where = if wheres.is_empty() {
@@ -530,7 +530,7 @@ fn make_trait_impl(
     quote! {
         #[automatically_derived]
         impl #impl_g #trait_path for #self_id #self_g #impl_where {
-            #cotnents
+            #contents
         }
     }
 }
