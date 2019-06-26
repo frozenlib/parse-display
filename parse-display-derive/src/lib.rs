@@ -257,8 +257,8 @@ impl FieldTree {
         for p in &format.0 {
             match p {
                 DisplayFormatPart::Str(s) => self.push_str(s),
-                DisplayFormatPart::EscapedBeginBraket => self.push_str("{"),
-                DisplayFormatPart::EscapedEndBraket => self.push_str("}"),
+                DisplayFormatPart::EscapedBeginBracket => self.push_str("{"),
+                DisplayFormatPart::EscapedEndBracket => self.push_str("}"),
                 DisplayFormatPart::Var { name, .. } => {
                     let keys = FieldKey::from_str_deep(&name);
                     if let DisplayContext::Variant { variant, style } = context {
@@ -768,12 +768,12 @@ impl DisplayFormat {
         let mut ps = Vec::new();
         while !s.is_empty() {
             if s.starts_with("{{") {
-                ps.push(DisplayFormatPart::EscapedBeginBraket);
+                ps.push(DisplayFormatPart::EscapedBeginBracket);
                 s = &s[2..];
                 continue;
             }
             if s.starts_with("}}") {
-                ps.push(DisplayFormatPart::EscapedEndBraket);
+                ps.push(DisplayFormatPart::EscapedEndBracket);
                 s = &s[2..];
                 continue;
             }
@@ -819,8 +819,8 @@ impl DisplayFormat {
             use DisplayFormatPart::*;
             match p {
                 Str(s) => format_str.push_str(s.as_str()),
-                EscapedBeginBraket => format_str.push_str("{{"),
-                EscapedEndBraket => format_str.push_str("}}"),
+                EscapedBeginBracket => format_str.push_str("{{"),
+                EscapedEndBracket => format_str.push_str("}}"),
                 Var { name, parameters } => {
                     format_str.push_str("{:");
                     format_str.push_str(&parameters);
@@ -836,8 +836,8 @@ impl DisplayFormat {
 #[derive(Clone)]
 enum DisplayFormatPart {
     Str(String),
-    EscapedBeginBraket,
-    EscapedEndBraket,
+    EscapedBeginBracket,
+    EscapedEndBracket,
     Var { name: String, parameters: String },
 }
 
