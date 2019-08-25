@@ -561,23 +561,23 @@ impl HelperAttributes {
         for a in attrs {
             let m = a.parse_meta().unwrap();
             match &m {
-                Meta::List(ml) if ml.path.get_ident().map(|ident| ident == "display").unwrap_or(false) => {
+                Meta::List(ml) if ml.path.is_ident("display") => {
                     for m in ml.nested.iter() {
                         has.set_display_nested_meta(m);
                     }
                 }
-                Meta::NameValue(nv) if nv.path.get_ident().map(|ident| ident == "display").unwrap_or(false) => {
+                Meta::NameValue(nv) if nv.path.is_ident("display") => {
                     panic!(
                         "`#[display = ..]` is not allowed. \n{}",
                         DISPLAY_HELPER_USAGE
                     );
                 }
-                Meta::List(ml) if ml.path.get_ident().map(|ident| ident == "from_str").unwrap_or(false) => {
+                Meta::List(ml) if ml.path.is_ident("from_str") => {
                     for m in ml.nested.iter() {
                         has.set_from_str_nested_meta(m);
                     }
                 }
-                Meta::NameValue(nv) if nv.path.get_ident().map(|ident| ident == "from_str").unwrap_or(false) => {
+                Meta::NameValue(nv) if nv.path.is_ident("from_str") => {
                     panic!(
                         "`#[from_str = ..]` is not allowed. \n{}",
                         FROM_STR_HELPER_USAGE
@@ -600,7 +600,7 @@ impl HelperAttributes {
                 path,
                 lit: Lit::Str(s),
                 ..
-            })) if path.get_ident().map(|ident| ident == "style").unwrap_or(false) => {
+            })) if path.is_ident("style") => {
                 if self.style.is_some() {
                     panic!("display style can be specified only once.");
                 }
@@ -621,23 +621,24 @@ impl HelperAttributes {
                 path,
                 lit: Lit::Str(s),
                 ..
-            })) if path.get_ident().map(|ident| ident == "regex").unwrap_or(false) => {
+            })) if path.is_ident("regex") => {
                 if self.regex.is_some() {
                     panic!("from_str regex can be specified only once.");
                 }
                 self.regex = Some(s.value());
             }
-            NestedMeta::Meta(Meta::Path(path)) if path.get_ident().map(|ident| ident == "default").unwrap_or(false) => {
+            NestedMeta::Meta(Meta::Path(path)) if path.is_ident("default") => {
                 self.default_self = true;
             }
-            NestedMeta::Meta(Meta::List(l)) if l.path.get_ident().map(|ident| ident == "default_fields").unwrap_or(false) => {
+            NestedMeta::Meta(Meta::List(l)) if l.path.is_ident("default_fields") => {
                 for m in l.nested.iter() {
                     match m {
                         NestedMeta::Lit(Lit::Str(s)) => {
                             self.default_fields.push(s.value());
                         }
                         NestedMeta::Meta(Meta::Path(path)) => {
-                            path.get_ident().map(|ident| self.default_fields.push(ident.to_string()));
+                            path.get_ident()
+                                .map(|ident| self.default_fields.push(ident.to_string()));
                         }
                         _ => {
                             panic!(
