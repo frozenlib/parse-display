@@ -561,23 +561,23 @@ impl HelperAttributes {
         for a in attrs {
             let m = a.parse_meta().unwrap();
             match &m {
-                Meta::List(ml) if ml.ident == "display" => {
+                Meta::List(ml) if ml.path.get_ident().map(|ident| ident == "display").unwrap_or(false) => {
                     for m in ml.nested.iter() {
                         has.set_display_nested_meta(m);
                     }
                 }
-                Meta::NameValue(nv) if nv.ident == "display" => {
+                Meta::NameValue(nv) if nv.path.get_ident().map(|ident| ident == "display").unwrap_or(false) => {
                     panic!(
                         "`#[display = ..]` is not allowed. \n{}",
                         DISPLAY_HELPER_USAGE
                     );
                 }
-                Meta::List(ml) if ml.ident == "from_str" => {
+                Meta::List(ml) if ml.path.get_ident().map(|ident| ident == "from_str").unwrap_or(false) => {
                     for m in ml.nested.iter() {
                         has.set_from_str_nested_meta(m);
                     }
                 }
-                Meta::NameValue(nv) if nv.ident == "from_str" => {
+                Meta::NameValue(nv) if nv.path.get_ident().map(|ident| ident == "from_str").unwrap_or(false) => {
                     panic!(
                         "`#[from_str = ..]` is not allowed. \n{}",
                         FROM_STR_HELPER_USAGE
@@ -590,17 +590,17 @@ impl HelperAttributes {
     }
     fn set_display_nested_meta(&mut self, m: &NestedMeta) {
         match m {
-            NestedMeta::Literal(Lit::Str(s)) => {
+            NestedMeta::Lit(Lit::Str(s)) => {
                 if self.format.is_some() {
                     panic!("display format can be specified only once.")
                 }
                 self.format = Some(DisplayFormat::from(&s.value()));
             }
             NestedMeta::Meta(Meta::NameValue(MetaNameValue {
-                ident,
+                path,
                 lit: Lit::Str(s),
                 ..
-            })) if ident == "style" => {
+            })) if path.get_ident().map(|ident| ident == "style").unwrap_or(false) => {
                 if self.style.is_some() {
                     panic!("display style can be specified only once.");
                 }
@@ -618,26 +618,26 @@ impl HelperAttributes {
     fn set_from_str_nested_meta(&mut self, m: &NestedMeta) {
         match m {
             NestedMeta::Meta(Meta::NameValue(MetaNameValue {
-                ident,
+                path,
                 lit: Lit::Str(s),
                 ..
-            })) if ident == "regex" => {
+            })) if path.get_ident().map(|ident| ident == "regex").unwrap_or(false) => {
                 if self.regex.is_some() {
                     panic!("from_str regex can be specified only once.");
                 }
                 self.regex = Some(s.value());
             }
-            NestedMeta::Meta(Meta::Word(ident)) if ident == "default" => {
+            NestedMeta::Meta(Meta::Path(path)) if path.get_ident().map(|ident| ident == "default").unwrap_or(false) => {
                 self.default_self = true;
             }
-            NestedMeta::Meta(Meta::List(l)) if l.ident == "default_fields" => {
+            NestedMeta::Meta(Meta::List(l)) if l.path.get_ident().map(|ident| ident == "default_fields").unwrap_or(false) => {
                 for m in l.nested.iter() {
                     match m {
-                        NestedMeta::Literal(Lit::Str(s)) => {
+                        NestedMeta::Lit(Lit::Str(s)) => {
                             self.default_fields.push(s.value());
                         }
-                        NestedMeta::Meta(Meta::Word(ident)) => {
-                            self.default_fields.push(ident.to_string());
+                        NestedMeta::Meta(Meta::Path(path)) => {
+                            path.get_ident().map(|ident| self.default_fields.push(ident.to_string()));
                         }
                         _ => {
                             panic!(
