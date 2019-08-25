@@ -15,9 +15,9 @@ edition = "2018"
 proc-macro = true
 
 [dependencies]
-syn = "0.15"
-quote = "0.6"
-proc-macro2 = "0.4"
+syn = "1.0"
+quote = "1.0"
+proc-macro2 = "1.0"
 regex = "1"
 regex-syntax = "0.6"
 lazy_static = "1.3"
