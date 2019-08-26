@@ -635,18 +635,20 @@ impl HelperAttributes {
                     match m {
                         NestedMeta::Lit(Lit::Str(s)) => {
                             self.default_fields.push(s.value());
+                            continue;
                         }
                         NestedMeta::Meta(Meta::Path(path)) => {
-                            path.get_ident()
-                                .map(|ident| self.default_fields.push(ident.to_string()));
+                            if let Some(ident) = path.get_ident() {
+                                self.default_fields.push(ident.to_string());
+                                continue;
+                            }
                         }
-                        _ => {
-                            panic!(
-                                "{} is not allowed in `#[from_str(default_fields(..))]`.",
-                                quote!(#m)
-                            );
-                        }
+                        _ => {}
                     }
+                    panic!(
+                        "{} is not allowed in `#[from_str(default_fields(..))]`.",
+                        quote!(#m)
+                    );
                 }
             }
             m => {
