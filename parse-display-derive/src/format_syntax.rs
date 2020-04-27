@@ -1,7 +1,6 @@
 use lazy_static::*;
 use regex::*;
 
-use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 
@@ -77,14 +76,18 @@ impl Default for FormatType {
 #[derive(Debug, Eq, PartialEq)]
 pub struct FormatParseError;
 
+impl FormatParseError {
+    const ERROR_MESSAGE: &'static str = "FormatSpec parse failed.";
+}
+
 impl std::error::Error for FormatParseError {
     fn description(&self) -> &str {
-        "FormatSpec parse failed."
+        FormatParseError::ERROR_MESSAGE
     }
 }
 impl Display for FormatParseError {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(f, "{}", self.description())
+        write!(f, "{}", FormatParseError::ERROR_MESSAGE)
     }
 }
 
