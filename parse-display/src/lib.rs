@@ -486,6 +486,11 @@ impl ParseError {
     Self::with_message("parse failed.")
   }
 }
+impl Default for ParseError {
+  fn default() -> Self {
+    Self::new()
+  }
+}
 
 impl Display for ParseError {
   fn fmt(&self, f: &mut Formatter) -> Result {
