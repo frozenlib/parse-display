@@ -389,6 +389,7 @@ impl FieldTree {
         let regex = self.build_regex();
         quote! {
             parse_display::helpers::lazy_static::lazy_static! {
+                #[allow(clippy::trivial_regex)]
                 static ref RE: parse_display::helpers::regex::Regex = parse_display::helpers::regex::Regex::new(#regex).unwrap();
             }
             if let Some(c) = RE.captures(&s) {
