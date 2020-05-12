@@ -33,15 +33,13 @@ pub fn derive_display(input: proc_macro::TokenStream) -> proc_macro::TokenStream
 fn derive_display_for_struct(input: &DeriveInput, data: &DataStruct) -> TokenStream {
     let has = HelperAttributes::from(&input.attrs);
     let mut wheres = Vec::new();
-    let ctx = DisplayContext::Struct {
-        data,
-        generics: Some(GenericParamSet::new(&input.generics)),
-    };
+    let ctx = DisplayContext::Struct { data };
+    let generics = GenericParamSet::new(&input.generics);
     let args = has
         .format
         .or_else(|| DisplayFormat::from_newtype_struct(data))
         .expect("`#[display(\"format\")]` is required except newtype pattern.")
-        .format_args(ctx, &mut wheres);
+        .format_args(ctx, &mut wheres, &generics);
 
     make_trait_impl(
         input,
@@ -60,6 +58,7 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream 
         has_enum: &HelperAttributes,
         variant: &Variant,
         wheres: &mut Vec<WherePredicate>,
+        generics: &GenericParamSet,
     ) -> TokenStream {
         let fields = match &variant.fields {
             Fields::Named(fields) => {
@@ -85,7 +84,7 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream 
 
         let enum_ident = &input.ident;
         let variant_ident = &variant.ident;
-        let args = format.format_args(DisplayContext::Variant { variant, style }, wheres);
+        let args = format.format_args(DisplayContext::Variant { variant, style }, wheres, generics);
         quote! {
             #enum_ident::#variant_ident #fields => {
                 std::write!(f, #args)
@@ -94,10 +93,11 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream 
     }
     let has = HelperAttributes::from(&input.attrs);
     let mut wheres = Vec::new();
+    let generics = GenericParamSet::new(&input.generics);
     let arms = data
         .variants
         .iter()
-        .map(|v| make_arm(input, &has, v, &mut wheres));
+        .map(|v| make_arm(input, &has, v, &mut wheres, &generics));
     let contents = quote! {
         fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
             match self {
@@ -197,10 +197,7 @@ impl FieldTree {
     fn from_struct(input: &DeriveInput, data: &DataStruct) -> Self {
         let has = HelperAttributes::from(&input.attrs);
         let mut s = Self::new();
-        let ctx = DisplayContext::Struct {
-            data,
-            generics: None,
-        };
+        let ctx = DisplayContext::Struct { data };
         s.push_attrs(&has, &ctx);
         s.root.set_default(&has);
         s.root.set_default_by_fields(&data.fields);
@@ -832,6 +829,7 @@ impl DisplayFormat {
         &self,
         context: DisplayContext,
         wheres: &mut Vec<WherePredicate>,
+        generics: &GenericParamSet,
     ) -> TokenStream {
         let mut format_str = String::new();
         let mut format_args = Vec::new();
@@ -845,7 +843,7 @@ impl DisplayFormat {
                     format_str.push_str("{:");
                     format_str.push_str(&parameters);
                     format_str.push_str("}");
-                    format_args.push(context.format_arg(&name, &parameters, wheres));
+                    format_args.push(context.format_arg(&name, &parameters, wheres, generics));
                 }
             }
         }
@@ -864,7 +862,6 @@ enum DisplayFormatPart {
 enum DisplayContext<'a> {
     Struct {
         data: &'a DataStruct,
-        generics: Option<GenericParamSet>,
     },
     Variant {
         variant: &'a Variant,
@@ -878,33 +875,19 @@ enum DisplayContext<'a> {
 }
 
 impl<'a> DisplayContext<'a> {
-    fn generics(&self) -> Option<&GenericParamSet> {
-        match self {
-            Self::Struct { generics, .. } => generics.as_ref(),
-            Self::Variant { .. } => None,
-            Self::Field { parent, .. } => parent.generics(),
-        }
-    }
-    fn is_need_bounds(&self, ty: &Type) -> bool {
-        if let Some(g) = self.generics() {
-            g.contains_in_type(ty)
-        } else {
-            true
-        }
-    }
-
     fn format_arg(
         &self,
         name: &str,
         parameters: &str,
         wheres: &mut Vec<WherePredicate>,
+        generics: &GenericParamSet,
     ) -> TokenStream {
         let keys = FieldKey::from_str_deep(name);
         if keys.is_empty() {
             return match self {
                 DisplayContext::Struct { .. } => panic!("{{}} is not allowed in struct format."),
                 DisplayContext::Field { parent, field, key } => {
-                    parent.format_arg_by_field_expr(key, field, parameters, wheres)
+                    parent.format_arg_by_field_expr(key, field, parameters, wheres, generics)
                 }
                 DisplayContext::Variant { variant, style } => {
                     let s = style.apply(&variant.ident);
@@ -920,7 +903,7 @@ impl<'a> DisplayContext<'a> {
                 let field = m
                     .get(key)
                     .unwrap_or_else(|| panic!("unknown field '{}'.", key));
-                return self.format_arg_of_field(key, field, parameters, wheres);
+                return self.format_arg_of_field(key, field, parameters, wheres, generics);
             }
         }
         let mut expr = self.field_expr(&keys[0]);
@@ -935,6 +918,7 @@ impl<'a> DisplayContext<'a> {
         field: &Field,
         parameters: &str,
         wheres: &mut Vec<WherePredicate>,
+        generics: &GenericParamSet,
     ) -> TokenStream {
         let has = HelperAttributes::from(&field.attrs);
         if let Some(format) = has.format {
@@ -945,10 +929,11 @@ impl<'a> DisplayContext<'a> {
                     key,
                 },
                 wheres,
+                generics,
             );
             quote! { format_args!(#args) }
         } else {
-            self.format_arg_by_field_expr(key, field, parameters, wheres)
+            self.format_arg_by_field_expr(key, field, parameters, wheres, generics)
         }
     }
     fn format_arg_by_field_expr(
@@ -957,9 +942,10 @@ impl<'a> DisplayContext<'a> {
         field: &Field,
         parameters: &str,
         wheres: &mut Vec<WherePredicate>,
+        generics: &GenericParamSet,
     ) -> TokenStream {
         let ty = &field.ty;
-        if self.is_need_bounds(ty) {
+        if generics.contains_in_type(ty) {
             let ps = FormatParameters::from(&parameters).expect("invalid format parameters.");
             let tr = ps.format_type.trait_name();
             let tr: Ident = parse_str(tr).unwrap();
