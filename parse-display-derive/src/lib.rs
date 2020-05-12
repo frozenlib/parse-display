@@ -121,7 +121,7 @@ fn derive_from_str_for_struct(input: &DeriveInput, data: &DataStruct) -> TokenSt
     let tree = FieldTree::from_struct(input, data);
     let body = tree.build_from_str_body(&data.fields, quote!(Self));
     let generics = GenericParamSet::new(&input.generics);
-    let wheres = tree.build_wheres(&data.fields, Some(&generics));
+    let wheres = tree.build_wheres(&data.fields, &generics);
     make_trait_impl(
         input,
         quote! { std::str::FromStr },
@@ -138,6 +138,7 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream
     let mut bodys = Vec::new();
     let has_enum = HelperAttributes::from(&input.attrs);
     let mut wheres = Vec::new();
+    let generics = GenericParamSet::new(&input.generics);
     for (idx, variant) in data.variants.iter().enumerate() {
         let enum_ident = &input.ident;
         let variant_ident = &variant.ident;
@@ -145,7 +146,7 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream
 
         let tree = FieldTree::from_variant(&has_enum, variant);
         let body = tree.build_from_str_body(&variant.fields, ctor);
-        wheres.extend(tree.build_wheres(&variant.fields, None));
+        wheres.extend(tree.build_wheres(&variant.fields, &generics));
         let fn_ident: Ident = parse_str(&format!("parse_{}", idx)).unwrap();
         let body = quote! {
             let #fn_ident = |s: &str| -> std::result::Result<Self, parse_display::ParseError> {
@@ -409,31 +410,20 @@ impl FieldTree {
             Err(parse_display::ParseError::new())
         }
     }
-    fn build_wheres(
-        &self,
-        fields: &Fields,
-        generics: Option<&GenericParamSet>,
-    ) -> Vec<WherePredicate> {
+    fn build_wheres(&self, fields: &Fields, generics: &GenericParamSet) -> Vec<WherePredicate> {
         let m = field_map(&fields);
         let mut wheres = Vec::new();
         for (key, field) in &m {
             if let Some(e) = self.root.fields.get(&key) {
                 if e.is_need_bounds {
                     let ty = &field.ty;
-                    if Self::is_need_bounds(generics, ty) {
+                    if generics.contains_in_type(ty) {
                         wheres.push(parse2(quote!( #ty : std::str::FromStr )).unwrap());
                     }
                 }
             }
         }
         wheres
-    }
-    fn is_need_bounds(generics: Option<&GenericParamSet>, ty: &Type) -> bool {
-        if let Some(g) = generics {
-            g.contains_in_type(ty)
-        } else {
-            true
-        }
     }
 }
 impl FieldEntry {
