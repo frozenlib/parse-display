@@ -10,6 +10,7 @@ mod syn_utils;
 
 use crate::format_syntax::*;
 use crate::regex_utils::*;
+use crate::syn_utils::*;
 use lazy_static::lazy_static;
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -32,11 +33,12 @@ pub fn derive_display(input: proc_macro::TokenStream) -> proc_macro::TokenStream
 fn derive_display_for_struct(input: &DeriveInput, data: &DataStruct) -> TokenStream {
     let has = HelperAttributes::from(&input.attrs);
     let mut wheres = Vec::new();
+    let ctx = DisplayContext::new_struct(&input, &data);
     let args = has
         .format
         .or_else(|| DisplayFormat::from_newtype_struct(data))
         .expect("`#[display(\"format\")]` is required except newtype pattern.")
-        .format_args(DisplayContext::Struct(&data), &mut wheres);
+        .format_args(ctx, &mut wheres);
 
     make_trait_impl(
         input,
@@ -190,7 +192,7 @@ impl FieldTree {
     fn from_struct(input: &DeriveInput, data: &DataStruct) -> Self {
         let has = HelperAttributes::from(&input.attrs);
         let mut s = Self::new();
-        s.push_attrs(&has, &DisplayContext::Struct(data));
+        s.push_attrs(&has, &DisplayContext::new_struct(input, data));
         s.root.set_default(&has);
         s.root.set_default_by_fields(&data.fields);
         s
@@ -433,7 +435,7 @@ impl FieldEntry {
     }
     fn field_by_context(&mut self, context: &DisplayContext) -> &mut Self {
         match context {
-            DisplayContext::Struct(_) | DisplayContext::Variant { .. } => self,
+            DisplayContext::Struct { .. } | DisplayContext::Variant { .. } => self,
             DisplayContext::Field { key, .. } => self.field((*key).clone()),
         }
     }
@@ -847,7 +849,10 @@ enum DisplayFormatPart {
 }
 
 enum DisplayContext<'a> {
-    Struct(&'a DataStruct),
+    Struct {
+        data: &'a DataStruct,
+        generics: GenericParamSet,
+    },
     Variant {
         variant: &'a Variant,
         style: DisplayStyle,
@@ -860,6 +865,27 @@ enum DisplayContext<'a> {
 }
 
 impl<'a> DisplayContext<'a> {
+    fn new_struct(input: &DeriveInput, data: &'a DataStruct) -> Self {
+        DisplayContext::Struct {
+            data,
+            generics: GenericParamSet::new(&input.generics),
+        }
+    }
+    fn generics(&self) -> Option<&GenericParamSet> {
+        match self {
+            Self::Struct { generics, .. } => Some(generics),
+            Self::Variant { .. } => None,
+            Self::Field { parent, .. } => parent.generics(),
+        }
+    }
+    fn is_need_bounds(&self, ty: &Type) -> bool {
+        if let Some(g) = self.generics() {
+            g.contains_in_type(ty)
+        } else {
+            true
+        }
+    }
+
     fn format_arg(
         &self,
         name: &str,
@@ -869,7 +895,7 @@ impl<'a> DisplayContext<'a> {
         let keys = FieldKey::from_str_deep(name);
         if keys.is_empty() {
             return match self {
-                DisplayContext::Struct(_) => panic!("{{}} is not allowed in struct format."),
+                DisplayContext::Struct { .. } => panic!("{{}} is not allowed in struct format."),
                 DisplayContext::Field { parent, field, key } => {
                     parent.format_arg_by_field_expr(key, field, parameters, wheres)
                 }
@@ -926,16 +952,18 @@ impl<'a> DisplayContext<'a> {
         wheres: &mut Vec<WherePredicate>,
     ) -> TokenStream {
         let ty = &field.ty;
-        let ps = FormatParameters::from(&parameters).expect("invalid format parameters.");
-        let tr = ps.format_type.trait_name();
-        let tr: Ident = parse_str(tr).unwrap();
-        wheres.push(parse2(quote!(#ty : std::fmt::#tr)).unwrap());
+        if self.is_need_bounds(ty) {
+            let ps = FormatParameters::from(&parameters).expect("invalid format parameters.");
+            let tr = ps.format_type.trait_name();
+            let tr: Ident = parse_str(tr).unwrap();
+            wheres.push(parse2(quote!(#ty : std::fmt::#tr)).unwrap());
+        }
         self.field_expr(key)
     }
 
     fn field_expr(&self, key: &FieldKey) -> TokenStream {
         match self {
-            DisplayContext::Struct(_) => quote! { self.#key },
+            DisplayContext::Struct { .. } => quote! { self.#key },
             DisplayContext::Variant { .. } => {
                 let var = key.binding_var();
                 quote! { #var }
@@ -955,7 +983,7 @@ impl<'a> DisplayContext<'a> {
         const ERROR_MESSAGE_FOR_STRUCT:&str="`#[display(\"format\")]` or `#[from_str(regex = \"regex\")]` is required except newtype pattern.";
         const ERROR_MESSAGE_FOR_VARIANT:&str="`#[display(\"format\")]` or `#[from_str(regex = \"regex\")]` is required except unit variant.";
         match self {
-            DisplayContext::Struct(data) => {
+            DisplayContext::Struct { data, .. } => {
                 DisplayFormat::from_newtype_struct(data).expect(ERROR_MESSAGE_FOR_STRUCT)
             }
             DisplayContext::Variant { variant, .. } => {
@@ -966,7 +994,7 @@ impl<'a> DisplayContext<'a> {
     }
     fn fields(&self) -> Option<&Fields> {
         match self {
-            DisplayContext::Struct(data) => Some(&data.fields),
+            DisplayContext::Struct { data, .. } => Some(&data.fields),
             DisplayContext::Variant { variant, .. } => Some(&variant.fields),
             DisplayContext::Field { .. } => None,
         }

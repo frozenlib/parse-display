@@ -49,7 +49,7 @@ impl GenericParamSet {
             _ => false,
         }
     }
-    fn contains_in_expr(&self, e: &syn::Expr) -> bool {
+    fn contains_in_expr(&self, _e: &syn::Expr) -> bool {
         false
     }
     fn contains_in_type_bare_fn(&self, ty: &syn::TypeBareFn) -> bool {

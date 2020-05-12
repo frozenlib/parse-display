@@ -30,7 +30,6 @@ fn display_struct_field() {
     assert_display(TestStruct { a: 1, b: 2 }, "1 --- 2");
 }
 
-
 #[test]
 fn display_struct_field_raw() {
     #[derive(Display)]
@@ -54,7 +53,6 @@ fn display_struct_field_raw_keyword() {
 
     assert_display(TestStruct { r#fn: 1, b: 2 }, "1,2");
 }
-
 
 #[test]
 fn display_struct_field_with_parameter() {
@@ -111,7 +109,6 @@ fn display_struct_nested_field_raw_keyword() {
 
     assert_display(value, "1,4");
 }
-
 
 #[test]
 fn display_tuple_struct_field() {
@@ -198,7 +195,6 @@ fn display_struct_field_attribute_self() {
     assert_display(TestStruct { a: 1, b: 2 }, "_1_,2");
 }
 
-
 #[test]
 fn display_struct_field_another_attribute() {
     #[derive(Display)]
@@ -210,7 +206,6 @@ fn display_struct_field_another_attribute() {
     }
     assert_display(TestStruct { a: 1, b: 2 }, "1,2");
 }
-
 
 #[test]
 fn display_tuple_struct_nested_field() {
@@ -229,7 +224,6 @@ fn display_tuple_struct_attribute() {
 
     assert_display(TestStruct(10, 20), "AAA-10,20");
 }
-
 
 #[test]
 fn display_enum() {
@@ -625,6 +619,17 @@ fn auto_bound_enum() {
     }
     assert_display(TestEnum::VarA(10), "10");
 }
+
+#[test]
+fn private_in_public_non_generic() {
+    assert_display(TestStructPrivateInPublic(TestStructPrivate(5)), "5");
+}
+
+#[derive(Display)]
+pub struct TestStructPrivateInPublic(TestStructPrivate);
+
+#[derive(Display)]
+struct TestStructPrivate(u8);
 
 fn assert_display<T: Display>(value: T, display: &str) {
     let value_display = format!("{}", value);
