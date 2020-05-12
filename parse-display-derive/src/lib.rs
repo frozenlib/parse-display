@@ -6,6 +6,7 @@ extern crate proc_macro;
 
 mod format_syntax;
 mod regex_utils;
+mod syn_utils;
 
 use crate::format_syntax::*;
 use crate::regex_utils::*;
