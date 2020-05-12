@@ -33,7 +33,10 @@ pub fn derive_display(input: proc_macro::TokenStream) -> proc_macro::TokenStream
 fn derive_display_for_struct(input: &DeriveInput, data: &DataStruct) -> TokenStream {
     let has = HelperAttributes::from(&input.attrs);
     let mut wheres = Vec::new();
-    let ctx = DisplayContext::new_struct(&input, &data);
+    let ctx = DisplayContext::Struct {
+        data,
+        generics: Some(GenericParamSet::new(&input.generics)),
+    };
     let args = has
         .format
         .or_else(|| DisplayFormat::from_newtype_struct(data))
@@ -117,8 +120,8 @@ pub fn derive_from_str(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
 fn derive_from_str_for_struct(input: &DeriveInput, data: &DataStruct) -> TokenStream {
     let tree = FieldTree::from_struct(input, data);
     let body = tree.build_from_str_body(&data.fields, quote!(Self));
-    let wheres = tree.build_wheres(&data.fields);
-
+    let generics = GenericParamSet::new(&input.generics);
+    let wheres = tree.build_wheres(&data.fields, Some(&generics));
     make_trait_impl(
         input,
         quote! { std::str::FromStr },
@@ -142,7 +145,7 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream
 
         let tree = FieldTree::from_variant(&has_enum, variant);
         let body = tree.build_from_str_body(&variant.fields, ctor);
-        wheres.extend(tree.build_wheres(&variant.fields));
+        wheres.extend(tree.build_wheres(&variant.fields, None));
         let fn_ident: Ident = parse_str(&format!("parse_{}", idx)).unwrap();
         let body = quote! {
             let #fn_ident = |s: &str| -> std::result::Result<Self, parse_display::ParseError> {
@@ -179,6 +182,7 @@ struct FieldEntry {
     fields: HashMap<FieldKey, FieldEntry>,
     capture: Option<usize>,
     use_default: bool,
+    is_need_bounds: bool,
 }
 
 impl FieldTree {
@@ -192,7 +196,11 @@ impl FieldTree {
     fn from_struct(input: &DeriveInput, data: &DataStruct) -> Self {
         let has = HelperAttributes::from(&input.attrs);
         let mut s = Self::new();
-        s.push_attrs(&has, &DisplayContext::new_struct(input, data));
+        let ctx = DisplayContext::Struct {
+            data,
+            generics: None,
+        };
+        s.push_attrs(&has, &ctx);
         s.root.set_default(&has);
         s.root.set_default_by_fields(&data.fields);
         s
@@ -401,18 +409,31 @@ impl FieldTree {
             Err(parse_display::ParseError::new())
         }
     }
-    fn build_wheres(&self, fields: &Fields) -> Vec<WherePredicate> {
+    fn build_wheres(
+        &self,
+        fields: &Fields,
+        generics: Option<&GenericParamSet>,
+    ) -> Vec<WherePredicate> {
         let m = field_map(&fields);
         let mut wheres = Vec::new();
         for (key, field) in &m {
             if let Some(e) = self.root.fields.get(&key) {
-                if e.capture.is_some() {
+                if e.is_need_bounds {
                     let ty = &field.ty;
-                    wheres.push(parse2(quote!( #ty : std::str::FromStr )).unwrap());
+                    if Self::is_need_bounds(generics, ty) {
+                        wheres.push(parse2(quote!( #ty : std::str::FromStr )).unwrap());
+                    }
                 }
             }
         }
         wheres
+    }
+    fn is_need_bounds(generics: Option<&GenericParamSet>, ty: &Type) -> bool {
+        if let Some(g) = generics {
+            g.contains_in_type(ty)
+        } else {
+            true
+        }
     }
 }
 impl FieldEntry {
@@ -421,6 +442,7 @@ impl FieldEntry {
             fields: HashMap::new(),
             capture: None,
             use_default: false,
+            is_need_bounds: false,
         }
     }
     fn field(&mut self, key: FieldKey) -> &mut Self {
@@ -444,6 +466,7 @@ impl FieldEntry {
             self.capture = Some(*capture_next);
             *capture_next += 1;
         }
+        self.is_need_bounds = true;
         format!("value_{}", self.capture.unwrap())
     }
     fn capture(&self) -> Option<String> {
@@ -851,7 +874,7 @@ enum DisplayFormatPart {
 enum DisplayContext<'a> {
     Struct {
         data: &'a DataStruct,
-        generics: GenericParamSet,
+        generics: Option<GenericParamSet>,
     },
     Variant {
         variant: &'a Variant,
@@ -865,15 +888,9 @@ enum DisplayContext<'a> {
 }
 
 impl<'a> DisplayContext<'a> {
-    fn new_struct(input: &DeriveInput, data: &'a DataStruct) -> Self {
-        DisplayContext::Struct {
-            data,
-            generics: GenericParamSet::new(&input.generics),
-        }
-    }
     fn generics(&self) -> Option<&GenericParamSet> {
         match self {
-            Self::Struct { generics, .. } => Some(generics),
+            Self::Struct { generics, .. } => generics.as_ref(),
             Self::Variant { .. } => None,
             Self::Field { parent, .. } => parent.generics(),
         }

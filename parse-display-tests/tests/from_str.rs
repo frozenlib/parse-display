@@ -35,7 +35,6 @@ fn from_str_struct_format() {
     assert_from_str_err::<TestStruct>("aa,50");
 }
 
-
 #[test]
 fn from_str_struct_regex() {
     #[derive(FromStr, Debug, Eq, PartialEq)]
@@ -57,7 +56,6 @@ fn from_str_struct_regex_keyword() {
     }
     assert_from_str("12", TestStruct { r#fn: 12 });
 }
-
 
 #[test]
 fn from_str_struct_field_format() {
@@ -132,7 +130,7 @@ fn from_str_struct_format_chain_default_field() {
     struct TestStruct {
         #[from_str(default)]
         a: TestStruct2,
-        
+
         #[from_str(default)]
         b: TestStruct2,
     }
@@ -236,7 +234,6 @@ fn from_str_struct_field_deep_regex() {
     );
 }
 
-
 #[test]
 fn from_str_struct_default() {
     #[derive(FromStr, Debug, Eq, PartialEq, Default)]
@@ -268,7 +265,6 @@ fn from_str_struct_default_both() {
 
     assert_from_str("12", TestStruct { a: 12, b: 0 });
 }
-
 
 #[test]
 fn from_str_struct_field_default() {
@@ -335,11 +331,9 @@ fn from_str_struct_default_fields_ident_keyword() {
     #[from_str(default_fields(fn))]
     struct TestStruct {
         r#fn: u32,
-
     }
     assert_from_str("12", TestStruct { r#fn: 12 });
 }
-
 
 #[test]
 fn from_str_tuple() {
@@ -356,7 +350,6 @@ fn from_str_unit() {
     struct TestStruct;
     assert_from_str("abc", TestStruct);
 }
-
 
 #[test]
 fn from_str_enum_unit() {
@@ -380,7 +373,6 @@ fn from_str_enum_style() {
     assert_from_str("aaa_bbb", TestEnum::AaaBbb);
     assert_from_str("xyz_xyz", TestEnum::XyzXyz);
 }
-
 
 #[test]
 fn from_str_enum_format() {
@@ -418,7 +410,6 @@ fn from_str_enum_format_tuple_var() {
     assert_from_str("Bc--20", TestEnum::Bc(20));
 }
 
-
 #[test]
 fn from_str_enum_regex() {
     #[derive(FromStr, Debug, Eq, PartialEq)]
@@ -442,7 +433,6 @@ fn from_str_enum_regex_tuple_var() {
     assert_from_str("A--10", TestEnum::A(10));
     assert_from_str("Bc--20", TestEnum::Bc(20));
 }
-
 
 #[test]
 fn from_str_enum_regex_struct_var() {
@@ -525,7 +515,6 @@ fn from_str_enum_format_variant_format() {
     }
     assert_from_str("A - 10", TestEnum::A(10));
     assert_from_str("yyy + 50", TestEnum::Bc { x: 50 });
-
 }
 
 #[test]
@@ -542,7 +531,6 @@ fn from_str_enum_format_variant_regex() {
     }
     assert_from_str("A - 10", TestEnum::A(10));
     assert_from_str("yyy + 50", TestEnum::Bc { x: 50 });
-
 }
 
 #[test]
@@ -633,6 +621,16 @@ fn auto_bound_enum() {
     assert_from_str("10", TestEnum::VarA(10));
 }
 
+#[test]
+fn private_in_public_non_generic() {
+    assert_from_str("5", TestStructPrivateInPublic(TestStructPrivate(5)));
+}
+
+#[derive(FromStr, Debug, Eq, PartialEq)]
+pub struct TestStructPrivateInPublic(TestStructPrivate);
+
+#[derive(FromStr, Debug, Eq, PartialEq)]
+struct TestStructPrivate(u8);
 
 fn assert_from_str<T: FromStr + Debug + PartialEq>(s: &str, value: T)
 where
