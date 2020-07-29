@@ -4,14 +4,16 @@
 
 extern crate proc_macro;
 
-mod format_syntax;
+#[macro_use]
 mod regex_utils;
+
+mod format_syntax;
 mod syn_utils;
 
 use crate::format_syntax::*;
 use crate::regex_utils::*;
 use crate::syn_utils::*;
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use proc_macro2::TokenStream;
 use quote::quote;
 use regex::*;
@@ -218,10 +220,8 @@ impl FieldTree {
     }
 
     fn push_regex(&mut self, s: &str, context: &DisplayContext) {
-        lazy_static! {
-            static ref REGEX_CAPTURE: Regex = Regex::new(r"\(\?P<([_0-9a-zA-Z.]*)>").unwrap();
-            static ref REGEX_NUMBER: Regex = Regex::new("^[0-9]+$").unwrap();
-        }
+        static REGEX_CAPTURE: Lazy<Regex> = lazy_regex!(r"\(\?P<([_0-9a-zA-Z.]*)>");
+        static REGEX_NUMBER: Lazy<Regex> = lazy_regex!("^[0-9]+$");
         let node = self.root.field_by_context(context);
         let capture_next = &mut self.capture_next;
         let s_debug = REGEX_CAPTURE.replace_all(s, |c: &Captures| {
@@ -397,10 +397,9 @@ impl FieldTree {
         };
         let regex = self.build_regex();
         quote! {
-            parse_display::helpers::lazy_static::lazy_static! {
-                #[allow(clippy::trivial_regex)]
-                static ref RE: parse_display::helpers::regex::Regex = parse_display::helpers::regex::Regex::new(#regex).unwrap();
-            }
+            #[allow(clippy::trivial_regex)]
+            static RE: parse_display::helpers::once_cell::sync::Lazy<parse_display::helpers::regex::Regex> =
+                parse_display::helpers::once_cell::sync::Lazy::new(|| parse_display::helpers::regex::Regex::new(#regex).unwrap());
             if let Some(c) = RE.captures(&s) {
                  #code
             }
@@ -778,10 +777,8 @@ impl DisplayStyle {
 struct DisplayFormat(Vec<DisplayFormatPart>);
 impl DisplayFormat {
     fn from(mut s: &str) -> DisplayFormat {
-        lazy_static! {
-            static ref REGEX_STR: Regex = Regex::new(r"^[^{}]+").unwrap();
-            static ref REGEX_VAR: Regex = Regex::new(r"^\{([^:{}]*)(?::([^}]*))?\}").unwrap();
-        }
+        static REGEX_STR: Lazy<Regex> = lazy_regex!(r"^[^{}]+");
+        static REGEX_VAR: Lazy<Regex> = lazy_regex!(r"^\{([^:{}]*)(?::([^}]*))?\}");
         let mut ps = Vec::new();
         while !s.is_empty() {
             if s.starts_with("{{") {

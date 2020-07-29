@@ -1,4 +1,4 @@
-use lazy_static::*;
+use once_cell::sync::Lazy;
 use regex::*;
 
 use std::fmt::{Display, Formatter};
@@ -93,28 +93,26 @@ impl Display for FormatParseError {
 
 impl<'a> FormatParameters<'a> {
     pub fn from(s: &'a str) -> std::result::Result<Self, FormatParseError> {
-        lazy_static! {
-            static ref RE: Regex = Regex::new(
-                "^\
-                 ((?P<fill>.)?\
-                 (?P<align>[<>^]))??\
-                 (?P<sign>[+-])?\
-                 (?P<is_alternate>#)?\
-                 (?P<is_zero>0)?\
-                 (\
-                 (?P<width_integer>[0-9]+)|\
-                 ((?P<width_arg>[a-zA-Z0-9_]+)\\$)\
-                 )?\
-                 (\\.(\
-                 (?P<precision_input>\\*)|\
-                 (?P<precision_integer>[0-9]+)|\
-                 ((?P<precision_arg>[a-zA-Z0-9_]+)\\$)\
-                 ))?\
-                 (?P<format_type>[a-zA-Z0-9_]*\\??)\
-                 $"
-            )
-            .unwrap();
-        }
+        static RE: Lazy<Regex> = lazy_regex!(
+            "^\
+             ((?P<fill>.)?\
+             (?P<align>[<>^]))??\
+             (?P<sign>[+-])?\
+             (?P<is_alternate>#)?\
+             (?P<is_zero>0)?\
+             (\
+             (?P<width_integer>[0-9]+)|\
+             ((?P<width_arg>[a-zA-Z0-9_]+)\\$)\
+             )?\
+             (\\.(\
+             (?P<precision_input>\\*)|\
+             (?P<precision_integer>[0-9]+)|\
+             ((?P<precision_arg>[a-zA-Z0-9_]+)\\$)\
+             ))?\
+             (?P<format_type>[a-zA-Z0-9_]*\\??)\
+             $"
+        );
+
         let c = RE.captures(s).ok_or(FormatParseError)?;
         let fill = c.name("fill").map(|m| m.as_str().chars().next().unwrap());
         let align = c.name("align").map(|m| m.as_str().parse().unwrap());

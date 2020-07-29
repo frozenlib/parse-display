@@ -13,5 +13,5 @@ edition = "2018"
 
 [dependencies]
 parse-display-derive = { version = "0.1.2", path ="../parse-display-derive" }
-lazy_static = "1.4"
+once_cell = "1.4"
 regex = "1"

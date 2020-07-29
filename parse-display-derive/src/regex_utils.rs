@@ -62,3 +62,9 @@ fn expand_capture(ast: &mut Ast, mut f: impl FnMut(&str) -> Option<Ast>) {
         true
     })
 }
+
+macro_rules! lazy_regex {
+    ($re:expr) => {
+        once_cell::sync::Lazy::new(|| regex::Regex::new($re).unwrap())
+    };
+}

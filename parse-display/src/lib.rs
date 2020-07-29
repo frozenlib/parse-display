@@ -470,8 +470,8 @@ assert_eq!("VarB-10".parse(), Ok(MyEnum::VarB { a:10, b:0, c:0 }));
 use std::fmt::{Display, Formatter, Result};
 
 pub mod helpers {
-  pub use lazy_static;
-  pub use regex;
+    pub use once_cell;
+    pub use regex;
 }
 
 pub use parse_display_derive::{Display, FromStr};
@@ -479,26 +479,26 @@ pub use parse_display_derive::{Display, FromStr};
 #[derive(Debug, Eq, PartialEq)]
 pub struct ParseError(&'static str);
 impl ParseError {
-  pub fn with_message(message: &'static str) -> Self {
-    Self(message)
-  }
-  pub fn new() -> Self {
-    Self::with_message("parse failed.")
-  }
+    pub fn with_message(message: &'static str) -> Self {
+        Self(message)
+    }
+    pub fn new() -> Self {
+        Self::with_message("parse failed.")
+    }
 }
 impl Default for ParseError {
-  fn default() -> Self {
-    Self::new()
-  }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Display for ParseError {
-  fn fmt(&self, f: &mut Formatter) -> Result {
-    write!(f, "{}", self.0)
-  }
+    fn fmt(&self, f: &mut Formatter) -> Result {
+        write!(f, "{}", self.0)
+    }
 }
 impl std::error::Error for ParseError {
-  fn description(&self) -> &str {
-    self.0
-  }
+    fn description(&self) -> &str {
+        self.0
+    }
 }
