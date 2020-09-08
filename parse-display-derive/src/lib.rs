@@ -45,11 +45,11 @@ fn derive_display_for_struct(input: &DeriveInput, data: &DataStruct) -> TokenStr
 
     make_trait_impl(
         input,
-        quote! { std::fmt::Display },
+        quote! { core::fmt::Display },
         wheres,
         quote! {
-            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-                std::write!(f, #args)
+            fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+                core::write!(f, #args)
             }
         },
     )
@@ -89,7 +89,7 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream 
         let args = format.format_args(DisplayContext::Variant { variant, style }, wheres, generics);
         quote! {
             #enum_ident::#variant_ident #fields => {
-                std::write!(f, #args)
+                core::write!(f, #args)
             },
         }
     }
@@ -101,13 +101,13 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream 
         .iter()
         .map(|v| make_arm(input, &has, v, &mut wheres, &generics));
     let contents = quote! {
-        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
             match self {
                 #(#arms)*
             }
         }
     };
-    make_trait_impl(input, quote! { std::fmt::Display }, wheres, contents)
+    make_trait_impl(input, quote! { core::fmt::Display }, wheres, contents)
 }
 
 #[proc_macro_derive(FromStr, attributes(display, from_str))]
@@ -126,11 +126,11 @@ fn derive_from_str_for_struct(input: &DeriveInput, data: &DataStruct) -> TokenSt
     let wheres = tree.build_wheres(&data.fields, &generics);
     make_trait_impl(
         input,
-        quote! { std::str::FromStr },
+        quote! { core::str::FromStr },
         wheres,
         quote! {
             type Err = parse_display::ParseError;
-            fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+            fn from_str(s: &str) -> core::result::Result<Self, Self::Err> {
                 #body
             }
         },
@@ -151,7 +151,7 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream
         wheres.extend(tree.build_wheres(&variant.fields, &generics));
         let fn_ident: Ident = parse_str(&format!("parse_{}", idx)).unwrap();
         let body = quote! {
-            let #fn_ident = |s: &str| -> std::result::Result<Self, parse_display::ParseError> {
+            let #fn_ident = |s: &str| -> core::result::Result<Self, parse_display::ParseError> {
                 #body
             };
             if let Ok(value) = #fn_ident(s) {
@@ -162,11 +162,11 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream
     }
     make_trait_impl(
         input,
-        quote! { std::str::FromStr },
+        quote! { core::str::FromStr },
         wheres,
         quote! {
             type Err = parse_display::ParseError;
-            fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+            fn from_str(s: &str) -> core::result::Result<Self, Self::Err> {
                 #({ #bodys })*
                 Err(parse_display::ParseError::new())
             }
@@ -358,7 +358,7 @@ impl FieldTree {
                 }
             });
             quote! {
-                let mut value = <Self as std::default::Default>::default();
+                let mut value = <Self as core::default::Default>::default();
                 #(#setters)*
                 return Ok(value);
             }
@@ -414,7 +414,7 @@ impl FieldTree {
                 if e.is_need_bounds {
                     let ty = &field.ty;
                     if generics.contains_in_type(ty) {
-                        wheres.push(parse2(quote!( #ty : std::str::FromStr )).unwrap());
+                        wheres.push(parse2(quote!( #ty : core::str::FromStr )).unwrap());
                     }
                 }
             }
@@ -500,7 +500,7 @@ impl FieldEntry {
                 .map_err(|e| parse_display::ParseError::with_message(#msg))?
             })
         } else if self.use_default {
-            Some(quote! { std::default::Default::default() })
+            Some(quote! { core::default::Default::default() })
         } else {
             None
         }
@@ -946,7 +946,7 @@ impl<'a> DisplayContext<'a> {
             let ps = FormatParameters::from(&parameters).expect("invalid format parameters.");
             let tr = ps.format_type.trait_name();
             let tr: Ident = parse_str(tr).unwrap();
-            wheres.push(parse2(quote!(#ty : std::fmt::#tr)).unwrap());
+            wheres.push(parse2(quote!(#ty : core::fmt::#tr)).unwrap());
         }
         self.field_expr(key)
     }
