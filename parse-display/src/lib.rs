@@ -467,8 +467,11 @@ assert_eq!("VarB-10".parse(), Ok(MyEnum::VarB { a:10, b:0, c:0 }));
 ```
 */
 
-use std::fmt::{Display, Formatter, Result};
+#![cfg_attr(not(feature = "std"), no_std)]
 
+use core::fmt::{Display, Formatter, Result};
+
+#[cfg(feature = "regex")]
 pub mod helpers {
     pub use once_cell;
     pub use regex;
@@ -497,6 +500,7 @@ impl Display for ParseError {
         write!(f, "{}", self.0)
     }
 }
+#[cfg(feature = "std")]
 impl std::error::Error for ParseError {
     fn description(&self) -> &str {
         self.0
