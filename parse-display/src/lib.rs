@@ -7,7 +7,7 @@ These macros use common helper attributes to specify the format.
 Add this to your Cargo.toml:
 ```toml
 [dependencies]
-parse-display = "0.1"
+parse-display = "0.2"
 ```
 
 ## Example
