@@ -651,7 +651,7 @@ struct TestStructPrivateGeneric<T>(T);
 fn bound_predicate_struct() {
     #[derive(Display)]
     #[display(bound("T : Copy"))]
-    struct TestStructBoundPredicate<T>(DisplayIfCopy<T>);
+    pub struct TestStructBoundPredicate<T>(DisplayIfCopy<T>);
 
     struct DisplayIfCopy<T>(T);
 

@@ -632,6 +632,51 @@ pub struct TestStructPrivateInPublic(TestStructPrivate);
 #[derive(FromStr, Debug, Eq, PartialEq)]
 struct TestStructPrivate(u8);
 
+#[test]
+fn private_in_public_generic() {
+    assert_from_str(
+        "5",
+        TestStructPrivateInPublicGeneric(TestStructPrivateGeneric(5)),
+    );
+}
+
+#[derive(FromStr, Debug, Eq, PartialEq)]
+#[display(bound(T))]
+pub struct TestStructPrivateInPublicGeneric<T>(TestStructPrivateGeneric<T>);
+
+#[derive(FromStr, Debug, Eq, PartialEq)]
+struct TestStructPrivateGeneric<T>(T);
+
+#[test]
+fn bound_predicate_struct() {
+    #[derive(FromStr, Debug, Eq, PartialEq)]
+    #[from_str(bound("T : Default"))]
+    pub struct TestStructBoundPredicate<T>(DisplayIfDefault<T>);
+
+    #[derive(Debug, Eq, PartialEq)]
+    struct DisplayIfDefault<T>(T);
+    impl<T: Default> FromStr for DisplayIfDefault<T> {
+        type Err = ParseError;
+
+        fn from_str(_: &str) -> Result<Self, Self::Err> {
+            Ok(Self(Default::default()))
+        }
+    }
+}
+
+// #[test]
+// fn bound_type_enum() {
+//     assert_from_str("10", Outer::A(Inner(10)));
+//     #[derive(FromStr, Debug, Eq, PartialEq)]
+//     #[display("{0.0}", bound(T))]
+//     #[from_str(default_fields("0"))]
+//     enum Outer<T: Default> {
+//         A(Inner<T>),
+//     }
+//     #[derive(Debug, Eq, PartialEq, Default)]
+//     struct Inner<T: Default>(T);
+// }
+
 fn assert_from_str<T: FromStr + Debug + PartialEq>(s: &str, value: T)
 where
     <T as FromStr>::Err: Display,
