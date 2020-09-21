@@ -44,7 +44,7 @@ fn derive_display_for_struct(input: &DeriveInput, data: &DataStruct) -> TokenStr
         .format_args(ctx, &mut wheres, &generics);
 
     let trait_path = quote! { core::fmt::Display };
-    let wheres = Bound::build_wheres(hattrs.bound_display, &trait_path, true).unwrap_or(wheres);
+    let wheres = Bound::build_wheres(hattrs.bound_display, &trait_path).unwrap_or(wheres);
     make_trait_impl(
         input,
         &trait_path,
@@ -110,7 +110,7 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream 
             }
         }
     };
-    let wheres = Bound::build_wheres(hattrs.bound_display, &trait_path, true).unwrap_or(wheres);
+    let wheres = Bound::build_wheres(hattrs.bound_display, &trait_path).unwrap_or(wheres);
     make_trait_impl(input, &trait_path, wheres, contents)
 }
 
@@ -130,12 +130,8 @@ fn derive_from_str_for_struct(input: &DeriveInput, data: &DataStruct) -> TokenSt
     let generics = GenericParamSet::new(&input.generics);
     let wheres = tree.build_wheres(&data.fields, &generics);
     let trait_path = quote! { core::str::FromStr };
-    let wheres = Bound::build_wheres(hattrs.bound_from_str, &trait_path, true)
-        .or(Bound::build_wheres(
-            hattrs.bound_display,
-            &trait_path,
-            false,
-        ))
+    let wheres = Bound::build_wheres(hattrs.bound_from_str, &trait_path)
+        .or(Bound::build_wheres(hattrs.bound_display, &trait_path))
         .unwrap_or(wheres);
     make_trait_impl(
         input,
@@ -174,12 +170,8 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream
         bodys.push(body);
     }
     let trait_path = quote! { core::str::FromStr };
-    let wheres = Bound::build_wheres(hattrs_enum.bound_from_str, &trait_path, true)
-        .or(Bound::build_wheres(
-            hattrs_enum.bound_display,
-            &trait_path,
-            false,
-        ))
+    let wheres = Bound::build_wheres(hattrs_enum.bound_from_str, &trait_path)
+        .or(Bound::build_wheres(hattrs_enum.bound_display, &trait_path))
         .unwrap_or(wheres);
     make_trait_impl(
         input,
@@ -1048,27 +1040,21 @@ impl Bound {
         }
     }
 
-    fn build_where(&self, trait_path: &TokenStream, use_pred: bool) -> Option<WherePredicate> {
+    fn build_where(&self, trait_path: &TokenStream) -> Option<WherePredicate> {
         let s = match self {
             Bound::Type(type_path) => quote!(#type_path : #trait_path),
-            Bound::Pred(w) => {
-                if !use_pred {
-                    return None;
-                }
-                quote!(#w)
-            }
+            Bound::Pred(w) => quote!(#w),
         };
         Some(parse2(s).unwrap())
     }
     fn build_wheres(
         bound: Option<Vec<Bound>>,
         trait_path: &TokenStream,
-        use_pred: bool,
     ) -> Option<Vec<WherePredicate>> {
         Some(
             bound?
                 .iter()
-                .flat_map(|x| x.build_where(trait_path, use_pred))
+                .flat_map(|x| x.build_where(trait_path))
                 .collect(),
         )
     }

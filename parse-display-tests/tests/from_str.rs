@@ -650,12 +650,12 @@ struct TestStructPrivateGeneric<T>(T);
 #[test]
 fn bound_predicate_struct() {
     #[derive(FromStr, Debug, Eq, PartialEq)]
-    #[from_str(bound("T : Default"))]
-    pub struct TestStructBoundPredicate<T>(DisplayIfDefault<T>);
+    #[display(bound("T : Default"))]
+    pub struct TestStructBoundPredicate<T>(FromStrIfDefault<T>);
 
     #[derive(Debug, Eq, PartialEq)]
-    struct DisplayIfDefault<T>(T);
-    impl<T: Default> FromStr for DisplayIfDefault<T> {
+    struct FromStrIfDefault<T>(T);
+    impl<T: Default> FromStr for FromStrIfDefault<T> {
         type Err = ParseError;
 
         fn from_str(_: &str) -> Result<Self, Self::Err> {
