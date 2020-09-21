@@ -33,11 +33,11 @@ pub fn derive_display(input: proc_macro::TokenStream) -> proc_macro::TokenStream
 }
 
 fn derive_display_for_struct(input: &DeriveInput, data: &DataStruct) -> TokenStream {
-    let has = HelperAttributes::from(&input.attrs);
+    let hattrs = HelperAttributes::from(&input.attrs);
     let mut wheres = Vec::new();
     let ctx = DisplayContext::Struct { data };
     let generics = GenericParamSet::new(&input.generics);
-    let args = has
+    let args = hattrs
         .format
         .or_else(|| DisplayFormat::from_newtype_struct(data))
         .expect("`#[display(\"format\")]` is required except newtype pattern.")
@@ -93,13 +93,13 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream 
             },
         }
     }
-    let has = HelperAttributes::from(&input.attrs);
+    let hattrs = HelperAttributes::from(&input.attrs);
     let mut wheres = Vec::new();
     let generics = GenericParamSet::new(&input.generics);
     let arms = data
         .variants
         .iter()
-        .map(|v| make_arm(input, &has, v, &mut wheres, &generics));
+        .map(|v| make_arm(input, &hattrs, v, &mut wheres, &generics));
     let contents = quote! {
         fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
             match self {
@@ -197,11 +197,11 @@ impl FieldTree {
         }
     }
     fn from_struct(input: &DeriveInput, data: &DataStruct) -> Self {
-        let has = HelperAttributes::from(&input.attrs);
+        let hattrs = HelperAttributes::from(&input.attrs);
         let mut s = Self::new();
         let ctx = DisplayContext::Struct { data };
-        s.push_attrs(&has, &ctx);
-        s.root.set_default(&has);
+        s.push_attrs(&hattrs, &ctx);
+        s.root.set_default(&hattrs);
         s.root.set_default_by_fields(&data.fields);
         s
     }
@@ -311,16 +311,16 @@ impl FieldTree {
             },
         );
     }
-    fn push_attrs(&mut self, has: &HelperAttributes, context: &DisplayContext) {
-        if !self.try_push_attrs(has, context) {
+    fn push_attrs(&mut self, hattrs: &HelperAttributes, context: &DisplayContext) {
+        if !self.try_push_attrs(hattrs, context) {
             self.push_format(&context.default_from_str_format(), context);
         }
     }
-    fn try_push_attrs(&mut self, has: &HelperAttributes, context: &DisplayContext) -> bool {
-        if let Some(regex) = &has.regex {
+    fn try_push_attrs(&mut self, hattrs: &HelperAttributes, context: &DisplayContext) -> bool {
+        if let Some(regex) = &hattrs.regex {
             self.push_regex(&regex, context);
             true
-        } else if let Some(format) = &has.format {
+        } else if let Some(format) = &hattrs.format {
             self.push_format(&format, context);
             true
         } else {
@@ -459,19 +459,19 @@ impl FieldEntry {
         self.capture.map(|c| format!("value_{}", c))
     }
 
-    fn set_default(&mut self, has: &HelperAttributes) {
-        if has.default_self {
+    fn set_default(&mut self, hattrs: &HelperAttributes) {
+        if hattrs.default_self {
             self.use_default = true;
         }
-        for field in &has.default_fields {
+        for field in &hattrs.default_fields {
             self.field(FieldKey::from_str(field.as_str())).use_default = true;
         }
     }
     fn set_default_by_fields(&mut self, fields: &Fields) {
         let m = field_map(fields);
         for (key, field) in m {
-            let has = HelperAttributes::from(&field.attrs);
-            self.field(key).set_default(&has);
+            let hattrs = HelperAttributes::from(&field.attrs);
+            self.field(key).set_default(&hattrs);
         }
     }
 
@@ -564,7 +564,7 @@ const FROM_STR_HELPER_USAGE: &str = "The following syntax are available.
 #[from_str(default_fields(...))]";
 impl HelperAttributes {
     fn from(attrs: &[Attribute]) -> Self {
-        let mut has = Self {
+        let mut hattrs = Self {
             format: None,
             style: None,
             regex: None,
@@ -576,7 +576,7 @@ impl HelperAttributes {
             match &m {
                 Meta::List(ml) if ml.path.is_ident("display") => {
                     for m in ml.nested.iter() {
-                        has.set_display_nested_meta(m);
+                        hattrs.set_display_nested_meta(m);
                     }
                 }
                 Meta::NameValue(nv) if nv.path.is_ident("display") => {
@@ -587,7 +587,7 @@ impl HelperAttributes {
                 }
                 Meta::List(ml) if ml.path.is_ident("from_str") => {
                     for m in ml.nested.iter() {
-                        has.set_from_str_nested_meta(m);
+                        hattrs.set_from_str_nested_meta(m);
                     }
                 }
                 Meta::NameValue(nv) if nv.path.is_ident("from_str") => {
@@ -599,7 +599,7 @@ impl HelperAttributes {
                 _ => {}
             }
         }
-        has
+        hattrs
     }
     fn set_display_nested_meta(&mut self, m: &NestedMeta) {
         match m {
@@ -917,8 +917,8 @@ impl<'a> DisplayContext<'a> {
         wheres: &mut Vec<WherePredicate>,
         generics: &GenericParamSet,
     ) -> TokenStream {
-        let has = HelperAttributes::from(&field.attrs);
-        if let Some(format) = has.format {
+        let hattrs = HelperAttributes::from(&field.attrs);
+        if let Some(format) = hattrs.format {
             let args = format.format_args(
                 DisplayContext::Field {
                     parent: self,
