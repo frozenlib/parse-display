@@ -664,6 +664,21 @@ fn bound_predicate_struct() {
     }
 }
 
+#[test]
+fn different_bound() {
+    #![deny(private_in_public)]
+
+    #[derive(Display, FromStr, PartialEq, Debug)]
+    #[display(bound("T : Display"))]
+    #[from_str(bound("T : FromStr"))]
+    pub struct Outer<T>(Inner<T>);
+
+    #[derive(Display, FromStr, PartialEq, Debug)]
+    struct Inner<T>(T);
+
+    assert_from_str("5", Outer(Inner(5)));
+}
+
 // #[test]
 // fn bound_type_enum() {
 //     assert_from_str("10", Outer::A(Inner(10)));
