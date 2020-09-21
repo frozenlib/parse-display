@@ -218,7 +218,7 @@ assert_eq!(MyEnum::VarA(10).to_string(), "this is A ___10___");
 assert_eq!("this is A ___10___".parse(), Ok(MyEnum::VarA(10)));
 ```
 
-### Field chain
+### Display field chain
 
 You can use "field chain", e.g. `{x.a}` .
 
@@ -470,7 +470,7 @@ assert_eq!("___VarA___".parse(), Ok(MyEnum::VarA));
 assert_eq!("xxxVarBxxx".parse(), Ok(MyEnum::VarB));
 ```
 
-### Field chain
+### Regex field chain
 
 You can use "field chain" in regex.
 
