@@ -1,12 +1,13 @@
+#![no_std]
+extern crate alloc;
 use parse_display::*;
-use std::fmt::Display;
 
 #[test]
 fn display_newtype() {
     #[derive(Display)]
-    struct TestStruct(String);
+    struct TestStruct(u8);
 
-    assert_display(TestStruct("abcde".into()), "abcde");
+    assert_display(TestStruct(10), "10");
 }
 
 #[test]
@@ -422,11 +423,11 @@ fn display_enum_common_format() {
     #[display("{0}")]
     enum TestEnum {
         A(u32),
-        B(String),
+        B(bool),
     }
 
     assert_display(TestEnum::A(10), "10");
-    assert_display(TestEnum::B("abc".into()), "abc");
+    assert_display(TestEnum::B(true), "true");
 }
 
 #[test]
@@ -435,11 +436,11 @@ fn display_enum_common_format_variant_name() {
     #[display("{}-{0}")]
     enum TestEnum {
         A(u32),
-        B(String),
+        B(bool),
     }
 
     assert_display(TestEnum::A(10), "A-10");
-    assert_display(TestEnum::B("abc".into()), "B-abc");
+    assert_display(TestEnum::B(false), "B-false");
 }
 
 #[test]
@@ -450,11 +451,11 @@ fn display_enum_variant_format() {
         A(u32),
 
         #[display("BBB")]
-        B(String),
+        B(bool),
     }
 
     assert_display(TestEnum::A(10), "AAA");
-    assert_display(TestEnum::B("abc".into()), "BBB");
+    assert_display(TestEnum::B(false), "BBB");
 }
 
 #[test]
@@ -465,11 +466,11 @@ fn display_enum_variant_format_typle_var() {
         A(u32),
 
         #[display("BBB+{0}")]
-        B(String),
+        B(bool),
     }
 
     assert_display(TestEnum::A(10), "AAA-10");
-    assert_display(TestEnum::B("abc".into()), "BBB+abc");
+    assert_display(TestEnum::B(true), "BBB+true");
 }
 
 #[test]
@@ -550,13 +551,13 @@ fn display_enum_field_format_deep_noncopy() {
     }
 
     struct TestStruct {
-        l: String,
+        l: bool,
     }
     assert_display(
         TestEnum::A {
-            x: TestStruct { l: "abc".into() },
+            x: TestStruct { l: true },
         },
-        "A = ---abc",
+        "A = ---true",
     );
 }
 
@@ -631,7 +632,7 @@ pub struct TestStructPrivateInPublic(TestStructPrivate);
 #[derive(Display)]
 struct TestStructPrivate(u8);
 
-fn assert_display<T: Display>(value: T, display: &str) {
-    let value_display = format!("{}", value);
+fn assert_display<T: core::fmt::Display>(value: T, display: &str) {
+    let value_display = alloc::format!("{}", value);
     assert_eq!(value_display, display);
 }
