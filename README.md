@@ -50,6 +50,7 @@ Helper attributes can be written in the following positions.
 | ------------------------------------------------------------- | ------ | ---- | ------- | ----- |
 | [`#[display("...")]`](#display)                               | ✔      | ✔    | ✔       | ✔     |
 | [`#[display(style = "...")]`](#displaystyle--)                |        | ✔    | ✔       |       |
+| [`#[display(bound = "...")]`](#displaybound)                  | ✔      |      |         |       |
 | [`#[from_str(regex = "...")]`](#from_strregex--)              | ✔      | ✔    | ✔       | ✔     |
 | [`#[from_str(default)]`](#from_strdefault)                    | ✔      | ✔    |         | ✔     |
 | [`#[from_str(default_fields(...))]`](#from_strdefault_fields) | ✔      | ✔    | ✔       |       |
@@ -259,7 +260,7 @@ assert_eq!(WithFormatParameter { a:5 }.to_string(), "0005");
 
 ## `#[display(style = "...")]`
 
-By writing `#[display(style = "..")]`, you can specify the variant name style.
+By writing `#[display(style = "...")]`, you can specify the variant name style.
 The following styles are available.
 
 - none
@@ -320,6 +321,78 @@ assert_eq!(StyleExample::VarG1.to_string(), "VarG1");
 assert_eq!(StyleExample::varG2.to_string(), "VarG2");
 assert_eq!(StyleExample::VarH.to_string(), "var-h");
 assert_eq!(StyleExample::VarI.to_string(), "VAR-I");
+```
+
+## `#[display(bound("..."))]`
+
+By default, the type of field used in the format is added to the trait bound.
+
+This behavior causes a compile error if you use fields of non public type in public struct.
+
+```rust
+use parse_display::Display;
+
+// private type `Inner<T>` in public interface (error E0446)
+#[derive(Display)]
+pub struct Outer<T>(Inner<T>);
+
+#[derive(Display)]
+struct Inner<T>(T);
+```
+
+By writing `#[display(bound(...))]`, you can override the default behavior.
+
+### Specify trait bound type
+
+By specifying the type, you can specify the type that need to implement `Display` and `FromStr`.
+
+```rust
+use parse_display::Display;
+
+#[derive(Display)]
+#[display(bound(T))]
+pub struct Outer<T>(Inner<T>);
+
+#[derive(Display)]
+struct Inner<T>(T);
+
+assert_eq!(Outer(Inner(10)).to_string(), "10");
+```
+
+### Specify where predicate
+
+You can also specify the where predicate as a string.
+
+```rust
+use parse_display::Display;
+
+#[derive(Display)]
+#[display(bound("T : std::fmt::Debug"))]
+pub struct Outer<T>(Inner<T>);
+
+#[derive(Display)]
+#[display("{0:?}")]
+struct Inner<T>(T);
+
+assert_eq!(Outer(Inner(10)).to_string(), "10");
+```
+
+### No trait bounds
+
+You can also remove all trait bounds.
+
+```rust
+use parse_display::Display;
+
+#[derive(Display)]
+#[display(bound())]
+pub struct Outer<T>(Inner<T>);
+
+#[derive(Display)]
+#[display("ABC")]
+struct Inner<T>(T);
+
+assert_eq!(Outer(Inner(10)).to_string(), "ABC");
 ```
 
 ## `#[from_str(regex = "...")]`
