@@ -53,6 +53,9 @@ Helper attributes can be written in the following positions.
 `#[derive(Display)]` use `#[display]`.
 `#[derive(FromStr)]` use both `#[display]` and `#[from_str]`.
 
+`key = value` style parameter can be specified only once for each key.
+`key(value1, value2, ...)` style parameter can be specified multiple times.
+
 ## `#[display("...")]`
 
 Specifies the format using a syntax similar to `std::format!()`.
