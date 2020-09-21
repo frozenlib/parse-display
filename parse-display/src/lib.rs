@@ -5,6 +5,7 @@ These macros use common helper attributes to specify the format.
 ## Install
 
 Add this to your Cargo.toml:
+
 ```toml
 [dependencies]
 parse-display = "0.2"
@@ -39,11 +40,13 @@ assert_eq!("var_a".parse(), Ok(MyEnum::VarA));
 
 Helper attributes can be written in the following positions.
 
-|                           attribute                           | struct | enum | variant | field |
+| attribute                                                     | struct | enum | variant | field |
 | ------------------------------------------------------------- | ------ | ---- | ------- | ----- |
 | [`#[display("...")]`](#display)                               | ✔      | ✔    | ✔       | ✔     |
 | [`#[display(style = "...")]`](#displaystyle--)                |        | ✔    | ✔       |       |
+| [`#[display(bound = "...")]`](#displaybound)                  | ✔      | ✔    |         |       |
 | [`#[from_str(regex = "...")]`](#from_strregex--)              | ✔      | ✔    | ✔       | ✔     |
+| [`#[from_str(bound(...))]`](#from_strbound)                   | ✔      | ✔    |         |       |
 | [`#[from_str(default)]`](#from_strdefault)                    | ✔      | ✔    |         | ✔     |
 | [`#[from_str(default_fields(...))]`](#from_strdefault_fields) | ✔      | ✔    | ✔       |       |
 
@@ -52,10 +55,11 @@ Helper attributes can be written in the following positions.
 
 ## `#[display("...")]`
 
-Specifies the format using a syntax similar to [`std::format!()`].
+Specifies the format using a syntax similar to `std::format!()`.
 However, unlike `std::format!()`, field name is specified in `{}`.
 
 ### Struct format
+
 By writing `#[display("..")]`, you can specify the format used by `Display` and `FromStr`.
 
 ```rust
@@ -81,6 +85,7 @@ assert_eq!("10+20".parse(), Ok(MyTuple(10, 20)));
 
 If the struct has only one field, the format can be omitted.
 In this case, the only field is used.
+
 ```rust
 use parse_display::{Display, FromStr};
 
@@ -91,7 +96,9 @@ assert_eq!("10".parse(), Ok(NewType(10)));
 ```
 
 ### Enum format
+
 In enum, you can specify the format for each variant.
+
 ```rust
 use parse_display::{Display, FromStr};
 
@@ -109,7 +116,7 @@ assert_eq!("bbb".parse(), Ok(MyEnum::VarB));
 ```
 
 In enum format, `{}` means variant name.
-Variant name style (e.g. snake_case, camelCase, ...)  can be specified by [`#[from_str(style = "...")]`](#displaystyle--).
+Variant name style (e.g. snake_case, camelCase, ...) can be specified by [`#[from_str(style = "...")]`](#displaystyle--).
 
 ```rust
 use parse_display::{Display, FromStr};
@@ -137,6 +144,7 @@ assert_eq!("var_a".parse(), Ok(MyEnumSnake::VarA));
 ```
 
 By writing a format on enum instead of variant, you can specify the format common to multiple variants.
+
 ```rust
 use parse_display::{Display, FromStr};
 
@@ -156,6 +164,7 @@ assert_eq!("xxx-VarB".parse(), Ok(MyEnum::VarB));
 
 If all variants has no field, format can be omitted.
 In this case, variant name is used.
+
 ```rust
 use parse_display::{Display, FromStr};
 
@@ -171,8 +180,10 @@ assert_eq!("VarB".parse(), Ok(MyEnum::VarB));
 ```
 
 ### Field format
+
 You can specify the format of the field.
 In field format, `{}` means the field itself.
+
 ```rust
 use parse_display::{Display, FromStr};
 
@@ -202,9 +213,10 @@ assert_eq!(MyEnum::VarA(10).to_string(), "this is A ___10___");
 assert_eq!("this is A ___10___".parse(), Ok(MyEnum::VarA(10)));
 ```
 
-### Field chain
+### Display field chain
 
 You can use "field chain", e.g. `{x.a}` .
+
 ```rust
 use parse_display::{Display, FromStr};
 
@@ -223,11 +235,13 @@ struct FieldChain {
 assert_eq!(FieldChain { x:MyStruct { a:10, b:20 } }.to_string(), "10");
 assert_eq!("10".parse(), Ok(FieldChain { x:MyStruct { a:10, b:0 } }));
 ```
+
 When using "field chain", you need to use [`#[from_str(default)]`](#from_strdefault) to implement `FromStr`.
 
-
 ### Format parameter
+
 Like `std::format!()`, format parameter can be specified.
+
 ```rust
 use parse_display::{Display, FromStr};
 
@@ -240,7 +254,8 @@ assert_eq!(WithFormatParameter { a:5 }.to_string(), "0005");
 ```
 
 ## `#[display(style = "...")]`
-By writing `#[display(style = "..")]`, you can specify the variant name style.
+
+By writing `#[display(style = "...")]`, you can specify the variant name style.
 The following styles are available.
 
 - none
@@ -303,14 +318,88 @@ assert_eq!(StyleExample::VarH.to_string(), "var-h");
 assert_eq!(StyleExample::VarI.to_string(), "VAR-I");
 ```
 
+## `#[display(bound("..."))]`
+
+By default, the type of field used in the format is added to the trait bound.
+
+This behavior causes a compile error if you use fields of non public type in public struct.
+
+```compile_error
+#![deny(private_in_public)]
+use parse_display::Display;
+
+// private type `Inner<T>` in public interface (error E0446)
+#[derive(Display)]
+pub struct Outer<T>(Inner<T>);
+
+#[derive(Display)]
+struct Inner<T>(T);
+```
+
+By writing `#[display(bound(...))]`, you can override the default behavior.
+
+### Specify trait bound type
+
+By specifying the type, you can specify the type that need to implement `Display` and `FromStr`.
+
+```rust
+use parse_display::Display;
+
+#[derive(Display)]
+#[display(bound(T))]
+pub struct Outer<T>(Inner<T>);
+
+#[derive(Display)]
+struct Inner<T>(T);
+
+assert_eq!(Outer(Inner(10)).to_string(), "10");
+```
+
+### Specify where predicate
+
+You can also specify the where predicate as a string.
+
+```rust
+use parse_display::Display;
+
+#[derive(Display)]
+#[display(bound("T : std::fmt::Debug"))]
+pub struct Outer<T>(Inner<T>);
+
+#[derive(Display)]
+#[display("{0:?}")]
+struct Inner<T>(T);
+
+assert_eq!(Outer(Inner(10)).to_string(), "10");
+```
+
+### No trait bounds
+
+You can also remove all trait bounds.
+
+```rust
+use parse_display::Display;
+
+#[derive(Display)]
+#[display(bound())]
+pub struct Outer<T>(Inner<T>);
+
+#[derive(Display)]
+#[display("ABC")]
+struct Inner<T>(T);
+
+assert_eq!(Outer(Inner(10)).to_string(), "ABC");
+```
+
 ## `#[from_str(regex = "...")]`
 
 Specify the format of the string to be input with `FromStr`.
- `#[display("...")]` is ignored, when this attribute is specified.
+`#[display("...")]` is ignored, when this attribute is specified.
 
 ### Capture name
 
 The capture name corresponds to the field name.
+
 ```rust
 use parse_display::FromStr;
 
@@ -346,7 +435,6 @@ assert_eq!("10__20".parse(), Ok(MyStruct { a:10, b:20 }));
 If `#[from_str(regex = "...")]` is not set to field ,
 it operates in the same way as when `#[from_str(regex = ".*?")]` is set.
 
-
 ```rust
 use parse_display::FromStr;
 
@@ -378,7 +466,7 @@ assert_eq!("___VarA___".parse(), Ok(MyEnum::VarA));
 assert_eq!("xxxVarBxxx".parse(), Ok(MyEnum::VarB));
 ```
 
-### Field chain
+### Regex field chain
 
 You can use "field chain" in regex.
 
