@@ -51,8 +51,8 @@ Helper attributes can be written in the following positions.
 | [`#[display("...")]`](#display)                               | ✔      | ✔    | ✔       | ✔     |
 | [`#[display(style = "...")]`](#displaystyle--)                |        | ✔    | ✔       |       |
 | [`#[display(bound(...))]`](#displaybound)                     | ✔      | ✔    |         |       |
-| [`#[from_str(regex = "...")]`](#from_strregex--)              | ✔      | ✔    | ✔       | ✔     |
 | [`#[from_str(bound(...))]`](#from_strbound)                   | ✔      | ✔    |         |       |
+| [`#[from_str(regex = "...")]`](#from_strregex--)              | ✔      | ✔    | ✔       | ✔     |
 | [`#[from_str(default)]`](#from_strdefault)                    | ✔      | ✔    |         | ✔     |
 | [`#[from_str(default_fields(...))]`](#from_strdefault_fields) | ✔      | ✔    | ✔       |       |
 
@@ -349,16 +349,17 @@ By writing `#[display(bound(...))]`, you can override the default behavior.
 By specifying the type, you can specify the type that need to implement `Display` and `FromStr`.
 
 ```rust
-use parse_display::Display;
+use parse_display::{Display, FromStr};
 
-#[derive(Display)]
+#[derive(Display, FromStr, PartialEq, Debug)]
 #[display(bound(T))]
 pub struct Outer<T>(Inner<T>);
 
-#[derive(Display)]
+#[derive(Display, FromStr, PartialEq, Debug)]
 struct Inner<T>(T);
 
 assert_eq!(Outer(Inner(10)).to_string(), "10");
+assert_eq!("10".parse(), Ok(Outer(Inner(10))));
 ```
 
 ### Specify where predicate
@@ -395,6 +396,26 @@ pub struct Outer<T>(Inner<T>);
 struct Inner<T>(T);
 
 assert_eq!(Outer(Inner(10)).to_string(), "ABC");
+```
+
+## `#[from_str(bound("..."))]`
+
+You can use a different trait bound for `Display` and `FromStr` by specifying both `#[display(bound(...))]` and `#[from_str(bound(...))]`.
+
+```rust
+use parse_display::*;
+use std::{fmt::Display, str::FromStr};
+
+#[derive(Display, FromStr, PartialEq, Debug)]
+#[display(bound("T : Display"))]
+#[from_str(bound("T : FromStr"))]
+pub struct Outer<T>(Inner<T>);
+
+#[derive(Display, FromStr, PartialEq, Debug)]
+struct Inner<T>(T);
+
+assert_eq!(Outer(Inner(10)).to_string(), "10");
+assert_eq!("10".parse(), Ok(Outer(Inner(10))));
 ```
 
 ## `#[from_str(regex = "...")]`
