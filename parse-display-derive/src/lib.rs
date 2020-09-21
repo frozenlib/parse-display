@@ -102,6 +102,7 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream 
         .variants
         .iter()
         .map(|v| make_arm(input, &hattrs, v, &mut wheres, &generics));
+    let trait_path = quote! { core::fmt::Display };
     let contents = quote! {
         fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
             match self {
@@ -109,7 +110,8 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream 
             }
         }
     };
-    make_trait_impl(input, &quote! { core::fmt::Display }, wheres, contents)
+    let wheres = Bound::build_wheres(hattrs.bound, &trait_path, true).unwrap_or(wheres);
+    make_trait_impl(input, &trait_path, wheres, contents)
 }
 
 #[proc_macro_derive(FromStr, attributes(display, from_str))]

@@ -648,22 +648,33 @@ pub struct TestStructPrivateInPublicGeneric<T>(TestStructPrivateGeneric<T>);
 struct TestStructPrivateGeneric<T>(T);
 
 #[test]
-fn bound_predicate() {
+fn bound_predicate_struct() {
+    #[derive(Display)]
+    #[display(bound("T : Copy"))]
+    struct TestStructBoundPredicate<T>(DisplayIfCopy<T>);
+
+    struct DisplayIfCopy<T>(T);
+
+    impl<T: Copy> core::fmt::Display for DisplayIfCopy<T> {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+            write!(f, "this is display")
+        }
+    }
     assert_display(
         TestStructBoundPredicate(DisplayIfCopy(10)),
         "this is display",
     );
 }
 
-#[derive(Display)]
-#[display(bound("T : Copy"))]
-struct TestStructBoundPredicate<T>(DisplayIfCopy<T>);
-struct DisplayIfCopy<T>(T);
-
-impl<T: Copy> core::fmt::Display for DisplayIfCopy<T> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "this is display")
+#[test]
+fn bound_type_enum() {
+    assert_display(Outer::A(Inner(10)), "10");
+    #[derive(Display)]
+    #[display("{0.0}", bound(T))]
+    enum Outer<T> {
+        A(Inner<T>),
     }
+    struct Inner<T>(T);
 }
 
 fn assert_display<T: core::fmt::Display>(value: T, display: &str) {
