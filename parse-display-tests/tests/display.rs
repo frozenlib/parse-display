@@ -632,6 +632,40 @@ pub struct TestStructPrivateInPublic(TestStructPrivate);
 #[derive(Display)]
 struct TestStructPrivate(u8);
 
+#[test]
+fn private_in_public_generic() {
+    assert_display(
+        TestStructPrivateInPublicGeneric(TestStructPrivateGeneric(5)),
+        "5",
+    );
+}
+
+#[derive(Display)]
+#[display(bound(T))]
+pub struct TestStructPrivateInPublicGeneric<T>(TestStructPrivateGeneric<T>);
+
+#[derive(Display)]
+struct TestStructPrivateGeneric<T>(T);
+
+#[test]
+fn bound_predicate() {
+    assert_display(
+        TestStructBoundPredicate(DisplayIfCopy(10)),
+        "this is display",
+    );
+}
+
+#[derive(Display)]
+#[display(bound("T : Copy"))]
+struct TestStructBoundPredicate<T>(DisplayIfCopy<T>);
+struct DisplayIfCopy<T>(T);
+
+impl<T: Copy> core::fmt::Display for DisplayIfCopy<T> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "this is display")
+    }
+}
+
 fn assert_display<T: core::fmt::Display>(value: T, display: &str) {
     let value_display = alloc::format!("{}", value);
     assert_eq!(value_display, display);

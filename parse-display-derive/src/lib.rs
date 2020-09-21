@@ -43,9 +43,11 @@ fn derive_display_for_struct(input: &DeriveInput, data: &DataStruct) -> TokenStr
         .expect("`#[display(\"format\")]` is required except newtype pattern.")
         .format_args(ctx, &mut wheres, &generics);
 
+    let trait_path = quote! { core::fmt::Display };
+    let wheres = Bound::build_wheres(hattrs.bound, &trait_path, true).unwrap_or(wheres);
     make_trait_impl(
         input,
-        quote! { core::fmt::Display },
+        &trait_path,
         wheres,
         quote! {
             fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
@@ -107,7 +109,7 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream 
             }
         }
     };
-    make_trait_impl(input, quote! { core::fmt::Display }, wheres, contents)
+    make_trait_impl(input, &quote! { core::fmt::Display }, wheres, contents)
 }
 
 #[proc_macro_derive(FromStr, attributes(display, from_str))]
@@ -120,13 +122,14 @@ pub fn derive_from_str(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
     }
 }
 fn derive_from_str_for_struct(input: &DeriveInput, data: &DataStruct) -> TokenStream {
-    let tree = FieldTree::from_struct(input, data);
+    let hattrs = HelperAttributes::from(&input.attrs);
+    let tree = FieldTree::from_struct(&hattrs, data);
     let body = tree.build_from_str_body(&data.fields, quote!(Self));
     let generics = GenericParamSet::new(&input.generics);
     let wheres = tree.build_wheres(&data.fields, &generics);
     make_trait_impl(
         input,
-        quote! { core::str::FromStr },
+        &quote! { core::str::FromStr },
         wheres,
         quote! {
             type Err = parse_display::ParseError;
@@ -162,7 +165,7 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream
     }
     make_trait_impl(
         input,
-        quote! { core::str::FromStr },
+        &quote! { core::str::FromStr },
         wheres,
         quote! {
             type Err = parse_display::ParseError;
@@ -196,8 +199,7 @@ impl FieldTree {
             hirs: vec![Hir::anchor(regex_syntax::hir::Anchor::StartText)],
         }
     }
-    fn from_struct(input: &DeriveInput, data: &DataStruct) -> Self {
-        let hattrs = HelperAttributes::from(&input.attrs);
+    fn from_struct(hattrs: &HelperAttributes, data: &DataStruct) -> Self {
         let mut s = Self::new();
         let ctx = DisplayContext::Struct { data };
         s.push_attrs(&hattrs, &ctx);
@@ -522,7 +524,7 @@ fn get_newtype_field(data: &DataStruct) -> Option<String> {
 
 fn make_trait_impl(
     input: &DeriveInput,
-    trait_path: TokenStream,
+    trait_path: &TokenStream,
     mut wheres: Vec<WherePredicate>,
     contents: TokenStream,
 ) -> TokenStream {
@@ -551,15 +553,18 @@ fn make_trait_impl(
 struct HelperAttributes {
     format: Option<DisplayFormat>,
     style: Option<DisplayStyle>,
+    bound: Option<Vec<Bound>>,
     regex: Option<String>,
     default_self: bool,
     default_fields: Vec<String>,
 }
 const DISPLAY_HELPER_USAGE: &str = "The following syntax are available.
 #[display(\"...\")]
-#[display(style = \"...\")]";
+#[display(style = \"...\")]
+#[display(bound(...)]";
 const FROM_STR_HELPER_USAGE: &str = "The following syntax are available.
 #[from_str(regex = \"...\")]
+#[from_str(bound(...)]
 #[from_str(default)]
 #[from_str(default_fields(...))]";
 impl HelperAttributes {
@@ -567,6 +572,7 @@ impl HelperAttributes {
         let mut hattrs = Self {
             format: None,
             style: None,
+            bound: None,
             regex: None,
             default_self: false,
             default_fields: Vec::new(),
@@ -619,6 +625,7 @@ impl HelperAttributes {
                 }
                 self.style = Some(DisplayStyle::from(&s.value()));
             }
+            NestedMeta::Meta(Meta::List(l)) if l.path.is_ident("bound") => self.set_bound(l),
             m => {
                 panic!(
                     "`{}` is not allowed. \n{}",
@@ -640,6 +647,7 @@ impl HelperAttributes {
                 }
                 self.regex = Some(s.value());
             }
+            NestedMeta::Meta(Meta::List(l)) if l.path.is_ident("bound") => self.set_bound(l),
             NestedMeta::Meta(Meta::Path(path)) if path.is_ident("default") => {
                 self.default_self = true;
             }
@@ -671,6 +679,12 @@ impl HelperAttributes {
                     FROM_STR_HELPER_USAGE
                 );
             }
+        }
+    }
+    fn set_bound(&mut self, l: &MetaList) {
+        let b = self.bound.get_or_insert(Vec::new());
+        for m in l.nested.iter() {
+            b.push(Bound::from(m));
         }
     }
 }
@@ -988,6 +1002,50 @@ impl<'a> DisplayContext<'a> {
             DisplayContext::Variant { variant, .. } => Some(&variant.fields),
             DisplayContext::Field { .. } => None,
         }
+    }
+}
+
+enum Bound {
+    Type(Path),
+    Pred(WherePredicate),
+}
+impl Bound {
+    fn from(m: &NestedMeta) -> Self {
+        match m {
+            NestedMeta::Lit(Lit::Str(s)) => {
+                let s = s.value();
+                match parse_str(&s) {
+                    Ok(w) => Bound::Pred(w),
+                    Err(e) => panic!("invalid bound \"{}\". {}", s, e),
+                }
+            }
+            NestedMeta::Meta(Meta::Path(p)) => Bound::Type(p.clone()),
+            _ => panic!(format!("invalid bound \"{}\".", quote! {#m})),
+        }
+    }
+    fn build_where(&self, trait_path: &TokenStream, use_pred: bool) -> Option<WherePredicate> {
+        let s = match self {
+            Bound::Type(type_path) => quote!(#type_path : #trait_path),
+            Bound::Pred(w) => {
+                if !use_pred {
+                    return None;
+                }
+                quote!(#w)
+            }
+        };
+        Some(parse2(s).unwrap())
+    }
+    fn build_wheres(
+        bound: Option<Vec<Bound>>,
+        trait_path: &TokenStream,
+        use_pred: bool,
+    ) -> Option<Vec<WherePredicate>> {
+        Some(
+            bound?
+                .iter()
+                .flat_map(|x| x.build_where(trait_path, use_pred))
+                .collect(),
+        )
     }
 }
 
