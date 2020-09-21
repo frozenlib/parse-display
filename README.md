@@ -50,7 +50,7 @@ Helper attributes can be written in the following positions.
 | ------------------------------------------------------------- | ------ | ---- | ------- | ----- |
 | [`#[display("...")]`](#display)                               | ✔      | ✔    | ✔       | ✔     |
 | [`#[display(style = "...")]`](#displaystyle--)                |        | ✔    | ✔       |       |
-| [`#[display(bound = "...")]`](#displaybound)                  | ✔      | ✔    |         |       |
+| [`#[display(bound(...))]`](#displaybound)                     | ✔      | ✔    |         |       |
 | [`#[from_str(regex = "...")]`](#from_strregex--)              | ✔      | ✔    | ✔       | ✔     |
 | [`#[from_str(bound(...))]`](#from_strbound)                   | ✔      | ✔    |         |       |
 | [`#[from_str(default)]`](#from_strdefault)                    | ✔      | ✔    |         | ✔     |
