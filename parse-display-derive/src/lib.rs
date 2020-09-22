@@ -49,6 +49,7 @@ fn derive_display_for_struct(input: &DeriveInput, data: &DataStruct) -> TokenStr
         input,
         &trait_path,
         wheres,
+        hattrs.debug_mode,
         quote! {
             fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
                 core::write!(f, #args)
@@ -111,7 +112,7 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream 
         }
     };
     let wheres = Bound::build_wheres(hattrs.bound_display, &trait_path).unwrap_or(wheres);
-    make_trait_impl(input, &trait_path, wheres, contents)
+    make_trait_impl(input, &trait_path, wheres, hattrs.debug_mode, contents)
 }
 
 #[proc_macro_derive(FromStr, attributes(display, from_str))]
@@ -137,6 +138,7 @@ fn derive_from_str_for_struct(input: &DeriveInput, data: &DataStruct) -> TokenSt
         input,
         &trait_path,
         wheres,
+        hattrs.debug_mode,
         quote! {
             type Err = parse_display::ParseError;
             fn from_str(s: &str) -> core::result::Result<Self, Self::Err> {
@@ -180,6 +182,7 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream
         input,
         &trait_path,
         wheres,
+        hattrs_enum.debug_mode,
         quote! {
             type Err = parse_display::ParseError;
             fn from_str(s: &str) -> core::result::Result<Self, Self::Err> {
@@ -539,6 +542,7 @@ fn make_trait_impl(
     input: &DeriveInput,
     trait_path: &TokenStream,
     mut wheres: Vec<WherePredicate>,
+    debug_mode: bool,
     contents: TokenStream,
 ) -> TokenStream {
     let self_id = &input.ident;
@@ -555,12 +559,16 @@ fn make_trait_impl(
         quote! { where #(#wheres,)*}
     };
 
-    quote! {
+    let code = quote! {
         #[automatically_derived]
         impl #impl_g #trait_path for #self_id #self_g #impl_where {
             #contents
         }
+    };
+    if debug_mode {
+        panic!("debug mode:\n{}", code);
     }
+    code
 }
 
 struct HelperAttributes {
@@ -571,6 +579,7 @@ struct HelperAttributes {
     regex: Option<String>,
     default_self: bool,
     default_fields: Vec<String>,
+    debug_mode: bool,
 }
 const DISPLAY_HELPER_USAGE: &str = "The following syntax are available.
 #[display(\"...\")]
@@ -591,6 +600,7 @@ impl HelperAttributes {
             regex: None,
             default_self: false,
             default_fields: Vec::new(),
+            debug_mode: false,
         };
         for a in attrs {
             if a.path.is_ident("display") {
@@ -632,6 +642,9 @@ impl HelperAttributes {
             }
             NestedMeta::Meta(Meta::List(l)) if l.path.is_ident("bound") => {
                 Bound::from_meta_list(&mut self.bound_display, l)
+            }
+            NestedMeta::Meta(Meta::Path(p)) if p.is_ident("debug_mode") => {
+                self.debug_mode = true;
             }
             m => panic!(
                 "`{}` is not allowed. \n{}",
