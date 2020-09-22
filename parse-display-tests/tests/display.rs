@@ -677,6 +677,18 @@ fn bound_type_enum() {
     struct Inner<T>(T);
 }
 
+#[test]
+fn bound_type_generic() {
+    assert_display(Outer(Inner(5)), "5");
+
+    #[derive(Display)]
+    #[display(bound(Inner<T>))]
+    struct Outer<T>(Inner<T>);
+
+    #[derive(Display)]
+    struct Inner<T>(T);
+}
+
 fn assert_display<T: core::fmt::Display>(value: T, display: &str) {
     let value_display = alloc::format!("{}", value);
     assert_eq!(value_display, display);

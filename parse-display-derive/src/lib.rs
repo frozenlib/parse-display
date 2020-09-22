@@ -15,7 +15,7 @@ use crate::regex_utils::*;
 use crate::syn_utils::*;
 use once_cell::sync::Lazy;
 use proc_macro2::TokenStream;
-use quote::quote;
+use quote::{quote, ToTokens};
 use regex::*;
 use regex_syntax::hir::Hir;
 use std::borrow::Cow;
@@ -243,7 +243,7 @@ impl FieldTree {
             } else {
                 s.replace(".", "_")
             };
-            let s = REGEX_NUMBER.replace(&s, "_$0");
+            let s = REGEX_NUMBER.replace(&s, "_");
             format!("(?P<{}>", s)
         });
         if let Err(e) = regex_syntax::ast::parse::Parser::new().parse(&s_debug) {
@@ -590,31 +590,21 @@ impl HelperAttributes {
             default_fields: Vec::new(),
         };
         for a in attrs {
-            let m = a.parse_meta().unwrap();
-            match &m {
-                Meta::List(ml) if ml.path.is_ident("display") => {
-                    for m in ml.nested.iter() {
-                        hattrs.set_display_nested_meta(m);
-                    }
+            if a.path.is_ident("display") {
+                let args = a.parse_args_with(parse_attr_args).unwrap_or_else(|e| {
+                    panic!("invalid metadata \"{}\". {}", a.to_token_stream(), e)
+                });
+                for m in args.iter() {
+                    hattrs.set_display_nested_meta(m);
                 }
-                Meta::NameValue(nv) if nv.path.is_ident("display") => {
-                    panic!(
-                        "`#[display = ..]` is not allowed. \n{}",
-                        DISPLAY_HELPER_USAGE
-                    );
+            }
+            if a.path.is_ident("from_str") {
+                let args = a.parse_args_with(parse_attr_args).unwrap_or_else(|e| {
+                    panic!("invalid metadata \"{}\". {}", a.to_token_stream(), e)
+                });
+                for m in args.iter() {
+                    hattrs.set_from_str_nested_meta(m);
                 }
-                Meta::List(ml) if ml.path.is_ident("from_str") => {
-                    for m in ml.nested.iter() {
-                        hattrs.set_from_str_nested_meta(m);
-                    }
-                }
-                Meta::NameValue(nv) if nv.path.is_ident("from_str") => {
-                    panic!(
-                        "`#[from_str = ..]` is not allowed. \n{}",
-                        FROM_STR_HELPER_USAGE
-                    );
-                }
-                _ => {}
             }
         }
         hattrs
@@ -640,13 +630,11 @@ impl HelperAttributes {
             NestedMeta::Meta(Meta::List(l)) if l.path.is_ident("bound") => {
                 Bound::from_meta_list(&mut self.bound_display, l)
             }
-            m => {
-                panic!(
-                    "`{}` is not allowed. \n{}",
-                    quote! { #m },
-                    DISPLAY_HELPER_USAGE
-                );
-            }
+            m => panic!(
+                "`{}` is not allowed. \n{}",
+                m.to_token_stream(),
+                DISPLAY_HELPER_USAGE
+            ),
         }
     }
     fn set_from_str_nested_meta(&mut self, m: &NestedMeta) {
