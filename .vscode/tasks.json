@@ -47,7 +47,12 @@
       "presentation": {
         "panel": "dedicated",
         "clear": true
-      }
+      },
+      // "options": {
+      //   "env": {
+      //     "RUST_BACKTRACE": "1"
+      //   }
+      // }
     },
     {
       "type": "shell",
