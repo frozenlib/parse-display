@@ -481,7 +481,7 @@ fn from_str_enum_regex_struct_var() {
 }
 
 #[test]
-fn from_str_enum_var_failed() {
+fn from_str_enum_var_field() {
     #[derive(FromStr, Debug, PartialEq)]
     #[display("{0}")]
     enum TestEnum {
