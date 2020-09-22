@@ -417,10 +417,7 @@ impl FieldTree {
                 }
                 Fields::Unit => quote! {},
             };
-            quote! {
-                let mut value = #constructor #ps;
-                return Ok(value);
-            }
+            quote! { return Ok(#constructor #ps); }
         };
         let regex = self.build_regex();
         quote! {
@@ -615,18 +612,15 @@ impl HelperAttributes {
             debug_mode: false,
         };
         for a in attrs {
+            let args = a
+                .parse_args_with(parse_attr_args)
+                .unwrap_or_else(|e| panic!("invalid metadata \"{}\". {}", a.to_token_stream(), e));
             if a.path.is_ident("display") {
-                let args = a.parse_args_with(parse_attr_args).unwrap_or_else(|e| {
-                    panic!("invalid metadata \"{}\". {}", a.to_token_stream(), e)
-                });
                 for m in args.iter() {
                     hattrs.set_display_nested_meta(m);
                 }
             }
             if a.path.is_ident("from_str") {
-                let args = a.parse_args_with(parse_attr_args).unwrap_or_else(|e| {
-                    panic!("invalid metadata \"{}\". {}", a.to_token_stream(), e)
-                });
                 for m in args.iter() {
                     hattrs.set_from_str_nested_meta(m);
                 }
