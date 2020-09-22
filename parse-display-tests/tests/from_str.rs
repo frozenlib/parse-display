@@ -179,6 +179,28 @@ fn from_str_struct_field_format_chain() {
         },
     );
 }
+#[test]
+fn from_str_enum_named_field_chain() {
+    #[derive(FromStr, Eq, PartialEq, Debug)]
+    enum TestEnum {
+        #[display("{x.0}-{x.1}")]
+        A {
+            #[from_str(default)]
+            x: (u8, u8),
+        },
+    }
+    assert_from_str("5-6", TestEnum::A { x: (5, 6) });
+}
+
+#[test]
+fn from_str_enum_unnamed_field_chain() {
+    #[derive(FromStr, Eq, PartialEq, Debug)]
+    enum TestEnum {
+        #[display("{0.0}-{0.1}")]
+        A(#[from_str(default)] (u8, u8)),
+    }
+    assert_from_str("5-6", TestEnum::A((5, 6)));
+}
 
 #[test]
 fn from_str_struct_deep_regex() {

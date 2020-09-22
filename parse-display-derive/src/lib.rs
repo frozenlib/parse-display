@@ -193,18 +193,17 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream
     )
 }
 
-#[derive(Debug)]
 struct FieldTree {
     root: FieldEntry,
     capture_next: usize,
     hirs: Vec<Hir>,
 }
-#[derive(Debug)]
 struct FieldEntry {
     fields: HashMap<FieldKey, FieldEntry>,
     capture: Option<usize>,
     use_default: bool,
     is_need_bounds: bool,
+    ty: Option<Type>,
 }
 
 impl FieldTree {
@@ -220,7 +219,7 @@ impl FieldTree {
         let ctx = DisplayContext::Struct { data };
         s.push_attrs(&hattrs, &ctx);
         s.root.set_default(&hattrs);
-        s.root.set_default_by_fields(&data.fields);
+        s.root.apply_fields(&data.fields);
         s
     }
     fn from_variant(has_enum: &HelperAttributes, variant: &Variant) -> Self {
@@ -233,7 +232,7 @@ impl FieldTree {
         }
         s.root.set_default(has_enum);
         s.root.set_default(has_variant);
-        s.root.set_default_by_fields(&variant.fields);
+        s.root.apply_fields(&variant.fields);
         s
     }
 
@@ -352,10 +351,29 @@ impl FieldTree {
         Hir::concat(hirs).to_string()
     }
     fn build_from_str_body(&self, fields: &Fields, constructor: TokenStream) -> TokenStream {
-        fn to_expr(root: &FieldEntry, key: &FieldKey) -> TokenStream {
+        fn to_full_expr(root: &FieldEntry, key: &FieldKey) -> TokenStream {
             if let Some(e) = root.fields.get(&key) {
                 if let Some(expr) = e.to_expr(std::slice::from_ref(key)) {
-                    return expr;
+                    let mut setters = Vec::new();
+                    e.visit(|keys, node| {
+                        if keys.len() >= 1 {
+                            if let Some(expr) = node.to_expr(&keys) {
+                                setters.push(quote! { field_value #(.#keys)* = #expr; });
+                            }
+                        }
+                    });
+                    if setters.is_empty() {
+                        return expr;
+                    } else {
+                        let ty = e.ty.as_ref().unwrap();
+                        return quote! {
+                            {
+                                let mut field_value : #ty = #expr;
+                                #(#setters)*
+                                field_value
+                            }
+                        };
+                    }
                 }
             }
             panic!("field `{}` is not appear in format.", key);
@@ -387,29 +405,20 @@ impl FieldTree {
             let ps = match &fields {
                 Fields::Named(fields) => {
                     let fields = FieldKey::from_fields_named(fields).map(|key| {
-                        let expr = to_expr(root, &key);
+                        let expr = to_full_expr(root, &key);
                         quote! { #key : #expr }
                     });
                     quote! { { #(#fields,)* } }
                 }
                 Fields::Unnamed(fields) => {
                     let fields =
-                        FieldKey::from_fields_unnamed(fields).map(|key| to_expr(root, &key));
+                        FieldKey::from_fields_unnamed(fields).map(|key| to_full_expr(root, &key));
                     quote! { ( #(#fields,)* ) }
                 }
                 Fields::Unit => quote! {},
             };
-            let mut setters = Vec::new();
-            root.visit(|keys, node| {
-                if keys.len() >= 2 {
-                    if let Some(expr) = node.to_expr(&keys) {
-                        setters.push(quote! { value #(.#keys)* = #expr; });
-                    }
-                }
-            });
             quote! {
                 let mut value = #constructor #ps;
-                #(#setters)*
                 return Ok(value);
             }
         };
@@ -447,6 +456,7 @@ impl FieldEntry {
             capture: None,
             use_default: false,
             is_need_bounds: false,
+            ty: None,
         }
     }
     fn field(&mut self, key: FieldKey) -> &mut Self {
@@ -485,11 +495,13 @@ impl FieldEntry {
             self.field(FieldKey::from_str(field.as_str())).use_default = true;
         }
     }
-    fn set_default_by_fields(&mut self, fields: &Fields) {
+    fn apply_fields(&mut self, fields: &Fields) {
         let m = field_map(fields);
         for (key, field) in m {
             let hattrs = HelperAttributes::from(&field.attrs);
-            self.field(key).set_default(&hattrs);
+            let f = self.field(key);
+            f.set_default(&hattrs);
+            f.ty = Some(field.ty.clone());
         }
     }
 
