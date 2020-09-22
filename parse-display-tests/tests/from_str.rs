@@ -735,18 +735,18 @@ fn different_bound() {
     assert_from_str("5", Outer(Inner(5)));
 }
 
-// #[test]
-// fn bound_type_enum() {
-//     assert_from_str("10", Outer::A(Inner(10)));
-//     #[derive(FromStr, Debug, Eq, PartialEq)]
-//     #[display("{0.0}", bound(T))]
-//     #[from_str(default_fields("0"))]
-//     enum Outer<T: Default> {
-//         A(Inner<T>),
-//     }
-//     #[derive(Debug, Eq, PartialEq, Default)]
-//     struct Inner<T: Default>(T);
-// }
+#[test]
+fn bound_type_enum() {
+    assert_from_str("10", Outer::A(Inner(10)));
+    #[derive(FromStr, Debug, Eq, PartialEq)]
+    #[display("{0.0}", bound(T))]
+    #[from_str(default_fields("0"))]
+    enum Outer<T: Default> {
+        A(Inner<T>),
+    }
+    #[derive(Debug, Eq, PartialEq, Default)]
+    struct Inner<T: Default>(T);
+}
 
 fn assert_from_str<T: FromStr + Debug + PartialEq>(s: &str, value: T)
 where
