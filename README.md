@@ -327,7 +327,7 @@ assert_eq!(StyleExample::VarH.to_string(), "var-h");
 assert_eq!(StyleExample::VarI.to_string(), "VAR-I");
 ```
 
-## `#[display(bound("..."))]`
+## `#[display(bound(...))]`
 
 By default, the type of field used in the format is added to the trait bound.
 
@@ -401,7 +401,7 @@ struct Inner<T>(T);
 assert_eq!(Outer(Inner(10)).to_string(), "ABC");
 ```
 
-## `#[from_str(bound("..."))]`
+## `#[from_str(bound(...))]`
 
 You can use a different trait bound for `Display` and `FromStr` by specifying both `#[display(bound(...))]` and `#[from_str(bound(...))]`.
 
