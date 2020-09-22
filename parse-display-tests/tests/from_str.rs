@@ -334,6 +334,40 @@ fn from_str_struct_default_fields_ident_keyword() {
     }
     assert_from_str("12", TestStruct { r#fn: 12 });
 }
+#[test]
+fn from_str_enum_field_default() {
+    #[derive(FromStr, PartialEq, Debug)]
+    #[display("{a}")]
+    enum TestEnum {
+        VerA {
+            a: u8,
+            #[from_str(default)]
+            b: u8,
+        },
+    }
+    assert_from_str("10", TestEnum::VerA { a: 10, b: 0 });
+}
+
+#[test]
+fn from_str_enum_tuple_field_default() {
+    #[derive(FromStr, PartialEq, Debug)]
+    #[display("{0}")]
+    enum TestEnum {
+        VerA(u8, #[from_str(default)] u8),
+    }
+    assert_from_str("10", TestEnum::VerA(10, 0));
+}
+
+#[test]
+fn from_str_enum_default_fields() {
+    #[derive(FromStr, PartialEq, Debug)]
+    #[display("{a}")]
+    #[from_str(default_fields(b))]
+    enum TestEnum {
+        VerA { a: u8, b: u8 },
+    }
+    assert_from_str("10", TestEnum::VerA { a: 10, b: 0 });
+}
 
 #[test]
 fn from_str_tuple() {
