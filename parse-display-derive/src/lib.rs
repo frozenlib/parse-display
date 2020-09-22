@@ -148,6 +148,9 @@ fn derive_from_str_for_struct(input: &DeriveInput, data: &DataStruct) -> TokenSt
 fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream {
     let mut bodys = Vec::new();
     let hattrs_enum = HelperAttributes::from(&input.attrs);
+    if hattrs_enum.default_self {
+        panic!("`#[from_str(default)]` cannot be specified for enum.");
+    }
     let mut wheres = Vec::new();
     let generics = GenericParamSet::new(&input.generics);
     for (idx, variant) in data.variants.iter().enumerate() {

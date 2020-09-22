@@ -53,7 +53,7 @@ Helper attributes can be written in the following positions.
 | [`#[display(bound(...))]`](#displaybound)                     | ✔      | ✔    |         |       |
 | [`#[from_str(bound(...))]`](#from_strbound)                   | ✔      | ✔    |         |       |
 | [`#[from_str(regex = "...")]`](#from_strregex--)              | ✔      | ✔    | ✔       | ✔     |
-| [`#[from_str(default)]`](#from_strdefault)                    | ✔      | ✔    |         | ✔     |
+| [`#[from_str(default)]`](#from_strdefault)                    | ✔      |      |         | ✔     |
 | [`#[from_str(default_fields(...))]`](#from_strdefault_fields) | ✔      | ✔    | ✔       |       |
 
 `#[derive(Display)]` use `#[display]`.  
