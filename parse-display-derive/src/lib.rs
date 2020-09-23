@@ -438,7 +438,7 @@ impl FieldTree {
                 if e.is_need_bounds {
                     let ty = &field.ty;
                     if generics.contains_in_type(ty) {
-                        wheres.push(parse2(quote!( #ty : core::str::FromStr )).unwrap());
+                        wheres.push(parse_quote!(#ty : core::str::FromStr));
                     }
                 }
             }
@@ -980,7 +980,7 @@ impl<'a> DisplayContext<'a> {
             let ps = FormatParameters::from(&parameters).expect("invalid format parameters.");
             let tr = ps.format_type.trait_name();
             let tr: Ident = parse_str(tr).unwrap();
-            wheres.push(parse2(quote!(#ty : core::fmt::#tr)).unwrap());
+            wheres.push(parse_quote!(#ty : core::fmt::#tr));
         }
         self.field_expr(key)
     }
@@ -1050,23 +1050,17 @@ impl Bound {
         }
     }
 
-    fn build_where(&self, trait_path: &TokenStream) -> Option<WherePredicate> {
-        let s = match self {
-            Bound::Type(type_path) => quote!(#type_path : #trait_path),
-            Bound::Pred(w) => quote!(#w),
-        };
-        Some(parse2(s).unwrap())
+    fn build_where(&self, trait_path: &TokenStream) -> WherePredicate {
+        match self {
+            Bound::Type(type_path) => parse_quote!(#type_path : #trait_path),
+            Bound::Pred(w) => parse_quote!(#w),
+        }
     }
     fn build_wheres(
         bound: Option<Vec<Bound>>,
         trait_path: &TokenStream,
     ) -> Option<Vec<WherePredicate>> {
-        Some(
-            bound?
-                .iter()
-                .flat_map(|x| x.build_where(trait_path))
-                .collect(),
-        )
+        Some(bound?.iter().map(|x| x.build_where(trait_path)).collect())
     }
 }
 
