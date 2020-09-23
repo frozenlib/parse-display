@@ -15,7 +15,7 @@ use crate::regex_utils::*;
 use crate::syn_utils::*;
 use once_cell::sync::Lazy;
 use proc_macro2::TokenStream;
-use quote::{quote, ToTokens};
+use quote::{format_ident, quote, ToTokens};
 use regex::*;
 use regex_syntax::hir::Hir;
 use std::borrow::Cow;
@@ -163,7 +163,7 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream
         let tree = FieldTree::from_variant(&hattrs_enum, variant);
         let body = tree.build_from_str_body(&variant.fields, ctor);
         wheres.extend(tree.build_wheres(&variant.fields, &generics));
-        let fn_ident: Ident = parse_str(&format!("parse_{}", idx)).unwrap();
+        let fn_ident: Ident = format_ident!("parse_{}", idx);
         let body = quote! {
             let #fn_ident = |s: &str| -> core::result::Result<Self, parse_display::ParseError> {
                 #body
@@ -1111,7 +1111,7 @@ impl FieldKey {
 
     fn to_member(&self) -> Member {
         match self {
-            FieldKey::Named(s) => Member::Named(parse_str(&format!("r#{}", &s)).unwrap()),
+            FieldKey::Named(s) => Member::Named(format_ident!("r#{}", s)),
             FieldKey::Unnamed(idx) => Member::Unnamed(parse_str(&format!("{}", idx)).unwrap()),
         }
     }
