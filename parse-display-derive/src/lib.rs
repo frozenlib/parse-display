@@ -7,45 +7,56 @@ extern crate proc_macro;
 #[macro_use]
 mod regex_utils;
 
-mod format_syntax;
+#[macro_use]
 mod syn_utils;
+
+mod format_syntax;
 
 use crate::format_syntax::*;
 use crate::regex_utils::*;
 use crate::syn_utils::*;
 use once_cell::sync::Lazy;
-use proc_macro2::TokenStream;
-use quote::{format_ident, quote, ToTokens};
-use regex::*;
+use proc_macro2::{Span, TokenStream};
+use quote::{format_ident, quote};
+use regex::{Captures, Regex};
 use regex_syntax::hir::Hir;
-use std::borrow::Cow;
+use spanned::Spanned;
 use std::collections::HashMap;
+use std::{borrow::Cow, fmt::Display};
 use syn::*;
 
 #[proc_macro_derive(Display, attributes(display))]
 pub fn derive_display(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
-    match &input.data {
-        Data::Struct(data) => derive_display_for_struct(&input, data).into(),
-        Data::Enum(data) => derive_display_for_enum(&input, data).into(),
+    into_macro_output(match &input.data {
+        Data::Struct(data) => derive_display_for_struct(&input, data),
+        Data::Enum(data) => derive_display_for_enum(&input, data),
         _ => panic!("`#[derive(Display)]` supports only enum or struct."),
-    }
+    })
 }
 
-fn derive_display_for_struct(input: &DeriveInput, data: &DataStruct) -> TokenStream {
-    let hattrs = HelperAttributes::from(&input.attrs);
+fn derive_display_for_struct(input: &DeriveInput, data: &DataStruct) -> Result<TokenStream> {
+    let hattrs = HelperAttributes::from(&input.attrs)?;
     let mut wheres = Vec::new();
     let ctx = DisplayContext::Struct { data };
     let generics = GenericParamSet::new(&input.generics);
-    let args = hattrs
-        .format
-        .or_else(|| DisplayFormat::from_newtype_struct(data))
-        .expect("`#[display(\"format\")]` is required except newtype pattern.")
-        .format_args(ctx, &mut wheres, &generics);
+
+    let mut format = hattrs.format;
+    if format.is_none() {
+        format = DisplayFormat::from_newtype_struct(data);
+    }
+    let format = match format {
+        Some(x) => x,
+        None => bail!(
+            input.span(),
+            "`#[display(\"format\")]` is required except newtype pattern.",
+        ),
+    };
+    let args = format.format_args(ctx, &mut wheres, &generics)?;
 
     let trait_path = quote! { core::fmt::Display };
     let wheres = Bound::build_wheres(hattrs.bound_display, &trait_path).unwrap_or(wheres);
-    make_trait_impl(
+    Ok(make_trait_impl(
         input,
         &trait_path,
         wheres,
@@ -55,54 +66,65 @@ fn derive_display_for_struct(input: &DeriveInput, data: &DataStruct) -> TokenStr
                 core::write!(f, #args)
             }
         },
-    )
+    ))
 }
-fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream {
+fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<TokenStream> {
     fn make_arm(
         input: &DeriveInput,
         has_enum: &HelperAttributes,
         variant: &Variant,
         wheres: &mut Vec<WherePredicate>,
         generics: &GenericParamSet,
-    ) -> TokenStream {
+    ) -> Result<TokenStream> {
         let fields = match &variant.fields {
             Fields::Named(fields) => {
-                let fields = FieldKey::from_fields_named(fields).map(|key| {
+                let fields = FieldKey::from_fields_named(fields).map(|(key, ..)| {
                     let var = key.binding_var();
                     quote! { #key : #var }
                 });
                 quote! { { #(#fields,)* } }
             }
             Fields::Unnamed(fields) => {
-                let fields = FieldKey::from_fields_unnamed(fields).map(|key| key.binding_var());
+                let fields =
+                    FieldKey::from_fields_unnamed(fields).map(|(key, ..)| key.binding_var());
                 quote! { ( #(#fields,)* ) }
             }
             Fields::Unit => quote! {},
         };
-        let has_variant = HelperAttributes::from(&variant.attrs);
+        let has_variant = HelperAttributes::from(&variant.attrs)?;
         let style = DisplayStyle::from_helper_attributes(has_enum, &has_variant);
-        let format = has_variant
-            .format
-            .or_else(|| has_enum.format.clone())
-            .or_else(|| DisplayFormat::from_unit_variant(&variant))
-            .expect("`#[display(\"format\")]` is required except unit variant.");
+        let mut format = has_variant.format;
+        if format.is_none() {
+            format = has_enum.format.clone();
+        }
+        if format.is_none() {
+            format = DisplayFormat::from_unit_variant(&variant)?;
+        }
+        let format = match format {
+            Some(x) => x,
+            None => bail!(
+                variant.span(),
+                "`#[display(\"format\")]` is required except unit variant."
+            ),
+        };
 
         let enum_ident = &input.ident;
         let variant_ident = &variant.ident;
-        let args = format.format_args(DisplayContext::Variant { variant, style }, wheres, generics);
-        quote! {
+        let args =
+            format.format_args(DisplayContext::Variant { variant, style }, wheres, generics)?;
+        Ok(quote! {
             #enum_ident::#variant_ident #fields => {
                 core::write!(f, #args)
             },
-        }
+        })
     }
-    let hattrs = HelperAttributes::from(&input.attrs);
+    let hattrs = HelperAttributes::from(&input.attrs)?;
     let mut wheres = Vec::new();
     let generics = GenericParamSet::new(&input.generics);
-    let arms = data
-        .variants
-        .iter()
-        .map(|v| make_arm(input, &hattrs, v, &mut wheres, &generics));
+    let mut arms = Vec::new();
+    for variant in &data.variants {
+        arms.push(make_arm(input, &hattrs, variant, &mut wheres, &generics)?);
+    }
     let trait_path = quote! { core::fmt::Display };
     let contents = quote! {
         fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
@@ -112,29 +134,35 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream 
         }
     };
     let wheres = Bound::build_wheres(hattrs.bound_display, &trait_path).unwrap_or(wheres);
-    make_trait_impl(input, &trait_path, wheres, hattrs.debug_mode, contents)
+    Ok(make_trait_impl(
+        input,
+        &trait_path,
+        wheres,
+        hattrs.debug_mode,
+        contents,
+    ))
 }
 
 #[proc_macro_derive(FromStr, attributes(display, from_str))]
 pub fn derive_from_str(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
-    match &input.data {
-        Data::Struct(data) => derive_from_str_for_struct(&input, data).into(),
-        Data::Enum(data) => derive_from_str_for_enum(&input, data).into(),
+    into_macro_output(match &input.data {
+        Data::Struct(data) => derive_from_str_for_struct(&input, data),
+        Data::Enum(data) => derive_from_str_for_enum(&input, data),
         _ => panic!("`#[derive(FromStr)]` supports only enum or struct."),
-    }
+    })
 }
-fn derive_from_str_for_struct(input: &DeriveInput, data: &DataStruct) -> TokenStream {
-    let hattrs = HelperAttributes::from(&input.attrs);
-    let tree = FieldTree::from_struct(&hattrs, data);
-    let body = tree.build_from_str_body(&data.fields, quote!(Self));
+fn derive_from_str_for_struct(input: &DeriveInput, data: &DataStruct) -> Result<TokenStream> {
+    let hattrs = HelperAttributes::from(&input.attrs)?;
+    let tree = FieldTree::from_struct(&hattrs, data)?;
+    let body = tree.build_from_str_body(&data.fields, quote!(Self))?;
     let generics = GenericParamSet::new(&input.generics);
     let wheres = tree.build_wheres(&data.fields, &generics);
     let trait_path = quote! { core::str::FromStr };
     let wheres = Bound::build_wheres(hattrs.bound_from_str, &trait_path)
         .or(Bound::build_wheres(hattrs.bound_display, &trait_path))
         .unwrap_or(wheres);
-    make_trait_impl(
+    Ok(make_trait_impl(
         input,
         &trait_path,
         wheres,
@@ -145,13 +173,13 @@ fn derive_from_str_for_struct(input: &DeriveInput, data: &DataStruct) -> TokenSt
                 #body
             }
         },
-    )
+    ))
 }
-fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream {
+fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<TokenStream> {
     let mut bodys = Vec::new();
-    let hattrs_enum = HelperAttributes::from(&input.attrs);
-    if hattrs_enum.default_self {
-        panic!("`#[from_str(default)]` cannot be specified for enum.");
+    let hattrs_enum = HelperAttributes::from(&input.attrs)?;
+    if let Some(span) = hattrs_enum.default_self {
+        bail!(span, "`#[from_str(default)]` cannot be specified for enum.");
     }
     let mut wheres = Vec::new();
     let generics = GenericParamSet::new(&input.generics);
@@ -160,8 +188,8 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream
         let variant_ident = &variant.ident;
         let ctor = quote! { #enum_ident::#variant_ident };
 
-        let tree = FieldTree::from_variant(&hattrs_enum, variant);
-        let body = tree.build_from_str_body(&variant.fields, ctor);
+        let tree = FieldTree::from_variant(&hattrs_enum, variant)?;
+        let body = tree.build_from_str_body(&variant.fields, ctor)?;
         wheres.extend(tree.build_wheres(&variant.fields, &generics));
         let fn_ident: Ident = format_ident!("parse_{}", idx);
         let body = quote! {
@@ -178,7 +206,7 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream
     let wheres = Bound::build_wheres(hattrs_enum.bound_from_str, &trait_path)
         .or(Bound::build_wheres(hattrs_enum.bound_display, &trait_path))
         .unwrap_or(wheres);
-    make_trait_impl(
+    Ok(make_trait_impl(
         input,
         &trait_path,
         wheres,
@@ -190,7 +218,7 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> TokenStream
                 Err(parse_display::ParseError::new())
             }
         },
-    )
+    ))
 }
 
 struct FieldTree {
@@ -204,6 +232,8 @@ struct FieldEntry {
     use_default: bool,
     is_need_bounds: bool,
     ty: Option<Type>,
+    format_span: Span,
+    regex_span: Span,
 }
 
 impl FieldTree {
@@ -214,49 +244,51 @@ impl FieldTree {
             hirs: vec![Hir::anchor(regex_syntax::hir::Anchor::StartText)],
         }
     }
-    fn from_struct(hattrs: &HelperAttributes, data: &DataStruct) -> Self {
+    fn from_struct(hattrs: &HelperAttributes, data: &DataStruct) -> Result<Self> {
         let mut s = Self::new();
         let ctx = DisplayContext::Struct { data };
-        s.push_attrs(&hattrs, &ctx);
+        s.push_attrs(&hattrs, &ctx)?;
         s.root.set_default(&hattrs);
-        s.root.apply_fields(&data.fields);
-        s
+        s.root.apply_fields(&data.fields)?;
+        Ok(s)
     }
-    fn from_variant(has_enum: &HelperAttributes, variant: &Variant) -> Self {
-        let has_variant = &HelperAttributes::from(&variant.attrs);
+    fn from_variant(hattrs_enum: &HelperAttributes, variant: &Variant) -> Result<Self> {
+        let hattrs_variant = &HelperAttributes::from(&variant.attrs)?;
         let mut s = Self::new();
-        let style = DisplayStyle::from_helper_attributes(has_enum, has_variant);
+        let style = DisplayStyle::from_helper_attributes(hattrs_enum, hattrs_variant);
         let context = DisplayContext::Variant { variant, style };
-        if !s.try_push_attrs(has_variant, &context) {
-            s.push_attrs(has_enum, &context);
+        if !s.try_push_attrs(hattrs_variant, &context)? {
+            s.push_attrs(hattrs_enum, &context)?;
         }
-        s.root.set_default(has_enum);
-        s.root.set_default(has_variant);
-        s.root.apply_fields(&variant.fields);
-        s
+        s.root.set_default(hattrs_enum);
+        s.root.set_default(hattrs_variant);
+        s.root.apply_fields(&variant.fields)?;
+        Ok(s)
     }
 
-    fn push_regex(&mut self, s: &str, context: &DisplayContext) {
+    fn push_regex(&mut self, s: &LitStr, context: &DisplayContext) -> Result<()> {
         static REGEX_CAPTURE: Lazy<Regex> = lazy_regex!(r"\(\?P<([_0-9a-zA-Z.]*)>");
         static REGEX_NUMBER: Lazy<Regex> = lazy_regex!("^[0-9]+$");
         let node = self.root.field_by_context(context);
         let capture_next = &mut self.capture_next;
-        let s_debug = REGEX_CAPTURE.replace_all(s, |c: &Captures| {
-            let s = c.get(1).unwrap().as_str();
-            let s = if s.is_empty() {
+
+        let text = s.value();
+        let text_debug = REGEX_CAPTURE.replace_all(&text, |c: &Captures| {
+            let key = c.get(1).unwrap().as_str();
+            let key = if key.is_empty() {
                 "self".into()
             } else {
-                s.replace(".", "_")
+                key.replace(".", "_")
             };
-            let s = REGEX_NUMBER.replace(&s, "_");
-            format!("(?P<{}>", s)
+            let key = REGEX_NUMBER.replace(&key, "_");
+            format!("(?P<{}>", key)
         });
-        if let Err(e) = regex_syntax::ast::parse::Parser::new().parse(&s_debug) {
-            panic!("{}", e);
+        if let Err(e) = regex_syntax::ast::parse::Parser::new().parse(&text_debug) {
+            bail!(s.span(), "{}", e)
         }
 
         let mut has_capture = false;
-        let mut s = REGEX_CAPTURE.replace_all(s, |c: &Captures| {
+        let mut text = REGEX_CAPTURE.replace_all(&text, |c: &Captures| {
             has_capture = true;
             let keys = FieldKey::from_str_deep(c.get(1).unwrap().as_str());
             let node = node.field_deep(keys);
@@ -267,20 +299,20 @@ impl FieldTree {
             if let Some(c) = node.capture() {
                 node.capture = None;
                 let value = style.apply(&variant.ident);
-                self.hirs.push(to_hir_with_expand(&s, &c, &value));
-                return;
+                self.hirs.push(to_hir_with_expand(&text, &c, &value));
+                return Ok(());
             }
         }
         if let DisplayContext::Field { .. } = context {
             if !has_capture {
-                s = Cow::Owned(format!("(?P<{}>{})", node.set_capture(capture_next), &s));
+                text = Cow::Owned(format!("(?P<{}>{})", node.set_capture(capture_next), &text));
             }
         }
-
-        self.hirs.push(to_hir(&s));
+        self.hirs.push(to_hir(&text));
+        Ok(())
     }
-    fn push_format(&mut self, format: &DisplayFormat, context: &DisplayContext) {
-        for p in &format.0 {
+    fn push_format(&mut self, format: &DisplayFormat, context: &DisplayContext) -> Result<()> {
+        for p in &format.parts {
             match p {
                 DisplayFormatPart::Str(s) => self.push_str(s),
                 DisplayFormatPart::EscapedBeginBracket => self.push_str("{"),
@@ -298,10 +330,10 @@ impl FieldTree {
                             let m = field_map(fields);
                             let key = &keys[0];
                             if let Some(field) = m.get(key) {
-                                self.push_field(context, key, field);
+                                self.push_field(context, key, field)?;
                                 continue;
                             }
-                            panic!("field `{}` not found.", key);
+                            bail!(format.span, "field `{}` not found.", key)
                         }
                     }
 
@@ -311,6 +343,7 @@ impl FieldTree {
                 }
             }
         }
+        Ok(())
     }
     fn push_str(&mut self, s: &str) {
         for c in s.chars() {
@@ -318,31 +351,41 @@ impl FieldTree {
                 .push(Hir::literal(regex_syntax::hir::Literal::Unicode(c)));
         }
     }
-    fn push_field(&mut self, context: &DisplayContext, key: &FieldKey, field: &Field) {
+    fn push_field(
+        &mut self,
+        context: &DisplayContext,
+        key: &FieldKey,
+        field: &Field,
+    ) -> Result<()> {
         self.push_attrs(
-            &HelperAttributes::from(&field.attrs),
+            &HelperAttributes::from(&field.attrs)?,
             &DisplayContext::Field {
                 parent: context,
                 key,
                 field,
             },
-        );
+        )
     }
-    fn push_attrs(&mut self, hattrs: &HelperAttributes, context: &DisplayContext) {
-        if !self.try_push_attrs(hattrs, context) {
-            self.push_format(&context.default_from_str_format(), context);
+    fn push_attrs(&mut self, hattrs: &HelperAttributes, context: &DisplayContext) -> Result<()> {
+        if !self.try_push_attrs(hattrs, context)? {
+            self.push_format(&context.default_from_str_format()?, context)?;
         }
+        Ok(())
     }
-    fn try_push_attrs(&mut self, hattrs: &HelperAttributes, context: &DisplayContext) -> bool {
-        if let Some(regex) = &hattrs.regex {
-            self.push_regex(&regex, context);
+    fn try_push_attrs(
+        &mut self,
+        hattrs: &HelperAttributes,
+        context: &DisplayContext,
+    ) -> Result<bool> {
+        Ok(if let Some(regex) = &hattrs.regex {
+            self.push_regex(&regex, context)?;
             true
         } else if let Some(format) = &hattrs.format {
-            self.push_format(&format, context);
+            self.push_format(&format, context)?;
             true
         } else {
             false
-        }
+        })
     }
 
     fn build_regex(&self) -> String {
@@ -350,8 +393,16 @@ impl FieldTree {
         hirs.push(Hir::anchor(regex_syntax::hir::Anchor::EndText));
         Hir::concat(hirs).to_string()
     }
-    fn build_from_str_body(&self, fields: &Fields, constructor: TokenStream) -> TokenStream {
-        fn to_full_expr(root: &FieldEntry, key: &FieldKey) -> TokenStream {
+    fn build_from_str_body(
+        &self,
+        fields: &Fields,
+        constructor: TokenStream,
+    ) -> Result<TokenStream> {
+        fn to_full_expr(
+            root: &FieldEntry,
+            key: &FieldKey,
+            format_span: Span,
+        ) -> Result<TokenStream> {
             if let Some(e) = root.fields.get(&key) {
                 if let Some(expr) = e.to_expr(std::slice::from_ref(key)) {
                     let mut setters = Vec::new();
@@ -362,28 +413,28 @@ impl FieldTree {
                             }
                         }
                     });
-                    if setters.is_empty() {
-                        return expr;
+                    return Ok(if setters.is_empty() {
+                        expr
                     } else {
                         let ty = e.ty.as_ref().unwrap();
-                        return quote! {
+                        quote! {
                             {
                                 let mut field_value : #ty = #expr;
                                 #(#setters)*
                                 field_value
                             }
-                        };
-                    }
+                        }
+                    });
                 }
             }
-            panic!("field `{}` is not appear in format.", key);
+            bail!(format_span, "field `{}` is not appear in format.", key);
         }
 
         let root = &self.root;
         let m = field_map(&fields);
         for key in root.fields.keys() {
             if !m.contains_key(key) {
-                panic!("field `{}` not found.", key);
+                bail!(self.root.format_span, "field `{}` not found.", key);
             }
         }
         let code = if root.use_default {
@@ -400,27 +451,33 @@ impl FieldTree {
             }
         } else {
             if root.capture.is_some() {
-                panic!("`(?P<>)` (empty capture name) is not allowed in struct's regex.")
+                bail!(
+                    self.root.regex_span,
+                    "`(?P<>)` (empty capture name) is not allowed in struct's regex."
+                )
             }
             let ps = match &fields {
                 Fields::Named(fields) => {
-                    let fields = FieldKey::from_fields_named(fields).map(|key| {
-                        let expr = to_full_expr(root, &key);
-                        quote! { #key : #expr }
-                    });
-                    quote! { { #(#fields,)* } }
+                    let mut fields_code = Vec::new();
+                    for (key, _) in FieldKey::from_fields_named(fields) {
+                        let expr = to_full_expr(root, &key, self.root.format_span)?;
+                        fields_code.push(quote! { #key : #expr })
+                    }
+                    quote! { { #(#fields_code,)* } }
                 }
                 Fields::Unnamed(fields) => {
-                    let fields =
-                        FieldKey::from_fields_unnamed(fields).map(|key| to_full_expr(root, &key));
-                    quote! { ( #(#fields,)* ) }
+                    let mut fields_code = Vec::new();
+                    for (key, _) in FieldKey::from_fields_unnamed(fields) {
+                        fields_code.push(to_full_expr(root, &key, self.root.format_span)?);
+                    }
+                    quote! { ( #(#fields_code,)* ) }
                 }
                 Fields::Unit => quote! {},
             };
             quote! { return Ok(#constructor #ps); }
         };
         let regex = self.build_regex();
-        quote! {
+        Ok(quote! {
             #[allow(clippy::trivial_regex)]
             static RE: parse_display::helpers::once_cell::sync::Lazy<parse_display::helpers::regex::Regex> =
                 parse_display::helpers::once_cell::sync::Lazy::new(|| parse_display::helpers::regex::Regex::new(#regex).unwrap());
@@ -428,7 +485,7 @@ impl FieldTree {
                  #code
             }
             Err(parse_display::ParseError::new())
-        }
+        })
     }
     fn build_wheres(&self, fields: &Fields, generics: &GenericParamSet) -> Vec<WherePredicate> {
         let m = field_map(&fields);
@@ -454,6 +511,8 @@ impl FieldEntry {
             use_default: false,
             is_need_bounds: false,
             ty: None,
+            format_span: Span::call_site(),
+            regex_span: Span::call_site(),
         }
     }
     fn field(&mut self, key: FieldKey) -> &mut Self {
@@ -485,21 +544,28 @@ impl FieldEntry {
     }
 
     fn set_default(&mut self, hattrs: &HelperAttributes) {
-        if hattrs.default_self {
+        if hattrs.default_self.is_some() {
             self.use_default = true;
         }
         for field in &hattrs.default_fields {
             self.field(FieldKey::from_str(field.as_str())).use_default = true;
         }
+        if let Some(format) = &hattrs.format {
+            self.format_span = format.span;
+        }
+        if let Some(lit) = &hattrs.regex {
+            self.regex_span = lit.span();
+        }
     }
-    fn apply_fields(&mut self, fields: &Fields) {
+    fn apply_fields(&mut self, fields: &Fields) -> Result<()> {
         let m = field_map(fields);
         for (key, field) in m {
-            let hattrs = HelperAttributes::from(&field.attrs);
+            let hattrs = HelperAttributes::from(&field.attrs)?;
             let f = self.field(key);
             f.set_default(&hattrs);
             f.ty = Some(field.ty.clone());
         }
+        Ok(())
     }
 
     fn visit(&self, mut visitor: impl FnMut(&[FieldKey], &Self)) {
@@ -585,8 +651,8 @@ struct HelperAttributes {
     style: Option<DisplayStyle>,
     bound_display: Option<Vec<Bound>>,
     bound_from_str: Option<Vec<Bound>>,
-    regex: Option<String>,
-    default_self: bool,
+    regex: Option<LitStr>,
+    default_self: Option<Span>,
     default_fields: Vec<String>,
     debug_mode: bool,
 }
@@ -600,41 +666,39 @@ const FROM_STR_HELPER_USAGE: &str = "The following syntax are available.
 #[from_str(default)]
 #[from_str(default_fields(...))]";
 impl HelperAttributes {
-    fn from(attrs: &[Attribute]) -> Self {
+    fn from(attrs: &[Attribute]) -> Result<Self> {
         let mut hattrs = Self {
             format: None,
             style: None,
             bound_display: None,
             bound_from_str: None,
             regex: None,
-            default_self: false,
+            default_self: None,
             default_fields: Vec::new(),
             debug_mode: false,
         };
         for a in attrs {
-            let args = a
-                .parse_args_with(parse_attr_args)
-                .unwrap_or_else(|e| panic!("invalid metadata \"{}\". {}", a.to_token_stream(), e));
+            let args = a.parse_args_with(parse_attr_args)?;
             if a.path.is_ident("display") {
                 for m in args.iter() {
-                    hattrs.set_display_nested_meta(m);
+                    hattrs.set_display_nested_meta(m)?;
                 }
             }
             if a.path.is_ident("from_str") {
                 for m in args.iter() {
-                    hattrs.set_from_str_nested_meta(m);
+                    hattrs.set_from_str_nested_meta(m)?;
                 }
             }
         }
-        hattrs
+        Ok(hattrs)
     }
-    fn set_display_nested_meta(&mut self, m: &NestedMeta) {
+    fn set_display_nested_meta(&mut self, m: &NestedMeta) -> Result<()> {
         match m {
             NestedMeta::Lit(Lit::Str(s)) => {
                 if self.format.is_some() {
-                    panic!("display format can be specified only once.")
+                    bail!(m.span(), "display format can be specified only once.");
                 }
-                self.format = Some(DisplayFormat::from(&s.value()));
+                self.format = Some(DisplayFormat::parse_lit_str(&s)?);
             }
             NestedMeta::Meta(Meta::NameValue(MetaNameValue {
                 path,
@@ -642,24 +706,28 @@ impl HelperAttributes {
                 ..
             })) if path.is_ident("style") => {
                 if self.style.is_some() {
-                    panic!("display style can be specified only once.");
+                    return Err(Error::new_spanned(
+                        m,
+                        "display style can be specified only once.",
+                    ));
                 }
-                self.style = Some(DisplayStyle::from(&s.value()));
+                self.style = Some(DisplayStyle::parse_lit_str(&s)?);
             }
             NestedMeta::Meta(Meta::List(l)) if l.path.is_ident("bound") => {
-                Bound::from_meta_list(&mut self.bound_display, l)
+                Bound::from_meta_list(&mut self.bound_display, l)?
             }
             NestedMeta::Meta(Meta::Path(p)) if p.is_ident("debug_mode") => {
                 self.debug_mode = true;
             }
-            m => panic!(
-                "`{}` is not allowed. \n{}",
-                m.to_token_stream(),
+            m => bail!(
+                m.span(),
+                "invalid metadata in \"#[display]\"\n{0}",
                 DISPLAY_HELPER_USAGE
             ),
         }
+        Ok(())
     }
-    fn set_from_str_nested_meta(&mut self, m: &NestedMeta) {
+    fn set_from_str_nested_meta(&mut self, m: &NestedMeta) -> Result<()> {
         match m {
             NestedMeta::Meta(Meta::NameValue(MetaNameValue {
                 path,
@@ -667,15 +735,15 @@ impl HelperAttributes {
                 ..
             })) if path.is_ident("regex") => {
                 if self.regex.is_some() {
-                    panic!("from_str regex can be specified only once.");
+                    bail!(m.span(), "from_str regex can be specified only once.");
                 }
-                self.regex = Some(s.value());
+                self.regex = Some(s.clone());
             }
             NestedMeta::Meta(Meta::List(l)) if l.path.is_ident("bound") => {
-                Bound::from_meta_list(&mut self.bound_from_str, l)
+                Bound::from_meta_list(&mut self.bound_from_str, l)?
             }
             NestedMeta::Meta(Meta::Path(path)) if path.is_ident("default") => {
-                self.default_self = true;
+                self.default_self = Some(path.span());
             }
             NestedMeta::Meta(Meta::List(l)) if l.path.is_ident("default_fields") => {
                 for m in l.nested.iter() {
@@ -692,20 +760,21 @@ impl HelperAttributes {
                         }
                         _ => {}
                     }
-                    panic!(
-                        "{} is not allowed in `#[from_str(default_fields(..))]`.",
-                        quote!(#m)
+                    bail!(
+                        m.span(),
+                        "invalid arguemnts in \"#[from_str(default_fields)]\"."
                     );
                 }
             }
             m => {
-                panic!(
-                    "`{}` is not allowed. \n{}",
-                    quote!(#m),
+                bail!(
+                    m.span(),
+                    "invalid metadta in \"#[from_str]\".\n{}",
                     FROM_STR_HELPER_USAGE
                 );
             }
         }
+        Ok(())
     }
 }
 
@@ -723,9 +792,26 @@ enum DisplayStyle {
 }
 
 impl DisplayStyle {
-    fn from(s: &str) -> Self {
+    fn parse_lit_str(s: &LitStr) -> Result<Self> {
+        const ERROR_MESSAGE: &str = "Invalid display style. \
+        The following values are available: \
+        \"none\", \
+        \"lowercase\", \
+        \"UPPERCASE\", \
+        \"snake_case\", \
+        \"SNAKE_CASE\", \
+        \"camelCase\", \
+        \"CamelCase\", \
+        \"kebab-case\", \
+        \"KEBAB-CASE\"";
+        match Self::parse(&s.value()) {
+            Err(_) => bail!(s.span(), ERROR_MESSAGE),
+            Ok(value) => Ok(value),
+        }
+    }
+    fn parse(s: &str) -> std::result::Result<Self, ParseDisplayStyleError> {
         use DisplayStyle::*;
-        match s {
+        Ok(match s {
             "none" => None,
             "lowercase" => LowerCase,
             "UPPERCASE" => UpperCase,
@@ -735,27 +821,16 @@ impl DisplayStyle {
             "CamelCase" => UpperCamelCase,
             "kebab-case" => LowerKebabCase,
             "KEBAB-CASE" => UpperKebabCase,
-            _ => {
-                panic!(
-                    "Invalid display style. \
-                     The following values are available: \
-                     \"none\", \
-                     \"lowercase\", \
-                     \"UPPERCASE\", \
-                     \"snake_case\", \
-                     \"SNAKE_CASE\", \
-                     \"camelCase\", \
-                     \"CamelCase\", \
-                     \"kebab-case\", \
-                     \"KEBAB-CASE\""
-                );
-            }
-        }
+            _ => return Err(ParseDisplayStyleError),
+        })
     }
-    fn from_helper_attributes(has_enum: &HelperAttributes, has_variant: &HelperAttributes) -> Self {
-        has_variant
+    fn from_helper_attributes(
+        hattrs_enum: &HelperAttributes,
+        hattrs_variant: &HelperAttributes,
+    ) -> Self {
+        hattrs_variant
             .style
-            .or(has_enum.style)
+            .or(hattrs_enum.style)
             .unwrap_or(DisplayStyle::None)
     }
     fn apply(self, ident: &Ident) -> String {
@@ -808,52 +883,61 @@ impl DisplayStyle {
 }
 
 #[derive(Clone)]
-struct DisplayFormat(Vec<DisplayFormatPart>);
+struct DisplayFormat {
+    parts: Vec<DisplayFormatPart>,
+    span: Span,
+}
 impl DisplayFormat {
-    fn from(mut s: &str) -> DisplayFormat {
+    fn parse_lit_str(s: &LitStr) -> Result<DisplayFormat> {
+        Self::parse(&s.value(), s.span())
+    }
+    fn parse(mut s: &str, span: Span) -> Result<DisplayFormat> {
         static REGEX_STR: Lazy<Regex> = lazy_regex!(r"^[^{}]+");
         static REGEX_VAR: Lazy<Regex> = lazy_regex!(r"^\{([^:{}]*)(?::([^}]*))?\}");
-        let mut ps = Vec::new();
+        let mut parts = Vec::new();
         while !s.is_empty() {
             if s.starts_with("{{") {
-                ps.push(DisplayFormatPart::EscapedBeginBracket);
+                parts.push(DisplayFormatPart::EscapedBeginBracket);
                 s = &s[2..];
                 continue;
             }
             if s.starts_with("}}") {
-                ps.push(DisplayFormatPart::EscapedEndBracket);
+                parts.push(DisplayFormatPart::EscapedEndBracket);
                 s = &s[2..];
                 continue;
             }
             if let Some(m) = REGEX_STR.find(s) {
-                ps.push(DisplayFormatPart::Str(m.as_str().into()));
+                parts.push(DisplayFormatPart::Str(m.as_str().into()));
                 s = &s[m.end()..];
                 continue;
             }
             if let Some(c) = REGEX_VAR.captures(s) {
                 let name = c.get(1).unwrap().as_str().into();
                 let parameters = c.get(2).map_or("", |x| x.as_str()).into();
-                ps.push(DisplayFormatPart::Var { name, parameters });
+                parts.push(DisplayFormatPart::Var { name, parameters });
                 s = &s[c.get(0).unwrap().end()..];
                 continue;
             }
-            panic!("invalid display format. \"{}\"", s);
+            bail!(span, "invalid display format.");
         }
-        Self(ps)
+        Ok(Self { parts, span })
     }
     fn from_newtype_struct(data: &DataStruct) -> Option<Self> {
         let p = DisplayFormatPart::Var {
             name: get_newtype_field(data)?,
             parameters: String::new(),
         };
-        Some(Self(vec![p]))
+        Some(Self {
+            parts: vec![p],
+            span: data.fields.span(),
+        })
     }
-    fn from_unit_variant(variant: &Variant) -> Option<Self> {
-        if let Fields::Unit = &variant.fields {
-            Some(Self::from("{}"))
+    fn from_unit_variant(variant: &Variant) -> Result<Option<Self>> {
+        Ok(if let Fields::Unit = &variant.fields {
+            Some(Self::parse("{}", variant.span())?)
         } else {
             None
-        }
+        })
     }
 
     fn format_args(
@@ -861,10 +945,10 @@ impl DisplayFormat {
         context: DisplayContext,
         wheres: &mut Vec<WherePredicate>,
         generics: &GenericParamSet,
-    ) -> TokenStream {
+    ) -> Result<TokenStream> {
         let mut format_str = String::new();
         let mut format_args = Vec::new();
-        for p in &self.0 {
+        for p in &self.parts {
             use DisplayFormatPart::*;
             match p {
                 Str(s) => format_str.push_str(s.as_str()),
@@ -874,11 +958,17 @@ impl DisplayFormat {
                     format_str.push_str("{:");
                     format_str.push_str(&parameters);
                     format_str.push_str("}");
-                    format_args.push(context.format_arg(&name, &parameters, wheres, generics));
+                    format_args.push(context.format_arg(
+                        &name,
+                        &parameters,
+                        self.span,
+                        wheres,
+                        generics,
+                    )?);
                 }
             }
         }
-        quote! { #format_str #(,#format_args)* }
+        Ok(quote! { #format_str #(,#format_args)* })
     }
 }
 
@@ -910,49 +1000,52 @@ impl<'a> DisplayContext<'a> {
         &self,
         name: &str,
         parameters: &str,
+        span: Span,
         wheres: &mut Vec<WherePredicate>,
         generics: &GenericParamSet,
-    ) -> TokenStream {
+    ) -> Result<TokenStream> {
         let keys = FieldKey::from_str_deep(name);
         if keys.is_empty() {
-            return match self {
-                DisplayContext::Struct { .. } => panic!("{{}} is not allowed in struct format."),
-                DisplayContext::Field { parent, field, key } => {
-                    parent.format_arg_by_field_expr(key, field, parameters, wheres, generics)
-                }
+            return Ok(match self {
+                DisplayContext::Struct { .. } => bail!(span, "{} is not allowed in struct format."),
+                DisplayContext::Field { parent, field, key } => parent
+                    .format_arg_by_field_expr(key, field, parameters, span, wheres, generics)?,
                 DisplayContext::Variant { variant, style } => {
                     let s = style.apply(&variant.ident);
                     quote! { #s }
                 }
-            };
+            });
         }
 
         if keys.len() == 1 {
             if let Some(fields) = self.fields() {
                 let key = &keys[0];
                 let m = field_map(fields);
-                let field = m
-                    .get(key)
-                    .unwrap_or_else(|| panic!("unknown field '{}'.", key));
-                return self.format_arg_of_field(key, field, parameters, wheres, generics);
+                let field = if let Some(field) = m.get(key) {
+                    field
+                } else {
+                    bail!(span, "unknown field '{}'.", key);
+                };
+                return self.format_arg_of_field(key, field, parameters, span, wheres, generics);
             }
         }
         let mut expr = self.field_expr(&keys[0]);
         for key in &keys[1..] {
             expr.extend(quote! { .#key });
         }
-        expr
+        Ok(expr)
     }
     fn format_arg_of_field(
         &self,
         key: &FieldKey,
         field: &Field,
         parameters: &str,
+        span: Span,
         wheres: &mut Vec<WherePredicate>,
         generics: &GenericParamSet,
-    ) -> TokenStream {
-        let hattrs = HelperAttributes::from(&field.attrs);
-        if let Some(format) = hattrs.format {
+    ) -> Result<TokenStream> {
+        let hattrs = HelperAttributes::from(&field.attrs)?;
+        Ok(if let Some(format) = hattrs.format {
             let args = format.format_args(
                 DisplayContext::Field {
                     parent: self,
@@ -961,28 +1054,32 @@ impl<'a> DisplayContext<'a> {
                 },
                 wheres,
                 generics,
-            );
+            )?;
             quote! { format_args!(#args) }
         } else {
-            self.format_arg_by_field_expr(key, field, parameters, wheres, generics)
-        }
+            self.format_arg_by_field_expr(key, field, parameters, span, wheres, generics)?
+        })
     }
     fn format_arg_by_field_expr(
         &self,
         key: &FieldKey,
         field: &Field,
         parameters: &str,
+        span: Span,
         wheres: &mut Vec<WherePredicate>,
         generics: &GenericParamSet,
-    ) -> TokenStream {
+    ) -> Result<TokenStream> {
         let ty = &field.ty;
         if generics.contains_in_type(ty) {
-            let ps = FormatParameters::from(&parameters).expect("invalid format parameters.");
+            let ps = match FormatParameters::parse(&parameters) {
+                Ok(ps) => ps,
+                Err(_) => bail!(span, "invalid format parameters \"{}\".", parameters),
+            };
             let tr = ps.format_type.trait_name();
             let tr: Ident = parse_str(tr).unwrap();
             wheres.push(parse_quote!(#ty : core::fmt::#tr));
         }
-        self.field_expr(key)
+        Ok(self.field_expr(key))
     }
 
     fn field_expr(&self, key: &FieldKey) -> TokenStream {
@@ -1003,18 +1100,18 @@ impl<'a> DisplayContext<'a> {
         }
     }
 
-    fn default_from_str_format(&self) -> DisplayFormat {
+    fn default_from_str_format(&self) -> Result<DisplayFormat> {
         const ERROR_MESSAGE_FOR_STRUCT:&str="`#[display(\"format\")]` or `#[from_str(regex = \"regex\")]` is required except newtype pattern.";
         const ERROR_MESSAGE_FOR_VARIANT:&str="`#[display(\"format\")]` or `#[from_str(regex = \"regex\")]` is required except unit variant.";
-        match self {
+        Ok(match self {
             DisplayContext::Struct { data, .. } => {
                 DisplayFormat::from_newtype_struct(data).expect(ERROR_MESSAGE_FOR_STRUCT)
             }
             DisplayContext::Variant { variant, .. } => {
-                DisplayFormat::from_unit_variant(variant).expect(ERROR_MESSAGE_FOR_VARIANT)
+                DisplayFormat::from_unit_variant(variant)?.expect(ERROR_MESSAGE_FOR_VARIANT)
             }
-            DisplayContext::Field { .. } => DisplayFormat::from("{}"),
-        }
+            DisplayContext::Field { field, .. } => DisplayFormat::parse("{}", field.span())?,
+        })
     }
     fn fields(&self) -> Option<&Fields> {
         match self {
@@ -1025,29 +1122,37 @@ impl<'a> DisplayContext<'a> {
     }
 }
 
+#[derive(Debug)]
+struct ParseDisplayStyleError;
+impl std::error::Error for ParseDisplayStyleError {}
+
+impl Display for ParseDisplayStyleError {
+    fn fmt(&self, f: &mut export::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "invalid display style")
+    }
+}
+
 enum Bound {
     Type(Path),
     Pred(WherePredicate),
 }
 impl Bound {
-    fn from(m: &NestedMeta) -> Self {
-        match m {
-            NestedMeta::Lit(Lit::Str(s)) => {
-                let s = s.value();
-                match parse_str(&s) {
-                    Ok(w) => Bound::Pred(w),
-                    Err(e) => panic!("invalid bound \"{}\". {}", s, e),
-                }
-            }
+    fn parse(m: &NestedMeta) -> Result<Self> {
+        Ok(match m {
+            NestedMeta::Lit(Lit::Str(s)) => match parse_str(&s.value()) {
+                Ok(w) => Bound::Pred(w),
+                Err(e) => bail!(m.span(), "{}", e),
+            },
             NestedMeta::Meta(Meta::Path(p)) => Bound::Type(p.clone()),
-            _ => panic!(format!("invalid bound \"{}\".", quote! {#m})),
-        }
+            _ => bail!(m.span(), "invalid bound \"{}\".", quote! {#m}),
+        })
     }
-    fn from_meta_list(s: &mut Option<Vec<Self>>, l: &MetaList) {
+    fn from_meta_list(s: &mut Option<Vec<Self>>, l: &MetaList) -> Result<()> {
         let b = s.get_or_insert(Vec::new());
         for m in l.nested.iter() {
-            b.push(Bound::from(m));
+            b.push(Bound::parse(m)?);
         }
+        Ok(())
     }
 
     fn build_where(&self, trait_path: &TokenStream) -> WherePredicate {
@@ -1098,15 +1203,22 @@ impl FieldKey {
             s.split('.').map(Self::from_str).collect()
         }
     }
-    fn from_fields_named<'a>(fields: &'a FieldsNamed) -> impl Iterator<Item = FieldKey> + 'a {
+    fn from_fields_named<'a>(
+        fields: &'a FieldsNamed,
+    ) -> impl Iterator<Item = (FieldKey, &'a Field)> + 'a {
         fields
             .named
             .iter()
-            .map(|field| Self::from_ident(field.ident.as_ref().unwrap()))
+            .map(|field| (Self::from_ident(field.ident.as_ref().unwrap()), field))
     }
-    fn from_fields_unnamed(fields: &FieldsUnnamed) -> impl Iterator<Item = FieldKey> {
-        let len = fields.unnamed.len();
-        (0..len).map(FieldKey::Unnamed)
+    fn from_fields_unnamed<'a>(
+        fields: &'a FieldsUnnamed,
+    ) -> impl Iterator<Item = (FieldKey, &'a Field)> + 'a {
+        fields
+            .unnamed
+            .iter()
+            .enumerate()
+            .map(|(idx, field)| (FieldKey::Unnamed(idx), field))
     }
 
     fn to_member(&self) -> Member {

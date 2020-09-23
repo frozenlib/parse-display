@@ -1,0 +1,5 @@
+error: invalid display format.
+ --> $DIR/display_invalid_format.rs:3:11
+  |
+3 | #[display("{x")]
+  |           ^^^^

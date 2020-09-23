@@ -1,12 +1,35 @@
+use proc_macro2::TokenStream;
 use std::collections::HashSet;
 use syn::{
-    ext::IdentExt, parenthesized, parse::ParseStream, token, GenericParam, Generics, Ident, Lit,
-    Meta, MetaList, MetaNameValue, NestedMeta, Path, PathArguments, PathSegment, Token, Type,
-};
-use syn::{
+    ext::IdentExt,
+    parenthesized,
+    parse::ParseStream,
     punctuated::Punctuated,
+    token,
     visit::{visit_path, visit_type, Visit},
+    GenericParam, Generics, Ident, Lit, Meta, MetaList, MetaNameValue, NestedMeta, Path,
+    PathArguments, PathSegment, Result, Token, Type,
 };
+
+macro_rules! bail {
+    ($span:expr, $message:literal $(,)?) => {
+        return std::result::Result::Err(syn::Error::new($span, $message));
+    };
+    ($span:expr, $err:expr $(,)?) => {
+        return std::result::Result::Err(syn::Error::new($span, $err));
+    };
+    ($span:expr, $fmt:expr, $($arg:tt)*) => {
+        return std::result::Result::Err(syn::Error::new($span, std::format!($fmt, $($arg)*)));
+    };
+}
+
+pub fn into_macro_output(input: Result<TokenStream>) -> proc_macro::TokenStream {
+    match input {
+        Ok(s) => s,
+        Err(e) => e.to_compile_error(),
+    }
+    .into()
+}
 
 pub struct GenericParamSet {
     idents: HashSet<Ident>,

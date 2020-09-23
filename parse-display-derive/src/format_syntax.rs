@@ -92,7 +92,7 @@ impl Display for FormatParseError {
 }
 
 impl<'a> FormatParameters<'a> {
-    pub fn from(s: &'a str) -> std::result::Result<Self, FormatParseError> {
+    pub fn parse(s: &'a str) -> std::result::Result<Self, FormatParseError> {
         static RE: Lazy<Regex> = lazy_regex!(
             "^\
              ((?P<fill>.)?\
@@ -437,6 +437,6 @@ mod tests {
     }
 
     fn assert_ps<'a>(s: &'a str, ps: FormatParameters<'a>) {
-        assert_eq!(FormatParameters::from(s), Ok(ps), "input : {}", s);
+        assert_eq!(FormatParameters::parse(s), Ok(ps), "input : {}", s);
     }
 }

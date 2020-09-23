@@ -1,0 +1,5 @@
+error: `(?P<>)` (empty capture name) is not allowed in struct's regex.
+ --> $DIR/from_str_struct_empty_capture_name.rs:4:20
+  |
+4 | #[from_str(regex = "(?P<>)")]
+  |                    ^^^^^^^^
