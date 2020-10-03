@@ -14,7 +14,7 @@ Add this to your Cargo.toml:
 
 ```toml
 [dependencies]
-parse-display = "0.2"
+parse-display = "0.3"
 ```
 
 ## Example
