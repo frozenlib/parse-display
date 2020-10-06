@@ -678,13 +678,14 @@ impl HelperAttributes {
             debug_mode: false,
         };
         for a in attrs {
-            let args = a.parse_args_with(parse_attr_args)?;
             if a.path.is_ident("display") {
+                let args = a.parse_args_with(parse_attr_args)?;
                 for m in args.iter() {
                     hattrs.set_display_nested_meta(m)?;
                 }
             }
             if a.path.is_ident("from_str") {
+                let args = a.parse_args_with(parse_attr_args)?;
                 for m in args.iter() {
                     hattrs.set_from_str_nested_meta(m)?;
                 }

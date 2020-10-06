@@ -689,6 +689,56 @@ fn bound_type_generic() {
     struct Inner<T>(T);
 }
 
+#[test]
+fn doc_comment_struct() {
+    /// doc
+    #[derive(Display)]
+    struct TestStruct {
+        a: u8,
+    }
+    assert_display(TestStruct { a: 10 }, "10");
+}
+
+#[test]
+fn doc_comment_struct_field() {
+    #[derive(Display)]
+    pub struct TestStruct {
+        /// doc
+        a: u8,
+    }
+    assert_display(TestStruct { a: 10 }, "10");
+}
+
+#[test]
+fn doc_comment_enum() {
+    /// doc
+    #[derive(Display)]
+    enum TestEnum {
+        A,
+    }
+    assert_display(TestEnum::A, "A");
+}
+
+#[test]
+fn doc_comment_variant() {
+    #[derive(Display)]
+    enum TestEnum {
+        /// doc
+        A,
+    }
+    assert_display(TestEnum::A, "A");
+}
+
+#[test]
+fn attr_enum() {
+    #[derive(Display)]
+    #[non_exhaustive]
+    enum TestEnum {
+        A,
+    }
+    assert_display(TestEnum::A, "A");
+}
+
 fn assert_display<T: core::fmt::Display>(value: T, display: &str) {
     let value_display = alloc::format!("{}", value);
     assert_eq!(value_display, display);

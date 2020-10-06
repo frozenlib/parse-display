@@ -748,6 +748,56 @@ fn bound_type_enum() {
     struct Inner<T: Default>(T);
 }
 
+#[test]
+fn doc_comment_struct() {
+    /// doc
+    #[derive(FromStr, Debug, Eq, PartialEq)]
+    struct TestStruct {
+        a: u8,
+    }
+    assert_from_str("10", TestStruct { a: 10 });
+}
+
+#[test]
+fn doc_comment_struct_field() {
+    #[derive(FromStr, Debug, Eq, PartialEq)]
+    pub struct TestStruct {
+        /// doc
+        a: u8,
+    }
+    assert_from_str("10", TestStruct { a: 10 });
+}
+
+#[test]
+fn doc_comment_enum() {
+    /// doc
+    #[derive(FromStr, Debug, Eq, PartialEq)]
+    enum TestEnum {
+        A,
+    }
+    assert_from_str("A", TestEnum::A);
+}
+
+#[test]
+fn doc_comment_variant() {
+    #[derive(FromStr, Debug, Eq, PartialEq)]
+    enum TestEnum {
+        /// doc
+        A,
+    }
+    assert_from_str("A", TestEnum::A);
+}
+
+#[test]
+fn attr_enum() {
+    #[derive(FromStr, Debug, Eq, PartialEq)]
+    #[non_exhaustive]
+    enum TestEnum {
+        A,
+    }
+    assert_from_str("A", TestEnum::A);
+}
+
 fn assert_from_str<T: FromStr + Debug + PartialEq>(s: &str, value: T)
 where
     <T as FromStr>::Err: Display,
