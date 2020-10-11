@@ -71,7 +71,7 @@ fn derive_display_for_struct(input: &DeriveInput, data: &DataStruct) -> Result<T
 fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<TokenStream> {
     fn make_arm(
         input: &DeriveInput,
-        has_enum: &HelperAttributes,
+        hattrs_enum: &HelperAttributes,
         variant: &Variant,
         wheres: &mut Vec<WherePredicate>,
         generics: &GenericParamSet,
@@ -91,11 +91,11 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Token
             }
             Fields::Unit => quote! {},
         };
-        let has_variant = HelperAttributes::from(&variant.attrs)?;
-        let style = DisplayStyle::from_helper_attributes(has_enum, &has_variant);
-        let mut format = has_variant.format;
+        let hattrs_variant = HelperAttributes::from(&variant.attrs)?;
+        let style = DisplayStyle::from_helper_attributes(hattrs_enum, &hattrs_variant);
+        let mut format = hattrs_variant.format;
         if format.is_none() {
-            format = has_enum.format.clone();
+            format = hattrs_enum.format.clone();
         }
         if format.is_none() {
             format = DisplayFormat::from_unit_variant(&variant)?;
