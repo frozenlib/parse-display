@@ -24,6 +24,17 @@ fn to_ast(s: &str) -> Ast {
     regex_syntax::ast::parse::Parser::new().parse(s).unwrap()
 }
 
+pub fn push_str(hirs: &mut Vec<Hir>, s: &str) {
+    for c in s.chars() {
+        hirs.push(Hir::literal(regex_syntax::hir::Literal::Unicode(c)));
+    }
+}
+pub fn to_regex_string(hirs: &[Hir]) -> String {
+    let mut hirs = hirs.to_vec();
+    hirs.push(Hir::anchor(regex_syntax::hir::Anchor::EndText));
+    Hir::concat(hirs).to_string()
+}
+
 fn replace_ast(ast: &mut Ast, f: &mut impl FnMut(&mut Ast) -> bool) {
     if !f(ast) {
         return;

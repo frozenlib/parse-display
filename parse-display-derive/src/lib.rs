@@ -224,7 +224,7 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Toke
 struct FieldTree {
     root: FieldEntry,
     capture_next: usize,
-    hirs: Vec<Hir>,
+    parse_format: ParseFormat,
 }
 struct FieldEntry {
     fields: HashMap<FieldKey, FieldEntry>,
@@ -241,7 +241,7 @@ impl FieldTree {
         FieldTree {
             root: FieldEntry::new(),
             capture_next: 1,
-            hirs: vec![Hir::anchor(regex_syntax::hir::Anchor::StartText)],
+            parse_format: ParseFormat::new(),
         }
     }
     fn from_struct(hattrs: &HelperAttributes, data: &DataStruct) -> Result<Self> {
@@ -299,7 +299,8 @@ impl FieldTree {
             if let Some(c) = node.capture() {
                 node.capture = None;
                 let value = style.apply(&variant.ident);
-                self.hirs.push(to_hir_with_expand(&text, &c, &value));
+                self.parse_format
+                    .push_hir(to_hir_with_expand(&text, &c, &value));
                 return Ok(());
             }
         }
@@ -308,7 +309,7 @@ impl FieldTree {
                 text = Cow::Owned(format!("(?P<{}>{})", node.set_capture(capture_next), &text));
             }
         }
-        self.hirs.push(to_hir(&text));
+        self.parse_format.push_hir(to_hir(&text));
         Ok(())
     }
     fn push_format(&mut self, format: &DisplayFormat, context: &DisplayContext) -> Result<()> {
@@ -339,17 +340,15 @@ impl FieldTree {
 
                     let node = self.root.field_by_context(context).field_deep(keys);
                     let c = node.set_capture(&mut self.capture_next);
-                    self.hirs.push(to_hir(&format!("(?P<{}>.*?)", c)));
+                    self.parse_format
+                        .push_hir(to_hir(&format!("(?P<{}>.*?)", c)));
                 }
             }
         }
         Ok(())
     }
-    fn push_str(&mut self, s: &str) {
-        for c in s.chars() {
-            self.hirs
-                .push(Hir::literal(regex_syntax::hir::Literal::Unicode(c)));
-        }
+    fn push_str(&mut self, string: &str) {
+        self.parse_format.push_str(string)
     }
     fn push_field(
         &mut self,
@@ -388,11 +387,6 @@ impl FieldTree {
         })
     }
 
-    fn build_regex(&self) -> String {
-        let mut hirs = self.hirs.clone();
-        hirs.push(Hir::anchor(regex_syntax::hir::Anchor::EndText));
-        Hir::concat(hirs).to_string()
-    }
     fn build_from_str_body(
         &self,
         fields: &Fields,
@@ -476,14 +470,28 @@ impl FieldTree {
             };
             quote! { return Ok(#constructor #ps); }
         };
-        let regex = self.build_regex();
-        Ok(quote! {
-            #[allow(clippy::trivial_regex)]
-            static RE: parse_display::helpers::once_cell::sync::Lazy<parse_display::helpers::regex::Regex> =
-                parse_display::helpers::once_cell::sync::Lazy::new(|| parse_display::helpers::regex::Regex::new(#regex).unwrap());
-            if let Some(c) = RE.captures(&s) {
-                 #code
+        let code = match &self.parse_format {
+            ParseFormat::Hirs(hirs) => {
+                let regex = to_regex_string(hirs);
+                quote! {
+                    #[allow(clippy::trivial_regex)]
+                    static RE: parse_display::helpers::once_cell::sync::Lazy<parse_display::helpers::regex::Regex> =
+                        parse_display::helpers::once_cell::sync::Lazy::new(|| parse_display::helpers::regex::Regex::new(#regex).unwrap());
+                    if let Some(c) = RE.captures(&s) {
+                         #code
+                    }
+                }
             }
+            ParseFormat::String(s) => {
+                quote! {
+                    if s == #s {
+                        #code
+                    }
+                }
+            }
+        };
+        Ok(quote! {
+            #code
             Err(parse_display::ParseError::new())
         })
     }
@@ -1130,6 +1138,40 @@ impl std::error::Error for ParseDisplayStyleError {}
 impl Display for ParseDisplayStyleError {
     fn fmt(&self, f: &mut export::Formatter<'_>) -> std::fmt::Result {
         write!(f, "invalid display style")
+    }
+}
+
+enum ParseFormat {
+    Hirs(Vec<Hir>),
+    String(String),
+}
+impl ParseFormat {
+    fn new() -> Self {
+        Self::String(String::new())
+    }
+    fn as_hirs(&mut self) -> &mut Vec<Hir> {
+        match self {
+            Self::Hirs(_) => {}
+            Self::String(s) => {
+                let mut hirs = vec![Hir::anchor(regex_syntax::hir::Anchor::StartText)];
+                push_str(&mut hirs, s);
+                std::mem::swap(self, &mut Self::Hirs(hirs));
+            }
+        }
+        if let Self::Hirs(hirs) = self {
+            hirs
+        } else {
+            unreachable!()
+        }
+    }
+    fn push_str(&mut self, string: &str) {
+        match self {
+            Self::Hirs(hirs) => push_str(hirs, string),
+            Self::String(s) => s.push_str(string),
+        }
+    }
+    fn push_hir(&mut self, hir: Hir) {
+        self.as_hirs().push(hir);
     }
 }
 
