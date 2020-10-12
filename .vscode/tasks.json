@@ -127,6 +127,19 @@
         "panel": "dedicated",
         "clear": true
       }
+    },
+    {
+      "type": "shell",
+      "label": "cargo bench",
+      "command": "cargo",
+      "args": ["bench"],
+      "options": {"cwd": "${workspaceFolder}/parse-display-benches"},
+      "problemMatcher": ["$rustc"],
+      "presentation": {
+        "panel": "dedicated",
+        "clear": true
+      }
     }
+
   ]
 }
