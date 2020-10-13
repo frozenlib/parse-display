@@ -176,32 +176,35 @@ fn derive_from_str_for_struct(input: &DeriveInput, data: &DataStruct) -> Result<
     ))
 }
 fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<TokenStream> {
-    let mut bodys = Vec::new();
     let hattrs_enum = HelperAttributes::from(&input.attrs)?;
     if let Some(span) = hattrs_enum.default_self {
         bail!(span, "`#[from_str(default)]` cannot be specified for enum.");
     }
     let mut wheres = Vec::new();
     let generics = GenericParamSet::new(&input.generics);
-    for (idx, variant) in data.variants.iter().enumerate() {
+    let mut bodys = Vec::new();
+    let mut arms = Vec::new();
+    for variant in data.variants.iter() {
         let enum_ident = &input.ident;
         let variant_ident = &variant.ident;
-        let ctor = quote! { #enum_ident::#variant_ident };
-
+        let constructor = quote! { #enum_ident::#variant_ident };
         let tree = FieldTree::from_variant(&hattrs_enum, variant)?;
-        let body = tree.build_from_str_body(&variant.fields, ctor)?;
         wheres.extend(tree.build_wheres(&variant.fields, &generics));
-        let fn_ident: Ident = format_ident!("parse_{}", idx);
-        let body = quote! {
-            let #fn_ident = |s: &str| -> core::result::Result<Self, parse_display::ParseError> {
-                #body
-            };
-            if let Ok(value) = #fn_ident(s) {
-                return Ok(value);
-            }
-        };
-        bodys.push(body);
+        match tree.build_parse_variant_code(&variant.fields, constructor)? {
+            ParseVariantCode::MatchArm(arm) => arms.push(arm),
+            ParseVariantCode::Statement(body) => bodys.push(body),
+        }
     }
+    let match_body = if arms.is_empty() {
+        quote! {}
+    } else {
+        quote! {
+            match s {
+                #(#arms,)*
+                _ => { }
+            }
+        }
+    };
     let trait_path = quote! { core::str::FromStr };
     let wheres = Bound::build_wheres(hattrs_enum.bound_from_str, &trait_path)
         .or(Bound::build_wheres(hattrs_enum.bound_display, &trait_path))
@@ -214,6 +217,7 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Toke
         quote! {
             type Err = parse_display::ParseError;
             fn from_str(s: &str) -> core::result::Result<Self, Self::Err> {
+                #match_body
                 #({ #bodys })*
                 Err(parse_display::ParseError::new())
             }
@@ -392,6 +396,44 @@ impl FieldTree {
         fields: &Fields,
         constructor: TokenStream,
     ) -> Result<TokenStream> {
+        let code = self.build_parse_code(fields, constructor)?;
+        Ok(quote! {
+            #code
+            Err(parse_display::ParseError::new())
+        })
+    }
+    fn build_parse_variant_code(
+        &self,
+        fields: &Fields,
+        constructor: TokenStream,
+    ) -> Result<ParseVariantCode> {
+        match &self.parse_format {
+            ParseFormat::Hirs(_) => {
+                let fn_ident: Ident = format_ident!("parse_variant");
+                let code = self.build_from_str_body(fields, constructor)?;
+                let code = quote! {
+                    let #fn_ident = |s: &str| -> core::result::Result<Self, parse_display::ParseError> {
+                        #code
+                    };
+                    if let Ok(value) = #fn_ident(s) {
+                        return Ok(value);
+                    }
+                };
+                Ok(ParseVariantCode::Statement(code))
+            }
+            ParseFormat::String(s) => {
+                let code = self.build_construct_code(fields, constructor)?;
+                let code = quote! { #s  => { #code }};
+                Ok(ParseVariantCode::MatchArm(code))
+            }
+        }
+    }
+
+    fn build_construct_code(
+        &self,
+        fields: &Fields,
+        constructor: TokenStream,
+    ) -> Result<TokenStream> {
         let root = &self.root;
         let m = field_map(&fields);
         for key in root.fields.keys() {
@@ -438,6 +480,10 @@ impl FieldTree {
             };
             quote! { return Ok(#constructor #ps); }
         };
+        Ok(code)
+    }
+    fn build_parse_code(&self, fields: &Fields, constructor: TokenStream) -> Result<TokenStream> {
+        let code = self.build_construct_code(fields, constructor)?;
         let code = match &self.parse_format {
             ParseFormat::Hirs(hirs) => {
                 let regex = to_regex_string(hirs);
@@ -458,10 +504,7 @@ impl FieldTree {
                 }
             }
         };
-        Ok(quote! {
-            #code
-            Err(parse_display::ParseError::new())
-        })
+        Ok(code)
     }
     fn build_field_init_expr(&self, key: &FieldKey) -> Result<TokenStream> {
         let root = &self.root;
@@ -1169,6 +1212,11 @@ impl ParseFormat {
     fn push_hir(&mut self, hir: Hir) {
         self.as_hirs().push(hir);
     }
+}
+
+enum ParseVariantCode {
+    MatchArm(TokenStream),
+    Statement(TokenStream),
 }
 
 enum Bound {
