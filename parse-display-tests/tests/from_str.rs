@@ -798,6 +798,22 @@ fn attr_enum() {
     assert_from_str("A", TestEnum::A);
 }
 
+macro_rules! macro_rule_hygiene_test {
+    () => {
+        #[derive(FromStr, Debug, Eq, PartialEq)]
+        struct HygieneTestType {
+            x: $crate::U8Alias,
+        }
+    };
+}
+
+type U8Alias = u8;
+#[test]
+fn macro_rule_hygiene() {
+    macro_rule_hygiene_test!();
+    assert_from_str("5", HygieneTestType { x: 5 });
+}
+
 fn assert_from_str<T: FromStr + Debug + PartialEq>(s: &str, value: T)
 where
     <T as FromStr>::Err: Display,

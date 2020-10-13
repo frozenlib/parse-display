@@ -739,6 +739,22 @@ fn attr_enum() {
     assert_display(TestEnum::A, "A");
 }
 
+macro_rules! macro_rule_hygiene_test {
+    () => {
+        #[derive(Display)]
+        struct HygieneTestType {
+            x: $crate::U8Alias,
+        }
+    };
+}
+
+type U8Alias = u8;
+#[test]
+fn macro_rule_hygiene() {
+    macro_rule_hygiene_test!();
+    assert_display(HygieneTestType { x: 5 }, "5");
+}
+
 fn assert_display<T: core::fmt::Display>(value: T, display: &str) {
     let value_display = alloc::format!("{}", value);
     assert_eq!(value_display, display);
