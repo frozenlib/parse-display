@@ -392,43 +392,11 @@ impl FieldTree {
         fields: &Fields,
         constructor: TokenStream,
     ) -> Result<TokenStream> {
-        fn to_full_expr(
-            root: &FieldEntry,
-            key: &FieldKey,
-            format_span: Span,
-        ) -> Result<TokenStream> {
-            if let Some(e) = root.fields.get(&key) {
-                if let Some(expr) = e.to_expr(std::slice::from_ref(key)) {
-                    let mut setters = Vec::new();
-                    e.visit(|keys, node| {
-                        if keys.len() >= 1 {
-                            if let Some(expr) = node.to_expr(&keys) {
-                                setters.push(quote! { field_value #(.#keys)* = #expr; });
-                            }
-                        }
-                    });
-                    return Ok(if setters.is_empty() {
-                        expr
-                    } else {
-                        let ty = e.ty.as_ref().unwrap();
-                        quote! {
-                            {
-                                let mut field_value : #ty = #expr;
-                                #(#setters)*
-                                field_value
-                            }
-                        }
-                    });
-                }
-            }
-            bail!(format_span, "field `{}` is not appear in format.", key);
-        }
-
         let root = &self.root;
         let m = field_map(&fields);
         for key in root.fields.keys() {
             if !m.contains_key(key) {
-                bail!(self.root.format_span, "field `{}` not found.", key);
+                bail!(root.format_span, "field `{}` not found.", key);
             }
         }
         let code = if root.use_default {
@@ -446,7 +414,7 @@ impl FieldTree {
         } else {
             if root.capture.is_some() {
                 bail!(
-                    self.root.regex_span,
+                    root.regex_span,
                     "`(?P<>)` (empty capture name) is not allowed in struct's regex."
                 )
             }
@@ -454,7 +422,7 @@ impl FieldTree {
                 Fields::Named(fields) => {
                     let mut fields_code = Vec::new();
                     for (key, _) in FieldKey::from_fields_named(fields) {
-                        let expr = to_full_expr(root, &key, self.root.format_span)?;
+                        let expr = self.build_field_init_expr(&key)?;
                         fields_code.push(quote! { #key : #expr })
                     }
                     quote! { { #(#fields_code,)* } }
@@ -462,7 +430,7 @@ impl FieldTree {
                 Fields::Unnamed(fields) => {
                     let mut fields_code = Vec::new();
                     for (key, _) in FieldKey::from_fields_unnamed(fields) {
-                        fields_code.push(to_full_expr(root, &key, self.root.format_span)?);
+                        fields_code.push(self.build_field_init_expr(&key)?);
                     }
                     quote! { ( #(#fields_code,)* ) }
                 }
@@ -495,6 +463,34 @@ impl FieldTree {
             Err(parse_display::ParseError::new())
         })
     }
+    fn build_field_init_expr(&self, key: &FieldKey) -> Result<TokenStream> {
+        let root = &self.root;
+        if let Some(e) = root.fields.get(&key) {
+            if let Some(mut expr) = e.to_expr(std::slice::from_ref(key)) {
+                let mut setters = Vec::new();
+                e.visit(|keys, node| {
+                    if keys.len() >= 1 {
+                        if let Some(expr) = node.to_expr(&keys) {
+                            setters.push(quote! { field_value #(.#keys)* = #expr; });
+                        }
+                    }
+                });
+                if !setters.is_empty() {
+                    let ty = e.ty.as_ref().unwrap();
+                    expr = quote! {
+                        {
+                            let mut field_value : #ty = #expr;
+                            #(#setters)*
+                            field_value
+                        }
+                    };
+                }
+                return Ok(expr);
+            }
+        }
+        bail!(root.format_span, "field `{}` is not appear in format.", key);
+    }
+
     fn build_wheres(&self, fields: &Fields, generics: &GenericParamSet) -> Vec<WherePredicate> {
         let m = field_map(&fields);
         let mut wheres = Vec::new();
