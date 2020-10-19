@@ -236,8 +236,7 @@ struct FieldEntry {
     use_default: bool,
     is_need_bounds: bool,
     ty: Option<Type>,
-    format_span: Span,
-    regex_span: Span,
+    span: Span,
 }
 
 impl FieldTree {
@@ -438,7 +437,7 @@ impl FieldTree {
         let m = field_map(&fields);
         for key in root.fields.keys() {
             if !m.contains_key(key) {
-                bail!(root.format_span, "field `{}` not found.", key);
+                bail!(root.span, "field `{}` not found.", key);
             }
         }
         let code = if root.use_default {
@@ -456,7 +455,7 @@ impl FieldTree {
         } else {
             if root.capture.is_some() {
                 bail!(
-                    root.regex_span,
+                    root.span,
                     "`(?P<>)` (empty capture name) is not allowed in struct's regex."
                 )
             }
@@ -531,7 +530,7 @@ impl FieldTree {
                 return Ok(expr);
             }
         }
-        bail!(root.format_span, "field `{}` is not appear in format.", key);
+        bail!(root.span, "field `{}` is not appear in format.", key);
     }
 
     fn build_wheres(&self, fields: &Fields, generics: &GenericParamSet) -> Vec<WherePredicate> {
@@ -558,8 +557,7 @@ impl FieldEntry {
             use_default: false,
             is_need_bounds: false,
             ty: None,
-            format_span: Span::call_site(),
-            regex_span: Span::call_site(),
+            span: Span::call_site(),
         }
     }
     fn field(&mut self, key: FieldKey) -> &mut Self {
@@ -597,11 +595,10 @@ impl FieldEntry {
         for field in &hattrs.default_fields {
             self.field(FieldKey::from_str(field.as_str())).use_default = true;
         }
-        if let Some(format) = &hattrs.format {
-            self.format_span = format.span;
-        }
         if let Some(lit) = &hattrs.regex {
-            self.regex_span = lit.span();
+            self.span = lit.span();
+        } else if let Some(format) = &hattrs.format {
+            self.span = format.span;
         }
     }
     fn apply_fields(&mut self, fields: &Fields) -> Result<()> {
