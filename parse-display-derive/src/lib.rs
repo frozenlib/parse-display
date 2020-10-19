@@ -20,10 +20,13 @@ use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote};
 use regex::{Captures, Regex};
 use regex_syntax::hir::Hir;
-use spanned::Spanned;
-use std::collections::HashMap;
-use std::{borrow::Cow, fmt::Display};
-use syn::*;
+use std::collections::BTreeMap;
+use std::fmt::Display;
+use syn::{
+    export, parse_macro_input, parse_quote, parse_str, spanned::Spanned, Attribute, Data, DataEnum,
+    DataStruct, DeriveInput, Error, Field, Fields, FieldsNamed, FieldsUnnamed, Ident, Lit, LitStr,
+    Member, Meta, MetaList, MetaNameValue, NestedMeta, Path, Result, Variant, WherePredicate,
+};
 
 #[proc_macro_derive(Display, attributes(display))]
 pub fn derive_display(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
@@ -154,10 +157,10 @@ pub fn derive_from_str(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
 }
 fn derive_from_str_for_struct(input: &DeriveInput, data: &DataStruct) -> Result<TokenStream> {
     let hattrs = HelperAttributes::from(&input.attrs)?;
-    let tree = FieldTree::from_struct(&hattrs, data)?;
-    let body = tree.build_from_str_body(&data.fields, quote!(Self))?;
+    let p = ParserBuilder::from_struct(&hattrs, data)?;
+    let body = p.build_from_str_body(quote!(Self))?;
     let generics = GenericParamSet::new(&input.generics);
-    let wheres = tree.build_wheres(&data.fields, &generics);
+    let wheres = p.build_wheres(&generics);
     let trait_path = quote! { core::str::FromStr };
     let wheres = Bound::build_wheres(hattrs.bound_from_str, &trait_path)
         .or(Bound::build_wheres(hattrs.bound_display, &trait_path))
@@ -188,9 +191,9 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Toke
         let enum_ident = &input.ident;
         let variant_ident = &variant.ident;
         let constructor = quote! { #enum_ident::#variant_ident };
-        let tree = FieldTree::from_variant(&hattrs_enum, variant)?;
-        wheres.extend(tree.build_wheres(&variant.fields, &generics));
-        match tree.build_parse_variant_code(&variant.fields, constructor)? {
+        let p = ParserBuilder::from_variant(&hattrs_enum, variant)?;
+        wheres.extend(p.build_wheres(&generics));
+        match p.build_parse_variant_code(constructor)? {
             ParseVariantCode::MatchArm(arm) => arms.push(arm),
             ParseVariantCode::Statement(body) => bodys.push(body),
         }
@@ -225,56 +228,98 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Toke
     ))
 }
 
-struct FieldTree {
-    root: FieldEntry,
+struct ParserBuilder<'a> {
     capture_next: usize,
     parse_format: ParseFormat,
-}
-struct FieldEntry {
-    fields: HashMap<FieldKey, FieldEntry>,
-    capture: Option<usize>,
+    fields: BTreeMap<FieldKey, FieldEntry<'a>>,
+    source: &'a Fields,
     use_default: bool,
-    is_need_bounds: bool,
-    ty: Option<Type>,
     span: Span,
 }
+struct FieldEntry<'a> {
+    hattrs: HelperAttributes,
+    deep_captures: BTreeMap<Vec<FieldKey>, usize>,
+    source: &'a Field,
+    capture: Option<usize>,
+    use_default: bool,
+}
 
-impl FieldTree {
-    fn new() -> Self {
-        FieldTree {
-            root: FieldEntry::new(),
+impl<'a> ParserBuilder<'a> {
+    fn new(source: &'a Fields) -> Result<Self> {
+        let mut fields = BTreeMap::new();
+        for (key, field) in field_map(source) {
+            fields.insert(key, FieldEntry::new(field)?);
+        }
+        Ok(Self {
+            source,
             capture_next: 1,
             parse_format: ParseFormat::new(),
-        }
+            fields,
+            use_default: false,
+            span: Span::call_site(),
+        })
     }
-    fn from_struct(hattrs: &HelperAttributes, data: &DataStruct) -> Result<Self> {
-        let mut s = Self::new();
-        let ctx = DisplayContext::Struct { data };
-        s.push_attrs(&hattrs, &ctx)?;
-        s.root.set_default(&hattrs);
-        s.root.apply_fields(&data.fields)?;
+    fn from_struct(hattrs: &HelperAttributes, data: &'a DataStruct) -> Result<Self> {
+        let mut s = Self::new(&data.fields)?;
+        let context = DisplayContext::Struct { data };
+        s.apply_attrs(&hattrs)?;
+        s.push_attrs(&hattrs, &context)?;
         Ok(s)
     }
-    fn from_variant(hattrs_enum: &HelperAttributes, variant: &Variant) -> Result<Self> {
+    fn from_variant(hattrs_enum: &HelperAttributes, variant: &'a Variant) -> Result<Self> {
         let hattrs_variant = &HelperAttributes::from(&variant.attrs)?;
-        let mut s = Self::new();
+        let mut s = Self::new(&variant.fields)?;
         let style = DisplayStyle::from_helper_attributes(hattrs_enum, hattrs_variant);
         let context = DisplayContext::Variant { variant, style };
+        s.apply_attrs(hattrs_enum)?;
+        s.apply_attrs(hattrs_variant)?;
         if !s.try_push_attrs(hattrs_variant, &context)? {
             s.push_attrs(hattrs_enum, &context)?;
         }
-        s.root.set_default(hattrs_enum);
-        s.root.set_default(hattrs_variant);
-        s.root.apply_fields(&variant.fields)?;
         Ok(s)
+    }
+    fn apply_attrs(&mut self, hattrs: &HelperAttributes) -> Result<()> {
+        if hattrs.default_self.is_some() {
+            self.use_default = true;
+        }
+        for field in &hattrs.default_fields {
+            let key = FieldKey::from_str(field.as_str());
+            let span = hattrs.default_fields_span;
+            self.field(&key, span)?.use_default = true;
+        }
+        if let Some(span) = hattrs.from_str_format_span() {
+            self.span = span;
+        }
+        Ok(())
+    }
+    fn field(&mut self, key: &FieldKey, span: Span) -> Result<&mut FieldEntry<'a>> {
+        field_of(&mut self.fields, key, span)
+    }
+    fn set_capture(
+        &mut self,
+        context: &DisplayContext,
+        keys: &[FieldKey],
+        span: Span,
+    ) -> Result<String> {
+        let field_key;
+        let sub_keys;
+        if let DisplayContext::Field { key, .. } = context {
+            field_key = *key;
+            sub_keys = keys;
+        } else {
+            if keys.is_empty() {
+                return Ok(CAPTURE_NAME_EMPTY.into());
+            }
+            field_key = &keys[0];
+            sub_keys = &keys[1..];
+        }
+        let field = field_of(&mut self.fields, field_key, span)?;
+        Ok(field.set_capture(sub_keys, &mut self.capture_next))
     }
 
     fn push_regex(&mut self, s: &LitStr, context: &DisplayContext) -> Result<()> {
         static REGEX_CAPTURE: Lazy<Regex> = lazy_regex!(r"\(\?P<([_0-9a-zA-Z.]*)>");
         static REGEX_NUMBER: Lazy<Regex> = lazy_regex!("^[0-9]+$");
-        let node = self.root.field_by_context(context);
-        let capture_next = &mut self.capture_next;
-
         let text = s.value();
         let text_debug = REGEX_CAPTURE.replace_all(&text, |c: &Captures| {
             let key = c.get(1).unwrap().as_str();
@@ -291,25 +336,34 @@ impl FieldTree {
         }
 
         let mut has_capture = false;
-        let mut text = REGEX_CAPTURE.replace_all(&text, |c: &Captures| {
+        let mut has_capture_empty = false;
+        let mut text = try_replace_all(&REGEX_CAPTURE, &text, |c: &Captures| -> Result<String> {
             has_capture = true;
             let keys = FieldKey::from_str_deep(c.get(1).unwrap().as_str());
-            let node = node.field_deep(keys);
-            format!("(?P<{}>", node.set_capture(capture_next))
-        });
+            let name = self.set_capture(context, &keys, s.span())?;
+            if name == CAPTURE_NAME_EMPTY {
+                has_capture_empty = true;
+            }
+            Ok(format!("(?P<{}>", name))
+        })?;
 
-        if let DisplayContext::Variant { variant, style } = context {
-            if let Some(c) = node.capture() {
-                node.capture = None;
+        if has_capture_empty {
+            if let DisplayContext::Variant { variant, style } = context {
                 let value = style.apply(&variant.ident);
                 self.parse_format
-                    .push_hir(to_hir_with_expand(&text, &c, &value));
+                    .push_hir(to_hir_with_expand(&text, CAPTURE_NAME_EMPTY, &value));
                 return Ok(());
+            } else {
+                bail!(
+                    s.span(),
+                    "`(?P<>)` (empty capture name) is not allowed in struct's regex."
+                );
             }
         }
         if let DisplayContext::Field { .. } = context {
             if !has_capture {
-                text = Cow::Owned(format!("(?P<{}>{})", node.set_capture(capture_next), &text));
+                let name = self.set_capture(context, &[], s.span())?;
+                text = format!("(?P<{}>{})", name, &text);
             }
         }
         self.parse_format.push_hir(to_hir(&text));
@@ -330,19 +384,10 @@ impl FieldTree {
                         }
                     }
                     if keys.len() == 1 {
-                        if let Some(fields) = context.fields() {
-                            let m = field_map(fields);
-                            let key = &keys[0];
-                            if let Some(field) = m.get(key) {
-                                self.push_field(context, key, field)?;
-                                continue;
-                            }
-                            bail!(format.span, "field `{}` not found.", key)
-                        }
+                        self.push_field(context, &keys[0], format.span)?;
+                        continue;
                     }
-
-                    let node = self.root.field_by_context(context).field_deep(keys);
-                    let c = node.set_capture(&mut self.capture_next);
+                    let c = self.set_capture(context, &keys, format.span)?;
                     self.parse_format
                         .push_hir(to_hir(&format!("(?P<{}>.*?)", c)));
                 }
@@ -353,20 +398,12 @@ impl FieldTree {
     fn push_str(&mut self, string: &str) {
         self.parse_format.push_str(string)
     }
-    fn push_field(
-        &mut self,
-        context: &DisplayContext,
-        key: &FieldKey,
-        field: &Field,
-    ) -> Result<()> {
-        self.push_attrs(
-            &HelperAttributes::from(&field.attrs)?,
-            &DisplayContext::Field {
-                parent: context,
-                key,
-                field,
-            },
-        )
+    fn push_field(&mut self, context: &DisplayContext, key: &FieldKey, span: Span) -> Result<()> {
+        let e = self.field(key, span)?;
+        let hattrs = e.hattrs.clone();
+        let parent = context;
+        let field = e.source;
+        self.push_attrs(&hattrs, &DisplayContext::Field { parent, key, field })
     }
     fn push_attrs(&mut self, hattrs: &HelperAttributes, context: &DisplayContext) -> Result<()> {
         if !self.try_push_attrs(hattrs, context)? {
@@ -390,26 +427,18 @@ impl FieldTree {
         })
     }
 
-    fn build_from_str_body(
-        &self,
-        fields: &Fields,
-        constructor: TokenStream,
-    ) -> Result<TokenStream> {
-        let code = self.build_parse_code(fields, constructor)?;
+    fn build_from_str_body(&self, constructor: TokenStream) -> Result<TokenStream> {
+        let code = self.build_parse_code(constructor)?;
         Ok(quote! {
             #code
             Err(parse_display::ParseError::new())
         })
     }
-    fn build_parse_variant_code(
-        &self,
-        fields: &Fields,
-        constructor: TokenStream,
-    ) -> Result<ParseVariantCode> {
+    fn build_parse_variant_code(&self, constructor: TokenStream) -> Result<ParseVariantCode> {
         match &self.parse_format {
             ParseFormat::Hirs(_) => {
                 let fn_ident: Ident = format_ident!("parse_variant");
-                let code = self.build_from_str_body(fields, constructor)?;
+                let code = self.build_from_str_body(constructor)?;
                 let code = quote! {
                     let #fn_ident = |s: &str| -> core::result::Result<Self, parse_display::ParseError> {
                         #code
@@ -421,57 +450,39 @@ impl FieldTree {
                 Ok(ParseVariantCode::Statement(code))
             }
             ParseFormat::String(s) => {
-                let code = self.build_construct_code(fields, constructor)?;
+                let code = self.build_construct_code(constructor)?;
                 let code = quote! { #s  => { #code }};
                 Ok(ParseVariantCode::MatchArm(code))
             }
         }
     }
 
-    fn build_construct_code(
-        &self,
-        fields: &Fields,
-        constructor: TokenStream,
-    ) -> Result<TokenStream> {
-        let root = &self.root;
-        let m = field_map(&fields);
-        for key in root.fields.keys() {
-            if !m.contains_key(key) {
-                bail!(root.span, "field `{}` not found.", key);
-            }
-        }
-        let code = if root.use_default {
+    fn build_construct_code(&self, constructor: TokenStream) -> Result<TokenStream> {
+        let code = if self.use_default {
             let mut setters = Vec::new();
-            root.visit(|keys, node| {
-                if let Some(expr) = node.to_expr(&keys) {
-                    setters.push(quote! { value #(.#keys)* = #expr; });
-                }
-            });
+            for (key, field) in &self.fields {
+                let left_expr = quote! { value . #key };
+                setters.push(field.build_setters(key, left_expr, true));
+            }
             quote! {
                 let mut value = <Self as core::default::Default>::default();
                 #(#setters)*
                 return Ok(value);
             }
         } else {
-            if root.capture.is_some() {
-                bail!(
-                    root.span,
-                    "`(?P<>)` (empty capture name) is not allowed in struct's regex."
-                )
-            }
-            let ps = match &fields {
-                Fields::Named(fields) => {
+            let ps = match &self.source {
+                Fields::Named(..) => {
                     let mut fields_code = Vec::new();
-                    for (key, _) in FieldKey::from_fields_named(fields) {
-                        let expr = self.build_field_init_expr(&key)?;
+                    for (key, field) in &self.fields {
+                        let expr = field.build_field_init_expr(&key, self.span)?;
                         fields_code.push(quote! { #key : #expr })
                     }
                     quote! { { #(#fields_code,)* } }
                 }
-                Fields::Unnamed(fields) => {
+                Fields::Unnamed(..) => {
                     let mut fields_code = Vec::new();
-                    for (key, _) in FieldKey::from_fields_unnamed(fields) {
-                        fields_code.push(self.build_field_init_expr(&key)?);
+                    for (key, field) in &self.fields {
+                        fields_code.push(field.build_field_init_expr(&key, self.span)?);
                     }
                     quote! { ( #(#fields_code,)* ) }
                 }
@@ -481,8 +492,8 @@ impl FieldTree {
         };
         Ok(code)
     }
-    fn build_parse_code(&self, fields: &Fields, constructor: TokenStream) -> Result<TokenStream> {
-        let code = self.build_construct_code(fields, constructor)?;
+    fn build_parse_code(&self, constructor: TokenStream) -> Result<TokenStream> {
+        let code = self.build_construct_code(constructor)?;
         let code = match &self.parse_format {
             ParseFormat::Hirs(hirs) => {
                 let regex = to_regex_string(hirs);
@@ -505,142 +516,102 @@ impl FieldTree {
         };
         Ok(code)
     }
-    fn build_field_init_expr(&self, key: &FieldKey) -> Result<TokenStream> {
-        let root = &self.root;
-        if let Some(e) = root.fields.get(&key) {
-            if let Some(mut expr) = e.to_expr(std::slice::from_ref(key)) {
-                let mut setters = Vec::new();
-                e.visit(|keys, node| {
-                    if keys.len() >= 1 {
-                        if let Some(expr) = node.to_expr(&keys) {
-                            setters.push(quote! { field_value #(.#keys)* = #expr; });
-                        }
-                    }
-                });
-                if !setters.is_empty() {
-                    let ty = e.ty.as_ref().unwrap();
-                    expr = quote! {
-                        {
-                            let mut field_value : #ty = #expr;
-                            #(#setters)*
-                            field_value
-                        }
-                    };
-                }
-                return Ok(expr);
-            }
-        }
-        bail!(root.span, "field `{}` is not appear in format.", key);
-    }
 
-    fn build_wheres(&self, fields: &Fields, generics: &GenericParamSet) -> Vec<WherePredicate> {
-        let m = field_map(&fields);
+    fn build_wheres(&self, generics: &GenericParamSet) -> Vec<WherePredicate> {
         let mut wheres = Vec::new();
-        for (key, field) in &m {
-            if let Some(e) = self.root.fields.get(&key) {
-                if e.is_need_bounds {
-                    let ty = &field.ty;
-                    if generics.contains_in_type(ty) {
-                        wheres.push(parse_quote!(#ty : core::str::FromStr));
-                    }
+        for (_, field) in &self.fields {
+            if field.capture.is_some() {
+                let ty = &field.source.ty;
+                if generics.contains_in_type(ty) {
+                    wheres.push(parse_quote!(#ty : core::str::FromStr));
                 }
             }
         }
         wheres
     }
 }
-impl FieldEntry {
-    fn new() -> Self {
-        Self {
-            fields: HashMap::new(),
+impl<'a> FieldEntry<'a> {
+    fn new(source: &'a Field) -> Result<Self> {
+        let hattrs = HelperAttributes::from(&source.attrs)?;
+        let use_default = hattrs.default_self.is_some();
+        Ok(Self {
+            hattrs,
+            deep_captures: BTreeMap::new(),
             capture: None,
-            use_default: false,
-            is_need_bounds: false,
-            ty: None,
-            span: Span::call_site(),
-        }
+            use_default,
+            source,
+        })
     }
-    fn field(&mut self, key: FieldKey) -> &mut Self {
-        self.fields.entry(key).or_insert_with(Self::new)
-    }
-    fn field_deep(&mut self, keys: Vec<FieldKey>) -> &mut Self {
-        let mut node = self;
-        for key in keys {
-            node = node.field(key);
-        }
-        node
-    }
-    fn field_by_context(&mut self, context: &DisplayContext) -> &mut Self {
-        match context {
-            DisplayContext::Struct { .. } | DisplayContext::Variant { .. } => self,
-            DisplayContext::Field { key, .. } => self.field((*key).clone()),
-        }
-    }
-    fn set_capture(&mut self, capture_next: &mut usize) -> String {
-        if self.capture.is_none() {
-            self.capture = Some(*capture_next);
-            *capture_next += 1;
-        }
-        self.is_need_bounds = true;
-        format!("value_{}", self.capture.unwrap())
+    fn set_capture(&mut self, keys: &[FieldKey], capture_next: &mut usize) -> String {
+        let idx = if keys.is_empty() {
+            if let Some(idx) = self.capture {
+                idx
+            } else {
+                let idx = *capture_next;
+                self.capture = Some(idx);
+                *capture_next += 1;
+                idx
+            }
+        } else {
+            if let Some(&idx) = self.deep_captures.get(keys) {
+                idx
+            } else {
+                let idx = *capture_next;
+                self.deep_captures.insert(keys.to_vec(), idx);
+                *capture_next += 1;
+                idx
+            }
+        };
+        capture_name(idx)
     }
     fn capture(&self) -> Option<String> {
-        self.capture.map(|c| format!("value_{}", c))
+        self.capture.map(capture_name)
     }
-
-    fn set_default(&mut self, hattrs: &HelperAttributes) {
-        if hattrs.default_self.is_some() {
-            self.use_default = true;
-        }
-        for field in &hattrs.default_fields {
-            self.field(FieldKey::from_str(field.as_str())).use_default = true;
-        }
-        if let Some(lit) = &hattrs.regex {
-            self.span = lit.span();
-        } else if let Some(format) = &hattrs.format {
-            self.span = format.span;
-        }
-    }
-    fn apply_fields(&mut self, fields: &Fields) -> Result<()> {
-        let m = field_map(fields);
-        for (key, field) in m {
-            let hattrs = HelperAttributes::from(&field.attrs)?;
-            let f = self.field(key);
-            f.set_default(&hattrs);
-            f.ty = Some(field.ty.clone());
-        }
-        Ok(())
-    }
-
-    fn visit(&self, mut visitor: impl FnMut(&[FieldKey], &Self)) {
-        fn visit_with(
-            keys: &mut Vec<FieldKey>,
-            e: &FieldEntry,
-            visitor: &mut impl FnMut(&[FieldKey], &FieldEntry),
-        ) {
-            visitor(&keys, e);
-            for (key, e) in e.fields.iter() {
-                keys.push(key.clone());
-                visit_with(keys, e, visitor);
-                keys.pop();
-            }
-        }
-        let mut keys = Vec::new();
-        visit_with(&mut keys, self, &mut visitor)
-    }
-    fn to_expr(&self, keys: &[FieldKey]) -> Option<TokenStream> {
-        if let Some(c) = self.capture() {
-            let msg = format!("field `{}` parse failed.", join(keys, "."));
-            Some(quote! { c.name(#c)
-                .map_or("", |m| m.as_str())
-                .parse()
-                .map_err(|e| parse_display::ParseError::with_message(#msg))?
-            })
+    fn build_expr(&self, key: &FieldKey) -> Option<TokenStream> {
+        if let Some(capture_name) = self.capture() {
+            Some(build_parse_capture_expr(&key.to_string(), &capture_name))
         } else if self.use_default {
             Some(quote! { core::default::Default::default() })
         } else {
             None
         }
+    }
+    fn build_setters(
+        &self,
+        key: &FieldKey,
+        left_expr: TokenStream,
+        include_self: bool,
+    ) -> TokenStream {
+        let mut setters = Vec::new();
+        if include_self {
+            if let Some(expr) = self.build_expr(key) {
+                setters.push(quote! { #left_expr = #expr; });
+            }
+        }
+        for (keys, idx) in &self.deep_captures {
+            let field_name = key.to_string() + &join(keys, ".");
+            let expr = build_parse_capture_expr(&field_name, &capture_name(*idx));
+            setters.push(quote! { #left_expr #(.#keys)* = #expr; });
+        }
+        quote! { #(#setters)* }
+    }
+
+    fn build_field_init_expr(&self, key: &FieldKey, span: Span) -> Result<TokenStream> {
+        if let Some(mut expr) = self.build_expr(key) {
+            if !self.deep_captures.is_empty() {
+                let setters = self.build_setters(key, quote!(field_value), false);
+                let ty = &self.source.ty;
+                expr = quote! {
+                    {
+                        let mut field_value : #ty = #expr;
+                        #setters
+                        field_value
+                    }
+                };
+            }
+            return Ok(expr);
+        }
+        bail!(span, "field `{}` is not appear in format.", key);
     }
 }
 
@@ -690,6 +661,7 @@ fn make_trait_impl(
     code
 }
 
+#[derive(Clone)]
 struct HelperAttributes {
     format: Option<DisplayFormat>,
     style: Option<DisplayStyle>,
@@ -698,6 +670,7 @@ struct HelperAttributes {
     regex: Option<LitStr>,
     default_self: Option<Span>,
     default_fields: Vec<String>,
+    default_fields_span: Span,
     debug_mode: bool,
 }
 const DISPLAY_HELPER_USAGE: &str = "The following syntax are available.
@@ -719,6 +692,7 @@ impl HelperAttributes {
             regex: None,
             default_self: None,
             default_fields: Vec::new(),
+            default_fields_span: Span::call_site(),
             debug_mode: false,
         };
         for a in attrs {
@@ -820,6 +794,15 @@ impl HelperAttributes {
             }
         }
         Ok(())
+    }
+    fn from_str_format_span(&self) -> Option<Span> {
+        if let Some(lit) = &self.regex {
+            Some(lit.span())
+        } else if let Some(format) = &self.format {
+            Some(format.span)
+        } else {
+            None
+        }
     }
 }
 
@@ -1216,6 +1199,7 @@ enum ParseVariantCode {
     Statement(TokenStream),
 }
 
+#[derive(Clone)]
 enum Bound {
     Type(Path),
     Pred(WherePredicate),
@@ -1253,7 +1237,7 @@ impl Bound {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 enum FieldKey {
     Named(String),
     Unnamed(usize),
@@ -1329,8 +1313,8 @@ impl quote::ToTokens for FieldKey {
     }
 }
 
-fn field_map(fields: &Fields) -> HashMap<FieldKey, &Field> {
-    let mut m = HashMap::new();
+fn field_map(fields: &Fields) -> BTreeMap<FieldKey, &Field> {
+    let mut m = BTreeMap::new();
     for (idx, field) in fields.iter().enumerate() {
         let key = if let Some(ident) = &field.ident {
             FieldKey::from_ident(ident)
@@ -1357,5 +1341,32 @@ fn trim_raw(s: &str) -> &str {
         &s[2..]
     } else {
         s
+    }
+}
+
+fn field_of<'a, 'b>(
+    fields: &'a mut BTreeMap<FieldKey, FieldEntry<'b>>,
+    key: &FieldKey,
+    span: Span,
+) -> Result<&'a mut FieldEntry<'b>> {
+    if let Some(f) = fields.get_mut(&key) {
+        Ok(f)
+    } else {
+        bail!(span, "field `{}` not found.", key);
+    }
+}
+
+const CAPTURE_NAME_EMPTY: &str = "empty";
+fn capture_name(idx: usize) -> String {
+    format!("value_{}", idx)
+}
+
+fn build_parse_capture_expr(field_name: &str, capture_name: &str) -> TokenStream {
+    let msg = format!("field `{}` parse failed.", field_name);
+    quote! {
+        c.name(#capture_name)
+            .map_or("", |m| m.as_str())
+            .parse()
+            .map_err(|e| parse_display::ParseError::with_message(#msg))?
     }
 }

@@ -1,3 +1,4 @@
+use regex::{Captures, Regex};
 use regex_syntax::ast::Ast;
 use regex_syntax::hir::Hir;
 
@@ -72,6 +73,22 @@ fn expand_capture(ast: &mut Ast, mut f: impl FnMut(&str) -> Option<Ast>) {
         }
         true
     })
+}
+pub fn try_replace_all<R: AsRef<str>, E>(
+    regex: &Regex,
+    text: &str,
+    mut replacer: impl FnMut(&Captures) -> Result<R, E>,
+) -> Result<String, E> {
+    let mut s = String::new();
+    let mut last_end = 0;
+    for c in regex.captures_iter(text) {
+        let m = c.get(0).unwrap();
+        s.push_str(&text[last_end..m.start()]);
+        s.push_str(replacer(&c)?.as_ref());
+        last_end = m.end();
+    }
+    s.push_str(&text[last_end..]);
+    Ok(s)
 }
 
 macro_rules! lazy_regex {
