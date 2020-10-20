@@ -1,4 +1,5 @@
 #![recursion_limit = "128"]
+#![allow(clippy::large_enum_variant)]
 
 //! The documentation for this crate is found in the parse-display crate.
 
@@ -58,7 +59,7 @@ fn derive_display_for_struct(input: &DeriveInput, data: &DataStruct) -> Result<T
     let args = format.format_args(ctx, &mut wheres, &generics)?;
 
     let trait_path = quote! { core::fmt::Display };
-    let wheres = Bound::build_wheres(hattrs.bound_display, &trait_path).unwrap_or(wheres);
+    let wheres = Bound::build_wheres(&hattrs.bound_display, &trait_path).unwrap_or(wheres);
     Ok(make_trait_impl(
         input,
         &trait_path,
@@ -136,7 +137,7 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Token
             }
         }
     };
-    let wheres = Bound::build_wheres(hattrs.bound_display, &trait_path).unwrap_or(wheres);
+    let wheres = Bound::build_wheres(&hattrs.bound_display, &trait_path).unwrap_or(wheres);
     Ok(make_trait_impl(
         input,
         &trait_path,
@@ -162,8 +163,8 @@ fn derive_from_str_for_struct(input: &DeriveInput, data: &DataStruct) -> Result<
     let generics = GenericParamSet::new(&input.generics);
     let wheres = p.build_wheres(&generics);
     let trait_path = quote! { core::str::FromStr };
-    let wheres = Bound::build_wheres(hattrs.bound_from_str, &trait_path)
-        .or(Bound::build_wheres(hattrs.bound_display, &trait_path))
+    let wheres = Bound::build_wheres(&hattrs.bound_from_str, &trait_path)
+        .or_else(|| Bound::build_wheres(&hattrs.bound_display, &trait_path))
         .unwrap_or(wheres);
     Ok(make_trait_impl(
         input,
@@ -209,8 +210,8 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Toke
         }
     };
     let trait_path = quote! { core::str::FromStr };
-    let wheres = Bound::build_wheres(hattrs_enum.bound_from_str, &trait_path)
-        .or(Bound::build_wheres(hattrs_enum.bound_display, &trait_path))
+    let wheres = Bound::build_wheres(&hattrs_enum.bound_from_str, &trait_path)
+        .or_else(|| Bound::build_wheres(&hattrs_enum.bound_display, &trait_path))
         .unwrap_or(wheres);
     Ok(make_trait_impl(
         input,
@@ -519,7 +520,7 @@ impl<'a> ParserBuilder<'a> {
 
     fn build_wheres(&self, generics: &GenericParamSet) -> Vec<WherePredicate> {
         let mut wheres = Vec::new();
-        for (_, field) in &self.fields {
+        for field in self.fields.values() {
             if field.capture.is_some() {
                 let ty = &field.source.ty;
                 if generics.contains_in_type(ty) {
@@ -542,6 +543,7 @@ impl<'a> FieldEntry<'a> {
             source,
         })
     }
+    #[allow(clippy::collapsible_if)]
     fn set_capture(&mut self, keys: &[FieldKey], capture_next: &mut usize) -> String {
         let idx = if keys.is_empty() {
             if let Some(idx) = self.capture {
@@ -1230,10 +1232,16 @@ impl Bound {
         }
     }
     fn build_wheres(
-        bound: Option<Vec<Bound>>,
+        bound: &Option<Vec<Bound>>,
         trait_path: &TokenStream,
     ) -> Option<Vec<WherePredicate>> {
-        Some(bound?.iter().map(|x| x.build_where(trait_path)).collect())
+        Some(
+            bound
+                .as_ref()?
+                .iter()
+                .map(|x| x.build_where(trait_path))
+                .collect(),
+        )
     }
 }
 
