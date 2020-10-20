@@ -121,7 +121,7 @@
       "type": "shell",
       "label": "cargo clippy",
       "command": "cargo",
-      "args": ["clippy", "--all-features", "--", "-W", "clippy::all"],
+      "args": ["clippy", "--all-features", "--target-dir", "target/clippy", "--", "-W", "clippy::all"],
       "problemMatcher": ["$rustc"],
       "presentation": {
         "panel": "dedicated",
