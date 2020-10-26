@@ -58,7 +58,7 @@ fn derive_display_for_struct(input: &DeriveInput, data: &DataStruct) -> Result<T
     };
     let args = format.format_args(ctx, &mut wheres, &generics)?;
 
-    let trait_path = quote! { core::fmt::Display };
+    let trait_path = parse_quote!(core::fmt::Display);
     let wheres = Bound::build_wheres(&hattrs.bound_display, &trait_path).unwrap_or(wheres);
     Ok(make_trait_impl(
         input,
@@ -129,7 +129,7 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Token
     for variant in &data.variants {
         arms.push(make_arm(input, &hattrs, variant, &mut wheres, &generics)?);
     }
-    let trait_path = quote! { core::fmt::Display };
+    let trait_path = parse_quote!(core::fmt::Display);
     let contents = quote! {
         fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
             match self {
@@ -159,10 +159,10 @@ pub fn derive_from_str(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
 fn derive_from_str_for_struct(input: &DeriveInput, data: &DataStruct) -> Result<TokenStream> {
     let hattrs = HelperAttributes::from(&input.attrs)?;
     let p = ParserBuilder::from_struct(&hattrs, data)?;
-    let body = p.build_from_str_body(quote!(Self))?;
+    let body = p.build_from_str_body(parse_quote!(Self))?;
     let generics = GenericParamSet::new(&input.generics);
     let wheres = p.build_wheres(&generics);
-    let trait_path = quote! { core::str::FromStr };
+    let trait_path = parse_quote!(core::str::FromStr);
     let wheres = Bound::build_wheres(&hattrs.bound_from_str, &trait_path)
         .or_else(|| Bound::build_wheres(&hattrs.bound_display, &trait_path))
         .unwrap_or(wheres);
@@ -191,7 +191,7 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Toke
     for variant in data.variants.iter() {
         let enum_ident = &input.ident;
         let variant_ident = &variant.ident;
-        let constructor = quote! { #enum_ident::#variant_ident };
+        let constructor = parse_quote!(#enum_ident::#variant_ident);
         let p = ParserBuilder::from_variant(&hattrs_enum, variant)?;
         wheres.extend(p.build_wheres(&generics));
         match p.build_parse_variant_code(constructor)? {
@@ -209,7 +209,7 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Toke
             }
         }
     };
-    let trait_path = quote! { core::str::FromStr };
+    let trait_path = parse_quote!(core::str::FromStr);
     let wheres = Bound::build_wheres(&hattrs_enum.bound_from_str, &trait_path)
         .or_else(|| Bound::build_wheres(&hattrs_enum.bound_display, &trait_path))
         .unwrap_or(wheres);
@@ -428,14 +428,14 @@ impl<'a> ParserBuilder<'a> {
         })
     }
 
-    fn build_from_str_body(&self, constructor: TokenStream) -> Result<TokenStream> {
+    fn build_from_str_body(&self, constructor: Path) -> Result<TokenStream> {
         let code = self.build_parse_code(constructor)?;
         Ok(quote! {
             #code
             Err(parse_display::ParseError::new())
         })
     }
-    fn build_parse_variant_code(&self, constructor: TokenStream) -> Result<ParseVariantCode> {
+    fn build_parse_variant_code(&self, constructor: Path) -> Result<ParseVariantCode> {
         match &self.parse_format {
             ParseFormat::Hirs(_) => {
                 let fn_ident: Ident = format_ident!("parse_variant");
@@ -458,7 +458,7 @@ impl<'a> ParserBuilder<'a> {
         }
     }
 
-    fn build_construct_code(&self, constructor: TokenStream) -> Result<TokenStream> {
+    fn build_construct_code(&self, constructor: Path) -> Result<TokenStream> {
         let code = if self.use_default {
             let mut setters = Vec::new();
             for (key, field) in &self.fields {
@@ -493,7 +493,7 @@ impl<'a> ParserBuilder<'a> {
         };
         Ok(code)
     }
-    fn build_parse_code(&self, constructor: TokenStream) -> Result<TokenStream> {
+    fn build_parse_code(&self, constructor: Path) -> Result<TokenStream> {
         let code = self.build_construct_code(constructor)?;
         let code = match &self.parse_format {
             ParseFormat::Hirs(hirs) => {
@@ -632,7 +632,7 @@ fn get_newtype_field(data: &DataStruct) -> Option<String> {
 
 fn make_trait_impl(
     input: &DeriveInput,
-    trait_path: &TokenStream,
+    trait_path: &Path,
     mut wheres: Vec<WherePredicate>,
     debug_mode: bool,
     contents: TokenStream,
@@ -1225,16 +1225,13 @@ impl Bound {
         Ok(())
     }
 
-    fn build_where(&self, trait_path: &TokenStream) -> WherePredicate {
+    fn build_where(&self, trait_path: &Path) -> WherePredicate {
         match self {
             Bound::Type(type_path) => parse_quote!(#type_path : #trait_path),
             Bound::Pred(w) => parse_quote!(#w),
         }
     }
-    fn build_wheres(
-        bound: &Option<Vec<Bound>>,
-        trait_path: &TokenStream,
-    ) -> Option<Vec<WherePredicate>> {
+    fn build_wheres(bound: &Option<Vec<Bound>>, trait_path: &Path) -> Option<Vec<WherePredicate>> {
         Some(
             bound
                 .as_ref()?
