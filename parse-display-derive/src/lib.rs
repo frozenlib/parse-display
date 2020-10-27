@@ -60,17 +60,17 @@ fn derive_display_for_struct(input: &DeriveInput, data: &DataStruct) -> Result<T
 
     let trait_path = parse_quote!(core::fmt::Display);
     let wheres = Bound::build_wheres(&hattrs.bound_display, &trait_path).unwrap_or(wheres);
-    Ok(make_trait_impl(
+    impl_trait_result(
         input,
         &trait_path,
-        wheres,
-        hattrs.debug_mode,
+        &wheres,
         quote! {
             fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
                 core::write!(f, #args)
             }
         },
-    ))
+        hattrs.debug_mode,
+    )
 }
 fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<TokenStream> {
     fn make_arm(
@@ -138,13 +138,7 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Token
         }
     };
     let wheres = Bound::build_wheres(&hattrs.bound_display, &trait_path).unwrap_or(wheres);
-    Ok(make_trait_impl(
-        input,
-        &trait_path,
-        wheres,
-        hattrs.debug_mode,
-        contents,
-    ))
+    impl_trait_result(input, &trait_path, &wheres, contents, hattrs.debug_mode)
 }
 
 #[proc_macro_derive(FromStr, attributes(display, from_str))]
@@ -166,18 +160,18 @@ fn derive_from_str_for_struct(input: &DeriveInput, data: &DataStruct) -> Result<
     let wheres = Bound::build_wheres(&hattrs.bound_from_str, &trait_path)
         .or_else(|| Bound::build_wheres(&hattrs.bound_display, &trait_path))
         .unwrap_or(wheres);
-    Ok(make_trait_impl(
+    impl_trait_result(
         input,
         &trait_path,
-        wheres,
-        hattrs.debug_mode,
+        &wheres,
         quote! {
             type Err = parse_display::ParseError;
             fn from_str(s: &str) -> core::result::Result<Self, Self::Err> {
                 #body
             }
         },
-    ))
+        hattrs.debug_mode,
+    )
 }
 fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<TokenStream> {
     let hattrs_enum = HelperAttributes::from(&input.attrs)?;
@@ -213,11 +207,10 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Toke
     let wheres = Bound::build_wheres(&hattrs_enum.bound_from_str, &trait_path)
         .or_else(|| Bound::build_wheres(&hattrs_enum.bound_display, &trait_path))
         .unwrap_or(wheres);
-    Ok(make_trait_impl(
+    impl_trait_result(
         input,
         &trait_path,
-        wheres,
-        hattrs_enum.debug_mode,
+        &wheres,
         quote! {
             type Err = parse_display::ParseError;
             fn from_str(s: &str) -> core::result::Result<Self, Self::Err> {
@@ -226,7 +219,8 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Toke
                 Err(parse_display::ParseError::new())
             }
         },
-    ))
+        hattrs_enum.debug_mode,
+    )
 }
 
 struct ParserBuilder<'a> {
@@ -628,39 +622,6 @@ fn get_newtype_field(data: &DataStruct) -> Option<String> {
     } else {
         None
     }
-}
-
-fn make_trait_impl(
-    input: &DeriveInput,
-    trait_path: &Path,
-    mut wheres: Vec<WherePredicate>,
-    debug_mode: bool,
-    contents: TokenStream,
-) -> TokenStream {
-    let self_id = &input.ident;
-    let (impl_g, self_g, impl_where) = input.generics.split_for_impl();
-
-    if let Some(impl_where) = impl_where {
-        for w in impl_where.predicates.iter() {
-            wheres.push(WherePredicate::clone(w));
-        }
-    }
-    let impl_where = if wheres.is_empty() {
-        quote! {}
-    } else {
-        quote! { where #(#wheres,)*}
-    };
-
-    let code = quote! {
-        #[automatically_derived]
-        impl #impl_g #trait_path for #self_id #self_g #impl_where {
-            #contents
-        }
-    };
-    if debug_mode {
-        panic!("debug mode:\n{}", code);
-    }
-    code
 }
 
 #[derive(Clone)]

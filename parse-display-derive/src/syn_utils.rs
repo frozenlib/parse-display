@@ -1,4 +1,5 @@
 use proc_macro2::TokenStream;
+use quote::quote;
 use std::collections::HashSet;
 use syn::{
     ext::IdentExt,
@@ -7,8 +8,8 @@ use syn::{
     punctuated::Punctuated,
     token,
     visit::{visit_path, visit_type, Visit},
-    GenericParam, Generics, Ident, Lit, Meta, MetaList, MetaNameValue, NestedMeta, Path,
-    PathArguments, PathSegment, Result, Token, Type,
+    DeriveInput, GenericParam, Generics, Ident, Lit, Meta, MetaList, MetaNameValue, NestedMeta,
+    Path, PathArguments, PathSegment, Result, Token, Type, WherePredicate,
 };
 
 macro_rules! bail {
@@ -81,11 +82,11 @@ impl GenericParamSet {
     }
 }
 
-pub fn parse_attr_args(input: ParseStream) -> syn::Result<Punctuated<NestedMeta, Token![,]>> {
+pub fn parse_attr_args(input: ParseStream) -> Result<Punctuated<NestedMeta, Token![,]>> {
     input.parse_terminated(parse_attr_arg)
 }
 
-fn parse_attr_arg(input: ParseStream) -> syn::Result<NestedMeta> {
+fn parse_attr_arg(input: ParseStream) -> Result<NestedMeta> {
     if input.peek(Lit) {
         input.parse().map(NestedMeta::Lit)
     } else {
@@ -93,7 +94,7 @@ fn parse_attr_arg(input: ParseStream) -> syn::Result<NestedMeta> {
     }
 }
 
-fn parse_attr_arg_meta(input: ParseStream) -> syn::Result<Meta> {
+fn parse_attr_arg_meta(input: ParseStream) -> Result<Meta> {
     let path: Path = if input.peek(Ident::peek_any) && !input.peek(Ident) {
         let ident = Ident::parse_any(input)?;
         let mut segments = Punctuated::new();
@@ -127,4 +128,42 @@ fn parse_attr_arg_meta(input: ParseStream) -> syn::Result<Meta> {
     } else {
         Ok(Meta::Path(path))
     }
+}
+
+pub fn impl_trait(
+    input: &DeriveInput,
+    trait_path: &Path,
+    wheres: &[WherePredicate],
+    contents: TokenStream,
+) -> TokenStream {
+    let ty = &input.ident;
+    let (impl_g, ty_g, where_clause) = input.generics.split_for_impl();
+    let mut wheres = wheres.to_vec();
+    if let Some(where_clause) = where_clause {
+        wheres.extend(where_clause.predicates.iter().cloned());
+    }
+    let where_clause = if wheres.is_empty() {
+        quote! {}
+    } else {
+        quote! { where #(#wheres,)*}
+    };
+    quote! {
+        #[automatically_derived]
+        impl #impl_g #trait_path for #ty #ty_g #where_clause {
+            #contents
+        }
+    }
+}
+pub fn impl_trait_result(
+    input: &DeriveInput,
+    trait_path: &Path,
+    wheres: &[WherePredicate],
+    contents: TokenStream,
+    debug_mode: bool,
+) -> Result<TokenStream> {
+    let ts = impl_trait(input, trait_path, wheres, contents);
+    if debug_mode {
+        panic!("debug mode:\n{}", ts);
+    }
+    Ok(ts)
 }
