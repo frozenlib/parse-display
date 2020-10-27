@@ -690,6 +690,24 @@ fn bound_type_generic() {
 }
 
 #[test]
+fn auto_bound_unused_field() {
+    #[derive(Display)]
+    #[display("{val_u8}")]
+    #[allow(dead_code)]
+    struct TestStruct<T: Eq> {
+        val_eq: T,
+        val_u8: u8,
+    }
+    assert_display(
+        TestStruct {
+            val_eq: 0,
+            val_u8: 1,
+        },
+        "1",
+    )
+}
+
+#[test]
 fn doc_comment_struct() {
     /// doc
     #[derive(Display)]
