@@ -1,6 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::quote;
-use std::collections::HashSet;
+use std::{collections::HashSet, iter::once};
 use syn::{
     ext::IdentExt,
     parenthesized,
@@ -95,39 +95,35 @@ fn parse_attr_arg(input: ParseStream) -> Result<NestedMeta> {
 }
 
 fn parse_attr_arg_meta(input: ParseStream) -> Result<Meta> {
-    let path: Path = if input.peek(Ident::peek_any) && !input.peek(Ident) {
-        let ident = Ident::parse_any(input)?;
-        let mut segments = Punctuated::new();
-        segments.push(PathSegment {
-            ident,
+    let path = if input.peek(Ident::peek_any) && !input.peek(Ident) {
+        let segment = PathSegment {
+            ident: Ident::parse_any(input)?,
             arguments: PathArguments::None,
-        });
+        };
         Path {
             leading_colon: None,
-            segments,
+            segments: once(segment).collect(),
         }
     } else {
         input.parse()?
     };
-    if input.peek(Token![=]) {
-        let eq_token: Token![=] = input.parse()?;
-        let lit: Lit = input.parse()?;
-        Ok(Meta::NameValue(MetaNameValue {
+    let meta = if input.peek(Token![=]) {
+        Meta::NameValue(MetaNameValue {
             path,
-            eq_token,
-            lit,
-        }))
+            eq_token: input.parse()?,
+            lit: input.parse()?,
+        })
     } else if input.peek(token::Paren) {
         let content;
-        let paren_token = parenthesized!(content in input);
-        Ok(Meta::List(MetaList {
+        Meta::List(MetaList {
             path,
-            paren_token,
+            paren_token: parenthesized!(content in input),
             nested: parse_attr_args(&content)?,
-        }))
+        })
     } else {
-        Ok(Meta::Path(path))
-    }
+        Meta::Path(path)
+    };
+    Ok(meta)
 }
 
 pub fn impl_trait(
