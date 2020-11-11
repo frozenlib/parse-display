@@ -3,7 +3,7 @@
 [![Crates.io](https://img.shields.io/crates/v/parse-display.svg)](https://crates.io/crates/parse-display)
 [![Docs.rs](https://docs.rs/parse-display/badge.svg)](https://docs.rs/parse-display/)
 [![Build Status](https://travis-ci.org/frozenlib/parse-display.svg?branch=master)](https://travis-ci.org/frozenlib/parse-display)
-[![Actions Status](https://github.com/frozenlib/parse-display/workflows/build/badge.svg)](https://github.com/frozenlib/parse-display/actions)
+[![Actions Status](https://github.com/frozenlib/parse-display/workflows/CI/badge.svg)](https://github.com/frozenlib/parse-display/actions)
 
 This crate provides derive macro `Display` and `FromStr`.
 These macros use common helper attributes to specify the format.
