@@ -831,35 +831,3 @@ fn assert_from_str_err<T: FromStr + Debug>(s: &str) {
         );
     }
 }
-
-#[test]
-fn parse_non_regex_format_struct_by_hand() {
-    #[derive(Display, Eq, PartialEq, Debug)]
-    #[display("{a},{b},{c}")]
-    struct TestInput {
-        a: u32,
-        b: u32,
-        c: u32,
-    }
-    impl FromStr for TestInput {
-        type Err = ParseError;
-
-        fn from_str(s: &str) -> Result<Self, Self::Err> {
-            let idx1 = s.find(",").ok_or_else(ParseError::new)?;
-            let idx2 = idx1 + 1 + s[idx1 + 1..].find(",").ok_or_else(ParseError::new)?;
-            let a = s[0..idx1].parse().map_err(|_| ParseError::new())?;
-            let b = s[idx1 + 1..idx2].parse().map_err(|_| ParseError::new())?;
-            let c = s[idx2 + 1..].parse().map_err(|_| ParseError::new())?;
-            Ok(Self { a, b, c })
-        }
-    }
-
-    assert_from_str(
-        "10,20,30",
-        TestInput {
-            a: 10,
-            b: 20,
-            c: 30,
-        },
-    );
-}
