@@ -665,6 +665,32 @@ fn bound_predicate_struct() {
         "this is display",
     );
 }
+
+#[test]
+fn bound_predicate_struct_x2() {
+    #[derive(Display)]
+    #[display("{a},{b}", bound(T1 : Copy, T2 : Copy))]
+    pub struct TestStructBoundPredicate<T1, T2> {
+        a: DisplayIfCopy<T1>,
+        b: DisplayIfCopy<T2>,
+    }
+
+    struct DisplayIfCopy<T>(T);
+
+    impl<T: Copy> core::fmt::Display for DisplayIfCopy<T> {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+            write!(f, "this is display")
+        }
+    }
+    assert_display(
+        TestStructBoundPredicate {
+            a: DisplayIfCopy(10),
+            b: DisplayIfCopy(20),
+        },
+        "this is display,this is display",
+    );
+}
+
 #[test]
 fn bound_predicate_struct_str() {
     #[derive(Display)]
@@ -702,6 +728,18 @@ fn bound_type_generic() {
     #[derive(Display)]
     #[display(bound(Inner<T>))]
     struct Outer<T>(Inner<T>);
+
+    #[derive(Display)]
+    struct Inner<T>(T);
+}
+
+#[test]
+fn bound_type_generic_x2() {
+    assert_display(Outer(Inner(5), Inner(10)), "5,10");
+
+    #[derive(Display)]
+    #[display("{0},{1}",bound(Inner<T1>, Inner<T2>))]
+    struct Outer<T1, T2>(Inner<T1>, Inner<T2>);
 
     #[derive(Display)]
     struct Inner<T>(T);
