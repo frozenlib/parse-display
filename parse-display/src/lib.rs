@@ -361,13 +361,13 @@ assert_eq!("10".parse(), Ok(Outer(Inner(10))));
 
 ### Specify where predicate
 
-You can also specify the where predicate as a string.
+You can also specify the where predicate.
 
 ```rust
 use parse_display::Display;
 
 #[derive(Display)]
-#[display(bound("T : std::fmt::Debug"))]
+#[display(bound(T : std::fmt::Debug))]
 pub struct Outer<T>(Inner<T>);
 
 #[derive(Display)]
