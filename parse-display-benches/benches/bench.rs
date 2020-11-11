@@ -55,6 +55,14 @@ fn parse_simple_enum_by_hand(b: &mut test::Bencher) {
 
 #[bench]
 fn parse_non_regex_format_struct_derive(b: &mut test::Bencher) {
+    #[derive(Display, FromStr)]
+    #[display("{a},{b},{c}")]
+    struct TestInput {
+        a: u32,
+        b: u32,
+        c: u32,
+    }
+
     let input = TestInput {
         a: 10,
         b: 20,
