@@ -690,6 +690,15 @@ fn bound_type_generic() {
 }
 
 #[test]
+fn bound_type_array() {
+    #[derive(Display)]
+    #[display(bound([T; 1]))]
+    struct TestStruct<T> {
+        x: [T; 1],
+    }
+}
+
+#[test]
 fn auto_bound_unused_field() {
     #[derive(Display)]
     #[display("{val_u8}")]

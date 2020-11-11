@@ -18,15 +18,22 @@ use crate::regex_utils::*;
 use crate::syn_utils::*;
 use once_cell::sync::Lazy;
 use proc_macro2::{Span, TokenStream};
-use quote::{format_ident, quote};
+use quote::{format_ident, quote, ToTokens};
 use regex::{Captures, Regex};
 use regex_syntax::hir::Hir;
 use std::collections::BTreeMap;
 use std::fmt::Display;
 use syn::{
-    export, parse_macro_input, parse_quote, parse_str, spanned::Spanned, Attribute, Data, DataEnum,
-    DataStruct, DeriveInput, Error, Field, Fields, FieldsNamed, FieldsUnnamed, Ident, Lit, LitStr,
-    Member, Meta, MetaList, MetaNameValue, NestedMeta, Path, Result, Variant, WherePredicate,
+    export,
+    ext::IdentExt,
+    parenthesized,
+    parse::Parse,
+    parse::{discouraged::Speculative, ParseStream},
+    parse_macro_input, parse_quote, parse_str,
+    spanned::Spanned,
+    token::Paren,
+    Attribute, Data, DataEnum, DataStruct, DeriveInput, Field, Fields, FieldsNamed, FieldsUnnamed,
+    Ident, LitStr, Member, Path, Result, Token, Type, Variant, WherePredicate,
 };
 
 #[proc_macro_derive(Display, attributes(display))]
@@ -59,7 +66,7 @@ fn derive_display_for_struct(input: &DeriveInput, data: &DataStruct) -> Result<T
     let args = format.format_args(ctx, &mut wheres, &generics)?;
 
     let trait_path = parse_quote!(core::fmt::Display);
-    let wheres = Bound::build_wheres(&hattrs.bound_display, &trait_path).unwrap_or(wheres);
+    let wheres = Bound::build_wheres(&hattrs.bound_display, &trait_path, wheres);
     impl_trait_result(
         input,
         &trait_path,
@@ -137,7 +144,7 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Token
             }
         }
     };
-    let wheres = Bound::build_wheres(&hattrs.bound_display, &trait_path).unwrap_or(wheres);
+    let wheres = Bound::build_wheres(&hattrs.bound_display, &trait_path, wheres);
     impl_trait_result(input, &trait_path, &wheres, contents, hattrs.debug_mode)
 }
 
@@ -157,9 +164,8 @@ fn derive_from_str_for_struct(input: &DeriveInput, data: &DataStruct) -> Result<
     let generics = GenericParamSet::new(&input.generics);
     let wheres = p.build_wheres(&generics);
     let trait_path = parse_quote!(core::str::FromStr);
-    let wheres = Bound::build_wheres(&hattrs.bound_from_str, &trait_path)
-        .or_else(|| Bound::build_wheres(&hattrs.bound_display, &trait_path))
-        .unwrap_or(wheres);
+    let bounds = hattrs.bound_from_str.or(hattrs.bound_display);
+    let wheres = Bound::build_wheres(&bounds, &trait_path, wheres);
     impl_trait_result(
         input,
         &trait_path,
@@ -204,9 +210,8 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Toke
         }
     };
     let trait_path = parse_quote!(core::str::FromStr);
-    let wheres = Bound::build_wheres(&hattrs_enum.bound_from_str, &trait_path)
-        .or_else(|| Bound::build_wheres(&hattrs_enum.bound_display, &trait_path))
-        .unwrap_or(wheres);
+    let bounds = hattrs_enum.bound_from_str.or(hattrs_enum.bound_display);
+    let wheres = Bound::build_wheres(&bounds, &trait_path, wheres);
     impl_trait_result(
         input,
         &trait_path,
@@ -278,8 +283,8 @@ impl<'a> ParserBuilder<'a> {
             self.use_default = true;
         }
         for field in &hattrs.default_fields {
-            let key = FieldKey::from_str(field.as_str());
-            let span = hattrs.default_fields_span;
+            let key = FieldKey::from_member(&field.0);
+            let span = field.span();
             self.field(&key, span)?.use_default = true;
         }
         if let Some(span) = hattrs.from_str_format_span() {
@@ -624,6 +629,189 @@ fn get_newtype_field(data: &DataStruct) -> Option<String> {
     }
 }
 
+mod kw {
+    use syn::custom_keyword;
+
+    custom_keyword!(bound);
+    custom_keyword!(style);
+    custom_keyword!(regex);
+    custom_keyword!(default);
+    custom_keyword!(default_fields);
+}
+
+enum DisplayArg {
+    Format {
+        format: LitStr,
+    },
+    Style {
+        style_token: kw::style,
+        eq_token: Token![=],
+        style: LitStr,
+    },
+    Bound(BoundArg),
+}
+impl Parse for DisplayArg {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let value = if input.peek(LitStr) {
+            Self::Format {
+                format: input.parse()?,
+            }
+        } else if input.peek(kw::style) {
+            let style_token = input.parse()?;
+            let eq_token = input.parse()?;
+            let style = input.parse()?;
+            Self::Style {
+                style_token,
+                eq_token,
+                style,
+            }
+        } else if input.peek(kw::bound) {
+            Self::Bound(input.parse()?)
+        } else {
+            return Err(input.error(DISPLAY_HELPER_USAGE));
+        };
+        Ok(value)
+    }
+}
+impl ToTokens for DisplayArg {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        match self {
+            DisplayArg::Format { format } => {
+                format.to_tokens(tokens);
+            }
+            DisplayArg::Style {
+                style_token,
+                eq_token,
+                style,
+            } => {
+                style_token.to_tokens(tokens);
+                eq_token.to_tokens(tokens);
+                style.to_tokens(tokens);
+            }
+            DisplayArg::Bound(bound) => bound.to_tokens(tokens),
+        }
+    }
+}
+
+struct BoundArg {
+    bound_token: kw::bound,
+    paren_token: Paren,
+    bounds: ArgsOf<Quotable<Bound>>,
+}
+impl Parse for BoundArg {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let bound_token = input.parse()?;
+        let content;
+        let paren_token = parenthesized!(content in input);
+        let bounds = content.parse()?;
+        Ok(Self {
+            bound_token,
+            paren_token,
+            bounds,
+        })
+    }
+}
+impl ToTokens for BoundArg {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        self.bound_token.to_tokens(tokens);
+        self.paren_token
+            .surround(tokens, |tokens| self.bounds.to_tokens(tokens));
+    }
+}
+
+#[derive(Clone)]
+struct DefaultField(Member);
+
+impl Parse for DefaultField {
+    fn parse(input: ParseStream) -> Result<Self> {
+        if input.peek(Ident::peek_any) {
+            Ok(Self(Member::Named(Ident::parse_any(input)?)))
+        } else {
+            Ok(Self(input.parse()?))
+        }
+    }
+}
+impl ToTokens for DefaultField {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        self.0.to_tokens(tokens)
+    }
+}
+
+enum FromStrArg {
+    Regex {
+        regex_token: kw::regex,
+        eq_token: Token![=],
+        regex: LitStr,
+    },
+    Bound(BoundArg),
+    Default {
+        default_token: kw::default,
+    },
+    DefaultFields {
+        default_fields_token: kw::default_fields,
+        paren_token: Paren,
+        fields: ArgsOf<Quotable<DefaultField>>,
+    },
+}
+impl Parse for FromStrArg {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let value = if input.peek(kw::bound) {
+            Self::Bound(input.parse()?)
+        } else if input.peek(kw::regex) {
+            let regex_token = input.parse()?;
+            let eq_token = input.parse()?;
+            let regex = input.parse()?;
+            Self::Regex {
+                regex_token,
+                eq_token,
+                regex,
+            }
+        } else if input.peek(kw::default) {
+            Self::Default {
+                default_token: input.parse()?,
+            }
+        } else if input.peek(kw::default_fields) {
+            let default_fields_token = input.parse()?;
+            let content;
+            let paren_token = parenthesized!(content in input);
+            let fields = content.parse()?;
+            Self::DefaultFields {
+                default_fields_token,
+                paren_token,
+                fields,
+            }
+        } else {
+            return Err(input.error(FROM_STR_HELPER_USAGE));
+        };
+        Ok(value)
+    }
+}
+impl ToTokens for FromStrArg {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        match self {
+            Self::Regex {
+                regex_token,
+                eq_token,
+                regex,
+            } => {
+                regex_token.to_tokens(tokens);
+                eq_token.to_tokens(tokens);
+                regex.to_tokens(tokens);
+            }
+            Self::Bound(bound) => bound.to_tokens(tokens),
+            Self::Default { default_token } => default_token.to_tokens(tokens),
+            Self::DefaultFields {
+                default_fields_token,
+                paren_token,
+                fields,
+            } => {
+                default_fields_token.to_tokens(tokens);
+                paren_token.surround(tokens, |tokens| fields.to_tokens(tokens));
+            }
+        }
+    }
+}
+
 #[derive(Clone)]
 struct HelperAttributes {
     format: Option<DisplayFormat>,
@@ -632,8 +820,7 @@ struct HelperAttributes {
     bound_from_str: Option<Vec<Bound>>,
     regex: Option<LitStr>,
     default_self: Option<Span>,
-    default_fields: Vec<String>,
-    default_fields_span: Span,
+    default_fields: Vec<DefaultField>,
     debug_mode: bool,
 }
 const DISPLAY_HELPER_USAGE: &str = "The following syntax are available.
@@ -655,105 +842,80 @@ impl HelperAttributes {
             regex: None,
             default_self: None,
             default_fields: Vec::new(),
-            default_fields_span: Span::call_site(),
             debug_mode: false,
         };
         for a in attrs {
             if a.path.is_ident("display") {
-                let args = a.parse_args_with(parse_attr_args)?;
-                for m in args.iter() {
-                    hattrs.set_display_nested_meta(m)?;
+                let args: ArgsOf<DisplayArg> = a.parse_args()?;
+                for m in args.into_iter() {
+                    hattrs.set_display_arg(m)?;
                 }
             }
             if a.path.is_ident("from_str") {
-                let args = a.parse_args_with(parse_attr_args)?;
-                for m in args.iter() {
-                    hattrs.set_from_str_nested_meta(m)?;
+                let args: ArgsOf<FromStrArg> = a.parse_args()?;
+                for arg in args.into_iter() {
+                    hattrs.set_from_str_arg(arg)?;
                 }
+            }
+            if a.path.is_ident("debug_mode") {
+                hattrs.debug_mode = true;
             }
         }
         Ok(hattrs)
     }
-    fn set_display_nested_meta(&mut self, m: &NestedMeta) -> Result<()> {
-        match m {
-            NestedMeta::Lit(Lit::Str(s)) => {
+    fn set_display_arg(&mut self, arg: DisplayArg) -> Result<()> {
+        match arg {
+            DisplayArg::Format { format } => {
                 if self.format.is_some() {
-                    bail!(m.span(), "display format can be specified only once.");
+                    let span = format.span();
+                    bail!(span, "display format can be specified only once.");
                 }
-                self.format = Some(DisplayFormat::parse_lit_str(&s)?);
+                self.format = Some(DisplayFormat::parse_lit_str(&format)?);
             }
-            NestedMeta::Meta(Meta::NameValue(MetaNameValue {
-                path,
-                lit: Lit::Str(s),
-                ..
-            })) if path.is_ident("style") => {
+            DisplayArg::Style {
+                style_token, style, ..
+            } => {
                 if self.style.is_some() {
-                    return Err(Error::new_spanned(
-                        m,
-                        "display style can be specified only once.",
-                    ));
+                    let span = style_token.span();
+                    bail!(span, "display style can be specified only once.");
                 }
-                self.style = Some(DisplayStyle::parse_lit_str(&s)?);
+                self.style = Some(DisplayStyle::parse_lit_str(&style)?);
             }
-            NestedMeta::Meta(Meta::List(l)) if l.path.is_ident("bound") => {
-                Bound::from_meta_list(&mut self.bound_display, l)?
+            DisplayArg::Bound(BoundArg { bounds, .. }) => {
+                let list = self.bound_display.get_or_insert(Vec::new());
+                for bound in bounds.into_flatten() {
+                    list.push(bound);
+                }
             }
-            NestedMeta::Meta(Meta::Path(p)) if p.is_ident("debug_mode") => {
-                self.debug_mode = true;
-            }
-            m => bail!(
-                m.span(),
-                "invalid metadata in \"#[display]\"\n{0}",
-                DISPLAY_HELPER_USAGE
-            ),
         }
         Ok(())
     }
-    fn set_from_str_nested_meta(&mut self, m: &NestedMeta) -> Result<()> {
-        match m {
-            NestedMeta::Meta(Meta::NameValue(MetaNameValue {
-                path,
-                lit: Lit::Str(s),
-                ..
-            })) if path.is_ident("regex") => {
+    fn set_from_str_arg(&mut self, arg: FromStrArg) -> Result<()> {
+        match arg {
+            FromStrArg::Regex {
+                regex_token, regex, ..
+            } => {
                 if self.regex.is_some() {
-                    bail!(m.span(), "from_str regex can be specified only once.");
-                }
-                self.regex = Some(s.clone());
-            }
-            NestedMeta::Meta(Meta::List(l)) if l.path.is_ident("bound") => {
-                Bound::from_meta_list(&mut self.bound_from_str, l)?
-            }
-            NestedMeta::Meta(Meta::Path(path)) if path.is_ident("default") => {
-                self.default_self = Some(path.span());
-            }
-            NestedMeta::Meta(Meta::List(l)) if l.path.is_ident("default_fields") => {
-                for m in l.nested.iter() {
-                    match m {
-                        NestedMeta::Lit(Lit::Str(s)) => {
-                            self.default_fields.push(s.value());
-                            continue;
-                        }
-                        NestedMeta::Meta(Meta::Path(path)) => {
-                            if let Some(ident) = path.get_ident() {
-                                self.default_fields.push(ident.to_string());
-                                continue;
-                            }
-                        }
-                        _ => {}
-                    }
                     bail!(
-                        m.span(),
-                        "invalid arguemnts in \"#[from_str(default_fields)]\"."
+                        regex_token.span(),
+                        "from_str regex can be specified only once."
                     );
                 }
+                self.regex = Some(regex);
             }
-            m => {
-                bail!(
-                    m.span(),
-                    "invalid metadta in \"#[from_str]\".\n{}",
-                    FROM_STR_HELPER_USAGE
-                );
+            FromStrArg::Bound(BoundArg { bounds, .. }) => {
+                let list = self.bound_from_str.get_or_insert(Vec::new());
+                for bound in bounds.into_flatten() {
+                    list.push(bound);
+                }
+            }
+            FromStrArg::Default { default_token } => {
+                self.default_self = Some(default_token.span());
+            }
+            FromStrArg::DefaultFields { fields, .. } => {
+                for field in fields.into_flatten() {
+                    self.default_fields.push(field);
+                }
             }
         }
         Ok(())
@@ -1164,42 +1326,61 @@ enum ParseVariantCode {
 
 #[derive(Clone)]
 enum Bound {
-    Type(Path),
+    Type(Type),
     Pred(WherePredicate),
+    Default(Token![..]),
 }
-impl Bound {
-    fn parse(m: &NestedMeta) -> Result<Self> {
-        Ok(match m {
-            NestedMeta::Lit(Lit::Str(s)) => match parse_str(&s.value()) {
-                Ok(w) => Bound::Pred(w),
-                Err(e) => bail!(m.span(), "{}", e),
-            },
-            NestedMeta::Meta(Meta::Path(p)) => Bound::Type(p.clone()),
-            _ => bail!(m.span(), "invalid bound \"{}\".", quote! {#m}),
-        })
-    }
-    fn from_meta_list(s: &mut Option<Vec<Self>>, l: &MetaList) -> Result<()> {
-        let b = s.get_or_insert(Vec::new());
-        for m in l.nested.iter() {
-            b.push(Bound::parse(m)?);
-        }
-        Ok(())
-    }
 
-    fn build_where(&self, trait_path: &Path) -> WherePredicate {
-        match self {
-            Bound::Type(type_path) => parse_quote!(#type_path : #trait_path),
-            Bound::Pred(w) => parse_quote!(#w),
+impl Parse for Bound {
+    fn parse(input: ParseStream) -> Result<Self> {
+        if input.peek(Token![..]) {
+            return Ok(Self::Default(input.parse()?));
+        }
+        let fork = input.fork();
+        match fork.parse() {
+            Ok(p) => {
+                input.advance_to(&fork);
+                Ok(Self::Pred(p))
+            }
+            Err(e) => {
+                if let Ok(ty) = input.parse() {
+                    Ok(Self::Type(ty))
+                } else {
+                    Err(e)
+                }
+            }
         }
     }
-    fn build_wheres(bound: &Option<Vec<Bound>>, trait_path: &Path) -> Option<Vec<WherePredicate>> {
-        Some(
-            bound
-                .as_ref()?
-                .iter()
-                .map(|x| x.build_where(trait_path))
-                .collect(),
-        )
+}
+impl ToTokens for Bound {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        match self {
+            Self::Type(ty) => ty.to_tokens(tokens),
+            Self::Pred(p) => p.to_tokens(tokens),
+            Self::Default(dot2) => dot2.to_tokens(tokens),
+        }
+    }
+}
+
+impl Bound {
+    fn build_wheres(
+        bounds: &Option<Vec<Bound>>,
+        trait_path: &Path,
+        mut wheres_default: Vec<WherePredicate>,
+    ) -> Vec<WherePredicate> {
+        if let Some(bounds) = bounds {
+            let mut results = Vec::new();
+            for bound in bounds {
+                match bound {
+                    Bound::Type(ty) => results.push(parse_quote!(#ty : #trait_path)),
+                    Bound::Pred(p) => results.push(p.clone()),
+                    Bound::Default(..) => results.extend(wheres_default.drain(..)),
+                }
+            }
+            results
+        } else {
+            wheres_default
+        }
     }
 }
 
@@ -1253,6 +1434,12 @@ impl FieldKey {
             .iter()
             .enumerate()
             .map(|(idx, field)| (FieldKey::Unnamed(idx), field))
+    }
+    fn from_member(member: &Member) -> Self {
+        match member {
+            Member::Named(ident) => Self::from_ident(ident),
+            Member::Unnamed(index) => Self::Unnamed(index.index as usize),
+        }
     }
 
     fn to_member(&self) -> Member {

@@ -1,15 +1,15 @@
 use proc_macro2::TokenStream;
-use quote::quote;
-use std::{collections::HashSet, iter::once};
+use quote::{quote, quote_spanned, ToTokens};
+use std::collections::HashSet;
 use syn::{
     ext::IdentExt,
-    parenthesized,
+    parse::discouraged::Speculative,
+    parse::Parse,
     parse::ParseStream,
+    parse2, parse_str,
     punctuated::Punctuated,
-    token,
     visit::{visit_path, visit_type, Visit},
-    DeriveInput, GenericParam, Generics, Ident, Lit, Meta, MetaList, MetaNameValue, NestedMeta,
-    Path, PathArguments, PathSegment, Result, Token, Type, WherePredicate,
+    DeriveInput, GenericParam, Generics, Ident, LitStr, Path, Result, Token, Type, WherePredicate,
 };
 
 macro_rules! bail {
@@ -82,48 +82,65 @@ impl GenericParamSet {
     }
 }
 
-pub fn parse_attr_args(input: ParseStream) -> Result<Punctuated<NestedMeta, Token![,]>> {
-    input.parse_terminated(parse_attr_arg)
+pub enum Quotable<T> {
+    Direct(T),
+    Quoted { s: LitStr, args: ArgsOf<T> },
 }
-
-fn parse_attr_arg(input: ParseStream) -> Result<NestedMeta> {
-    if input.peek(Lit) {
-        input.parse().map(NestedMeta::Lit)
-    } else {
-        parse_attr_arg_meta(input).map(NestedMeta::Meta)
+impl<T: Parse> Parse for Quotable<T> {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let fork = input.fork();
+        if let Ok(s) = fork.parse::<LitStr>() {
+            input.advance_to(&fork);
+            let token: TokenStream = parse_str(&s.value())?;
+            let tokens = quote_spanned!(s.span()=> #token);
+            let args = parse2(tokens)?;
+            Ok(Quotable::Quoted { s, args })
+        } else {
+            Ok(Quotable::Direct(input.parse()?))
+        }
+    }
+}
+impl<T: ToTokens> ToTokens for Quotable<T> {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        match self {
+            Self::Direct(value) => value.to_tokens(tokens),
+            Self::Quoted { s, .. } => s.to_tokens(tokens),
+        }
     }
 }
 
-fn parse_attr_arg_meta(input: ParseStream) -> Result<Meta> {
-    let path = if input.peek(Ident::peek_any) && !input.peek(Ident) {
-        let segment = PathSegment {
-            ident: Ident::parse_any(input)?,
-            arguments: PathArguments::None,
-        };
-        Path {
-            leading_colon: None,
-            segments: once(segment).collect(),
+impl<T> Quotable<T> {
+    fn into_iter(self) -> impl IntoIterator<Item = T> {
+        match self {
+            Self::Direct(item) => vec![item],
+            Self::Quoted { args, .. } => args.into_iter().collect(),
         }
-    } else {
-        input.parse()?
-    };
-    let meta = if input.peek(Token![=]) {
-        Meta::NameValue(MetaNameValue {
-            path,
-            eq_token: input.parse()?,
-            lit: input.parse()?,
-        })
-    } else if input.peek(token::Paren) {
-        let content;
-        Meta::List(MetaList {
-            path,
-            paren_token: parenthesized!(content in input),
-            nested: parse_attr_args(&content)?,
-        })
-    } else {
-        Meta::Path(path)
-    };
-    Ok(meta)
+        .into_iter()
+    }
+}
+
+pub struct ArgsOf<T>(Punctuated<T, Token![,]>);
+
+impl<T: Parse> Parse for ArgsOf<T> {
+    fn parse(input: ParseStream) -> Result<Self> {
+        Ok(Self(Punctuated::parse_terminated(input)?))
+    }
+}
+impl<T: ToTokens> ToTokens for ArgsOf<T> {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        self.0.to_tokens(tokens)
+    }
+}
+
+impl<T> ArgsOf<T> {
+    pub fn into_iter(self) -> impl Iterator<Item = T> {
+        self.0.into_iter()
+    }
+}
+impl<T> ArgsOf<Quotable<T>> {
+    pub fn into_flatten(self) -> impl Iterator<Item = T> {
+        self.into_iter().flat_map(|x| x.into_iter())
+    }
 }
 
 pub fn impl_trait(
