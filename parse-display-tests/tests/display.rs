@@ -773,6 +773,31 @@ fn auto_bound_unused_field() {
 }
 
 #[test]
+fn bound_by_hand_with_auto() {
+    #[derive(Display)]
+    #[display("{a},{b}", bound(T1 : Copy, ..))]
+    pub struct TestStructBoundPredicate<T1, T2> {
+        a: DisplayIfCopy<T1>,
+        b: T2,
+    }
+
+    pub struct DisplayIfCopy<T>(T);
+
+    impl<T: Copy> core::fmt::Display for DisplayIfCopy<T> {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+            write!(f, "this is display")
+        }
+    }
+    assert_display(
+        TestStructBoundPredicate {
+            a: DisplayIfCopy(10),
+            b: 20,
+        },
+        "this is display,20",
+    );
+}
+
+#[test]
 fn doc_comment_struct() {
     /// doc
     #[derive(Display)]
