@@ -395,6 +395,24 @@ struct Inner<T>(T);
 assert_eq!(Outer(Inner(10)).to_string(), "ABC");
 ```
 
+### Default trait bounds
+
+`..` means default (automatically generated) trait bounds.
+
+The following example specifies `T1` as a trait bound in addition to the default trait bound `T2`.
+
+```rust
+use parse_display::Display;
+
+pub struct Inner<T>(T);
+
+#[derive(Display)]
+#[display("{0.0}, {1}", bound(T1, ..))]
+pub struct Outer<T1, T2>(Inner<T1>, T2);
+
+assert_eq!(Outer(Inner(10), 20).to_string(), "10, 20");
+```
+
 ## `#[from_str(bound(...))]`
 
 You can use a different trait bound for `Display` and `FromStr` by specifying both `#[display(bound(...))]` and `#[from_str(bound(...))]`.
