@@ -4,9 +4,7 @@
 [![Docs.rs](https://docs.rs/parse-display/badge.svg)](https://docs.rs/parse-display/)
 [![Actions Status](https://github.com/frozenlib/parse-display/workflows/CI/badge.svg)](https://github.com/frozenlib/parse-display/actions)
 
-This crate provides derive macro
-[`Display`](https://doc.rust-lang.org/std/fmt/trait.Display.html) and
-[`FromStr`](https://doc.rust-lang.org/std/str/trait.FromStr.html).
+This crate provides derive macro `Display` and `FromStr`.
 These macros use common helper attributes to specify the format.
 
 ## Install
