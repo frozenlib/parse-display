@@ -1,5 +1,7 @@
 /*!
-This crate provides derive macro `Display` and `FromStr`.
+This crate provides derive macro
+[`Display`](https://doc.rust-lang.org/std/fmt/trait.Display.html) and
+[`FromStr`](https://doc.rust-lang.org/std/str/trait.FromStr.html).
 These macros use common helper attributes to specify the format.
 
 ## Install
@@ -8,7 +10,7 @@ Add this to your Cargo.toml:
 
 ```toml
 [dependencies]
-parse-display = "0.3"
+parse-display = "0.4"
 ```
 
 ## Example
