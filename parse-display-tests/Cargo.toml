@@ -1,6 +1,6 @@
 [package]
 name = "parse-display-tests"
-version = "0.3.1"
+version = "0.0.0"
 authors = ["frozenlib <frozenlib@users.noreply.github.com>"]
 edition = "2018"
 publish = false
