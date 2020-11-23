@@ -1110,7 +1110,7 @@ impl DisplayFormat {
                 Var { name, parameters } => {
                     format_str.push_str("{:");
                     format_str.push_str(&parameters);
-                    format_str.push_str("}");
+                    format_str.push('}');
                     format_args.push(context.format_arg(
                         &name,
                         &parameters,
@@ -1490,8 +1490,8 @@ fn join<T: std::fmt::Display>(s: impl IntoIterator<Item = T>, sep: &str) -> Stri
     buf
 }
 fn trim_raw(s: &str) -> &str {
-    if s.starts_with("r#") {
-        &s[2..]
+    if let Some(s) = s.strip_prefix("r#") {
+        s
     } else {
         s
     }
