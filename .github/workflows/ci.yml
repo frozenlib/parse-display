@@ -17,3 +17,5 @@ jobs:
         run: cargo test --verbose --no-run
       - name: Run tests
         run: cargo test --verbose
+      - name: Clippy
+        run: cargo clippy --all-features --tests --lib -- -W clippy::all
