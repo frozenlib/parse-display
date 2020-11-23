@@ -121,8 +121,17 @@
       "type": "shell",
       "label": "cargo clippy",
       "command": "cargo",
-      "args": ["clippy", "--all-features", "--target-dir", "target/clippy", "--", "-W", "clippy::all"],
-      "problemMatcher": ["$rustc"],
+      "args": [
+        "clippy",
+        "--all-features",
+        "--target-dir",
+        "target/clippy",
+        "--tests",
+        "--",
+        "-W",
+        "clippy::all"
+      ],
+      "problemMatcher": [
       "presentation": {
         "panel": "dedicated",
         "clear": true
