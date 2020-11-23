@@ -91,13 +91,15 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Token
             Fields::Named(fields) => {
                 let fields = FieldKey::from_fields_named(fields).map(|(key, ..)| {
                     let var = key.binding_var();
-                    quote! { #key : #var }
+                    quote! { #key : ref #var }
                 });
                 quote! { { #(#fields,)* } }
             }
             Fields::Unnamed(fields) => {
-                let fields =
-                    FieldKey::from_fields_unnamed(fields).map(|(key, ..)| key.binding_var());
+                let fields = FieldKey::from_fields_unnamed(fields).map(|(key, ..)| {
+                    let var = key.binding_var();
+                    quote! { ref #var }
+                });
                 quote! { ( #(#fields,)* ) }
             }
             Fields::Unit => quote! {},
@@ -124,7 +126,7 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Token
         let args =
             format.format_args(DisplayContext::Variant { variant, style }, wheres, generics)?;
         Ok(quote! {
-            #enum_ident::#variant_ident #fields => {
+            & #enum_ident::#variant_ident #fields => {
                 core::write!(f, #args)
             },
         })

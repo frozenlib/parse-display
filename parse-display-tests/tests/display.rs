@@ -1,3 +1,4 @@
+#![deny(clippy::pattern_type_mismatch)]
 #![no_std]
 extern crate alloc;
 use parse_display::*;
