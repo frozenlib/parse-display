@@ -276,6 +276,7 @@ impl<'a> ParserBuilder<'a> {
         let mut s = Self::new(&variant.fields)?;
         let style = DisplayStyle::from_helper_attributes(hattrs_enum, hattrs_variant);
         let context = DisplayContext::Variant { variant, style };
+        s.new_expr = hattrs_variant.new_expr.clone();
         s.apply_attrs(hattrs_enum)?;
         s.apply_attrs(hattrs_variant)?;
         if !s.try_push_attrs(hattrs_variant, &context)? {

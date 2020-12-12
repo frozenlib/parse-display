@@ -955,6 +955,40 @@ fn new_struct_field_x2() {
     assert_from_str_err::<TestRange>("2-1");
 }
 
+#[test]
+fn new_enum() {
+    #[derive(Display, FromStr, Debug, Eq, PartialEq)]
+    #[display("{} {0}")]
+    enum NonZeroEnum {
+        #[from_str(new = Self::new_x(_0))]
+        X(usize),
+        #[from_str(new = Self::new_y(_0))]
+        Y(usize),
+    }
+
+    impl NonZeroEnum {
+        fn new_x(value: usize) -> Option<Self> {
+            if value == 0 {
+                None
+            } else {
+                Some(Self::X(value))
+            }
+        }
+        fn new_y(value: usize) -> Option<Self> {
+            if value == 0 {
+                None
+            } else {
+                Some(Self::Y(value))
+            }
+        }
+    }
+
+    assert_from_str("X 1", NonZeroEnum::X(1));
+    assert_from_str("Y 1", NonZeroEnum::Y(1));
+    assert_from_str_err::<NonZeroEnum>("X 0");
+    assert_from_str_err::<NonZeroEnum>("Y 0");
+}
+
 fn assert_from_str<T: FromStr + Debug + PartialEq>(s: &str, value: T)
 where
     <T as FromStr>::Err: Display,
