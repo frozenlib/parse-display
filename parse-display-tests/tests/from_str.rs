@@ -872,7 +872,68 @@ fn new_return_value() {
 }
 
 #[test]
+fn new_tuple() {
+    #[derive(Display, FromStr, Debug, Eq, PartialEq)]
+    #[from_str(new = Self::new(_0))]
+    struct Non1USize(usize);
+
+    impl Non1USize {
+        fn new(value: usize) -> Option<Self> {
+            if value == 1 {
+                None
+            } else {
+                Some(Self(value))
+            }
+        }
+    }
+
+    assert_from_str("0", Non1USize(0));
+    assert_from_str_err::<Non1USize>("1");
+}
+#[test]
+fn new_tuple_field_x2() {
+    #[derive(Display, FromStr, Debug, Eq, PartialEq)]
+    #[display("{0}-{1}")]
+    #[from_str(new = Self::new(_0, _1))]
+    struct TestRange(usize, usize);
+    impl TestRange {
+        fn new(start: usize, end: usize) -> Option<Self> {
+            if start <= end {
+                Some(TestRange(start, end))
+            } else {
+                None
+            }
+        }
+    }
+
+    assert_from_str("1-2", TestRange(1, 2));
+    assert_from_str_err::<TestRange>("2-1");
+}
+
+#[test]
 fn new_struct() {
+    #[derive(Display, FromStr, Debug, Eq, PartialEq)]
+    #[from_str(new = Self::new(value))]
+    struct Non1USize {
+        value: usize,
+    };
+
+    impl Non1USize {
+        fn new(value: usize) -> Option<Self> {
+            if value == 1 {
+                None
+            } else {
+                Some(Self { value })
+            }
+        }
+    }
+
+    assert_from_str("0", Non1USize { value: 0 });
+    assert_from_str_err::<Non1USize>("1");
+}
+
+#[test]
+fn new_struct_field_x2() {
     #[derive(Display, FromStr, Debug, Eq, PartialEq)]
     #[display("{start}-{end}")]
     #[from_str(new = Self::new(start, end))]
