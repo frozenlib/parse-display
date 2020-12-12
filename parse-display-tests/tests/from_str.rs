@@ -817,7 +817,7 @@ fn macro_rule_hygiene() {
 }
 
 #[test]
-fn new_option() {
+fn new_return_option() {
     #[derive(Display, FromStr, Debug, Eq, PartialEq)]
     #[from_str(new = Self::new(_0))]
     struct Non1USize(usize);
@@ -837,7 +837,7 @@ fn new_option() {
 }
 
 #[test]
-fn new_result() {
+fn new_return_result() {
     #[derive(Display, FromStr, Debug, Eq, PartialEq)]
     #[from_str(new = Self::new(_0))]
     struct Non1USize(usize);
@@ -858,7 +858,7 @@ fn new_result() {
 }
 
 #[test]
-fn new_value() {
+fn new_return_value() {
     #[derive(Display, FromStr, Debug, Eq, PartialEq)]
     #[from_str(new = Self::new(_0))]
     struct NewTypeUSize(usize);
@@ -869,6 +869,29 @@ fn new_value() {
     }
 
     assert_from_str("0", NewTypeUSize(0));
+}
+
+#[test]
+fn new_struct() {
+    #[derive(Display, FromStr, Debug, Eq, PartialEq)]
+    #[display("{start}-{end}")]
+    #[from_str(new = Self::new(start, end))]
+    struct TestRange {
+        start: usize,
+        end: usize,
+    };
+    impl TestRange {
+        fn new(start: usize, end: usize) -> Option<Self> {
+            if start <= end {
+                Some(TestRange { start, end })
+            } else {
+                None
+            }
+        }
+    }
+
+    assert_from_str("1-2", TestRange { start: 1, end: 2 });
+    assert_from_str_err::<TestRange>("2-1");
 }
 
 fn assert_from_str<T: FromStr + Debug + PartialEq>(s: &str, value: T)

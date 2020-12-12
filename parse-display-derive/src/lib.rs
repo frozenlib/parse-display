@@ -469,12 +469,12 @@ impl<'a> ParserBuilder<'a> {
                 let expr = field.build_field_init_expr(&key, self.span)?;
                 let var = key.new_arg_var();
                 code.extend(quote! { let #var = #expr; });
-                code.extend(quote! {
-                    if let Ok(value) = ::parse_display::IntoResult::into_result(#new_expr) {
-                        return Ok(value);
-                    }
-                });
             }
+            code.extend(quote! {
+                if let Ok(value) = ::parse_display::IntoResult::into_result(#new_expr) {
+                    return Ok(value);
+                }
+            });
             code
         } else if self.use_default {
             let mut setters = Vec::new();
