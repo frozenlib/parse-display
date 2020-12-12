@@ -438,6 +438,8 @@ assert_eq!("10".parse(), Ok(Outer(Inner(10))));
 
 If `#[from_str(new = ...)]` is specified, the value will be initialized with the specified expression instead of the constructor.
 
+The expression must return a value that implement [`IntoResult<Self>`](IntoResult) (e.g. `Self`, `Option<Self>`, `Result<Self, E>`).
+
 In the expression, you can use a variable with the same name as the field name.
 
 ```rust
@@ -462,7 +464,7 @@ assert_eq!("1".parse(), Ok(MyNonZeroUSize { value: 1 }));
 assert_eq!("0".parse::<MyNonZeroUSize>().is_err(), true);
 ```
 
-In tuple struct, variables are named with a leading underscore and their index, (e.g. `_0`, `_1`).
+In tuple struct, variables are named with a leading underscore and their index. (e.g. `_0`, `_1`).
 
 ```rust
 use parse_display::FromStr;
