@@ -816,6 +816,61 @@ fn macro_rule_hygiene() {
     assert_from_str("5", HygieneTestType { x: 5 });
 }
 
+#[test]
+fn new_option() {
+    #[derive(Display, FromStr, Debug, Eq, PartialEq)]
+    #[from_str(new = Self::new(_0))]
+    struct Non1USize(usize);
+
+    impl Non1USize {
+        fn new(value: usize) -> Option<Self> {
+            if value == 1 {
+                None
+            } else {
+                Some(Self(value))
+            }
+        }
+    }
+
+    assert_from_str("0", Non1USize(0));
+    assert_from_str_err::<Non1USize>("1");
+}
+
+#[test]
+fn new_result() {
+    #[derive(Display, FromStr, Debug, Eq, PartialEq)]
+    #[from_str(new = Self::new(_0))]
+    struct Non1USize(usize);
+    struct ParseNon1UsizeError;
+
+    impl Non1USize {
+        fn new(value: usize) -> core::result::Result<Self, ParseNon1UsizeError> {
+            if value == 1 {
+                Err(ParseNon1UsizeError)
+            } else {
+                Ok(Self(value))
+            }
+        }
+    }
+
+    assert_from_str("0", Non1USize(0));
+    assert_from_str_err::<Non1USize>("1");
+}
+
+#[test]
+fn new_value() {
+    #[derive(Display, FromStr, Debug, Eq, PartialEq)]
+    #[from_str(new = Self::new(_0))]
+    struct NewTypeUSize(usize);
+    impl NewTypeUSize {
+        fn new(value: usize) -> Self {
+            Self(value)
+        }
+    }
+
+    assert_from_str("0", NewTypeUSize(0));
+}
+
 fn assert_from_str<T: FromStr + Debug + PartialEq>(s: &str, value: T)
 where
     <T as FromStr>::Err: Display,

@@ -32,8 +32,8 @@ use syn::{
     parse_macro_input, parse_quote, parse_str,
     spanned::Spanned,
     token::Paren,
-    Attribute, Data, DataEnum, DataStruct, DeriveInput, Field, Fields, FieldsNamed, FieldsUnnamed,
-    Ident, LitStr, Member, Path, Result, Token, Type, Variant, WherePredicate,
+    Attribute, Data, DataEnum, DataStruct, DeriveInput, Expr, Field, Fields, FieldsNamed,
+    FieldsUnnamed, Ident, LitStr, Member, Path, Result, Token, Type, Variant, WherePredicate,
 };
 
 #[proc_macro_derive(Display, attributes(display))]
@@ -237,6 +237,7 @@ struct ParserBuilder<'a> {
     source: &'a Fields,
     use_default: bool,
     span: Span,
+    new_expr: Option<Expr>,
 }
 struct FieldEntry<'a> {
     hattrs: HelperAttributes,
@@ -259,11 +260,13 @@ impl<'a> ParserBuilder<'a> {
             fields,
             use_default: false,
             span: Span::call_site(),
+            new_expr: None,
         })
     }
     fn from_struct(hattrs: &HelperAttributes, data: &'a DataStruct) -> Result<Self> {
         let mut s = Self::new(&data.fields)?;
         let context = DisplayContext::Struct { data };
+        s.new_expr = hattrs.new_expr.clone();
         s.apply_attrs(&hattrs)?;
         s.push_attrs(&hattrs, &context)?;
         Ok(s)
@@ -460,7 +463,20 @@ impl<'a> ParserBuilder<'a> {
     }
 
     fn build_construct_code(&self, constructor: Path) -> Result<TokenStream> {
-        let code = if self.use_default {
+        let code = if let Some(new_expr) = &self.new_expr {
+            let mut code = TokenStream::new();
+            for (key, field) in &self.fields {
+                let expr = field.build_field_init_expr(&key, self.span)?;
+                let var = key.new_arg_var();
+                code.extend(quote! { let #var = #expr; });
+                code.extend(quote! {
+                    if let Ok(value) = ::parse_display::IntoResult::into_result(#new_expr) {
+                        return Ok(value);
+                    }
+                });
+            }
+            code
+        } else if self.use_default {
             let mut setters = Vec::new();
             for (key, field) in &self.fields {
                 let left_expr = quote! { value . #key };
@@ -637,6 +653,7 @@ mod kw {
     custom_keyword!(bound);
     custom_keyword!(style);
     custom_keyword!(regex);
+    custom_keyword!(new);
     custom_keyword!(default);
     custom_keyword!(default_fields);
 }
@@ -745,6 +762,11 @@ enum FromStrArg {
         eq_token: Token![=],
         regex: LitStr,
     },
+    New {
+        new_token: kw::new,
+        eq_token: Token![=],
+        expr: Expr,
+    },
     Bound(BoundArg),
     Default {
         default_token: kw::default,
@@ -767,6 +789,15 @@ impl Parse for FromStrArg {
                 regex_token,
                 eq_token,
                 regex,
+            }
+        } else if input.peek(kw::new) {
+            let new_token = input.parse()?;
+            let eq_token = input.parse()?;
+            let expr = input.parse()?;
+            Self::New {
+                new_token,
+                eq_token,
+                expr,
             }
         } else if input.peek(kw::default) {
             Self::Default {
@@ -800,6 +831,15 @@ impl ToTokens for FromStrArg {
                 eq_token.to_tokens(tokens);
                 regex.to_tokens(tokens);
             }
+            Self::New {
+                new_token,
+                eq_token,
+                expr,
+            } => {
+                new_token.to_tokens(tokens);
+                eq_token.to_tokens(tokens);
+                expr.to_tokens(tokens);
+            }
             Self::Bound(bound) => bound.to_tokens(tokens),
             Self::Default { default_token } => default_token.to_tokens(tokens),
             Self::DefaultFields {
@@ -824,6 +864,7 @@ struct HelperAttributes {
     default_self: Option<Span>,
     default_fields: Vec<DefaultField>,
     debug_mode: bool,
+    new_expr: Option<Expr>,
 }
 const DISPLAY_HELPER_USAGE: &str = "The following syntax are available.
 #[display(\"...\")]
@@ -831,6 +872,7 @@ const DISPLAY_HELPER_USAGE: &str = "The following syntax are available.
 #[display(bound(...)]";
 const FROM_STR_HELPER_USAGE: &str = "The following syntax are available.
 #[from_str(regex = \"...\")]
+#[from_str(new = ...)]
 #[from_str(bound(...)]
 #[from_str(default)]
 #[from_str(default_fields(...))]";
@@ -842,6 +884,7 @@ impl HelperAttributes {
             bound_display: None,
             bound_from_str: None,
             regex: None,
+            new_expr: None,
             default_self: None,
             default_fields: Vec::new(),
             debug_mode: false,
@@ -900,10 +943,21 @@ impl HelperAttributes {
                 if self.regex.is_some() {
                     bail!(
                         regex_token.span(),
-                        "from_str regex can be specified only once."
+                        "`#[from_str(regex = ...)]` can be specified only once."
                     );
                 }
                 self.regex = Some(regex);
+            }
+            FromStrArg::New {
+                new_token, expr, ..
+            } => {
+                if self.new_expr.is_some() {
+                    bail!(
+                        new_token.span(),
+                        "`#[from_str(new = ...)]` can be specified only once."
+                    );
+                }
+                self.new_expr = Some(expr);
             }
             FromStrArg::Bound(BoundArg { bounds, .. }) => {
                 let list = self.bound_from_str.get_or_insert(Vec::new());
@@ -1452,6 +1506,13 @@ impl FieldKey {
     }
     fn binding_var(&self) -> Ident {
         parse_str(&format!("_value_{}", self)).unwrap()
+    }
+    fn new_arg_var(&self) -> Ident {
+        match self {
+            Self::Named(s) => parse_str(&s),
+            Self::Unnamed(idx) => parse_str(&format!("_{}", idx)),
+        }
+        .unwrap()
     }
 }
 impl std::fmt::Display for FieldKey {

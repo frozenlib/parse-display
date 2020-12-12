@@ -599,6 +599,7 @@ assert_eq!("VarB-10".parse(), Ok(MyEnum::VarB { a:10, b:0, c:0 }));
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
+use core::convert::Infallible;
 use core::fmt::{Display, Formatter, Result};
 
 #[cfg(feature = "regex")]
@@ -634,5 +635,31 @@ impl Display for ParseError {
 impl std::error::Error for ParseError {
     fn description(&self) -> &str {
         self.0
+    }
+}
+
+pub trait IntoResult<T> {
+    type Err;
+    fn into_result(self) -> core::result::Result<T, Self::Err>;
+}
+
+impl<T> IntoResult<T> for T {
+    type Err = Infallible;
+    fn into_result(self) -> core::result::Result<T, Self::Err> {
+        Ok(self)
+    }
+}
+
+impl<T> IntoResult<T> for Option<T> {
+    type Err = ParseError;
+    fn into_result(self) -> core::result::Result<T, Self::Err> {
+        self.ok_or(ParseError::new())
+    }
+}
+
+impl<T, E> IntoResult<T> for core::result::Result<T, E> {
+    type Err = E;
+    fn into_result(self) -> core::result::Result<T, E> {
+        self
     }
 }
