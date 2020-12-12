@@ -443,7 +443,7 @@ assert_eq!("10".parse(), Ok(Outer(Inner(10))));
 
 If `#[from_str(new = ...)]` is specified, the value will be initialized with the specified expression instead of the constructor.
 
-The expression must return a value that implement [`IntoResult<Self>`](IntoResult) (e.g. `Self`, `Option<Self>`, `Result<Self, E>`).
+The expression must return a value that implement [`IntoResult`] (e.g. `Self`, `Option<Self>`, `Result<Self, E>`).
 
 In the expression, you can use a variable with the same name as the field name.
 
