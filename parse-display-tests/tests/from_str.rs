@@ -875,11 +875,11 @@ fn new_return_value() {
 fn new_tuple() {
     #[derive(Display, FromStr, Debug, Eq, PartialEq)]
     #[from_str(new = Self::new(_0))]
-    struct Non1USize(usize);
+    struct MyNonZeroUSize(usize);
 
-    impl Non1USize {
+    impl MyNonZeroUSize {
         fn new(value: usize) -> Option<Self> {
-            if value == 1 {
+            if value == 0 {
                 None
             } else {
                 Some(Self(value))
@@ -887,8 +887,8 @@ fn new_tuple() {
         }
     }
 
-    assert_from_str("0", Non1USize(0));
-    assert_from_str_err::<Non1USize>("1");
+    assert_from_str("1", MyNonZeroUSize(1));
+    assert_from_str_err::<MyNonZeroUSize>("0");
 }
 #[test]
 fn new_tuple_field_x2() {

@@ -47,6 +47,7 @@ Helper attributes can be written in the following positions.
 | [`#[display(bound(...))]`](#displaybound)                     | ✔      | ✔    |         |       |
 | [`#[from_str(bound(...))]`](#from_strbound)                   | ✔      | ✔    |         |       |
 | [`#[from_str(regex = "...")]`](#from_strregex--)              | ✔      | ✔    | ✔       | ✔     |
+| [`#[from_str(new = ...)]`](#new--)                            | ✔      |      | ✔       |       |
 | [`#[from_str(default)]`](#from_strdefault)                    | ✔      |      |         | ✔     |
 | [`#[from_str(default_fields(...))]`](#from_strdefault_fields) | ✔      | ✔    | ✔       |       |
 
@@ -431,6 +432,30 @@ struct Inner<T>(T);
 
 assert_eq!(Outer(Inner(10)).to_string(), "10");
 assert_eq!("10".parse(), Ok(Outer(Inner(10))));
+```
+
+## `#[from_str(new = ...)]`
+
+If `#[from_str(new = ...)]` is specified, the value will be initialized with the specified expression instead of the constructor.
+
+```rust
+use parse_display::FromStr;
+#[derive(FromStr, Debug, PartialEq)]
+#[from_str(new = Self::new(_0))]
+struct MyNonZeroUSize(usize);
+
+impl MyNonZeroUSize {
+    fn new(value: usize) -> Option<Self> {
+        if value == 0 {
+            None
+        } else {
+            Some(Self(value))
+        }
+    }
+}
+
+assert_eq!("1".parse(), Ok(MyNonZeroUSize(1)));
+assert_eq!("0".parse::<MyNonZeroUSize>().is_err(), true);
 ```
 
 ## `#[from_str(regex = "...")]`
