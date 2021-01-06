@@ -13,21 +13,20 @@ mod syn_utils;
 
 mod format_syntax;
 
-use crate::format_syntax::*;
-use crate::regex_utils::*;
-use crate::syn_utils::*;
+use crate::{format_syntax::*, regex_utils::*, syn_utils::*};
 use once_cell::sync::Lazy;
 use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote, ToTokens};
 use regex::{Captures, Regex};
 use regex_syntax::hir::Hir;
-use std::fmt::Display;
-use std::{collections::BTreeMap, fmt::Formatter};
+use std::{
+    collections::BTreeMap,
+    fmt::{Display, Formatter},
+};
 use syn::{
     ext::IdentExt,
     parenthesized,
-    parse::Parse,
-    parse::{discouraged::Speculative, ParseStream},
+    parse::{discouraged::Speculative, Parse, ParseStream},
     parse_macro_input, parse_quote, parse_str,
     spanned::Spanned,
     token::Paren,
