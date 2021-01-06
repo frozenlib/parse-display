@@ -21,10 +21,9 @@ use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote, ToTokens};
 use regex::{Captures, Regex};
 use regex_syntax::hir::Hir;
-use std::collections::BTreeMap;
 use std::fmt::Display;
+use std::{collections::BTreeMap, fmt::Formatter};
 use syn::{
-    export,
     ext::IdentExt,
     parenthesized,
     parse::Parse,
@@ -1337,7 +1336,7 @@ struct ParseDisplayStyleError;
 impl std::error::Error for ParseDisplayStyleError {}
 
 impl Display for ParseDisplayStyleError {
-    fn fmt(&self, f: &mut export::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "invalid display style")
     }
 }
