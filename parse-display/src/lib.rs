@@ -8,7 +8,7 @@ Add this to your Cargo.toml:
 
 ```toml
 [dependencies]
-parse-display = "0.4"
+parse-display = "0.4.1"
 ```
 
 ## Example
