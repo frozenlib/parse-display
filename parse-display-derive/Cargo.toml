@@ -21,3 +21,4 @@ proc-macro2 = "1.0.24"
 regex = "1.4.2"
 regex-syntax = "0.6.21"
 once_cell = "1.4"
+structmeta = { path = "../../structmeta/structmeta" }

@@ -916,7 +916,7 @@ fn new_struct() {
     #[from_str(new = Self::new(value))]
     struct Non1USize {
         value: usize,
-    };
+    }
 
     impl Non1USize {
         fn new(value: usize) -> Option<Self> {
@@ -940,7 +940,7 @@ fn new_struct_field_x2() {
     struct TestRange {
         start: usize,
         end: usize,
-    };
+    }
     impl TestRange {
         fn new(start: usize, end: usize) -> Option<Self> {
             if start <= end {

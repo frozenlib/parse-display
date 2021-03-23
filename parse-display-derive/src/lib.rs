@@ -16,20 +16,19 @@ mod format_syntax;
 use crate::{format_syntax::*, regex_utils::*, syn_utils::*};
 use once_cell::sync::Lazy;
 use proc_macro2::{Span, TokenStream};
-use quote::{format_ident, quote, ToTokens};
+use quote::{format_ident, quote};
 use regex::{Captures, Regex};
 use regex_syntax::hir::Hir;
 use std::{
     collections::BTreeMap,
     fmt::{Display, Formatter},
 };
+use structmeta::{Flag, StructMeta, ToTokens};
 use syn::{
     ext::IdentExt,
-    parenthesized,
     parse::{discouraged::Speculative, Parse, ParseStream},
     parse_macro_input, parse_quote, parse_str,
     spanned::Spanned,
-    token::Paren,
     Attribute, Data, DataEnum, DataStruct, DeriveInput, Expr, Field, Fields, FieldsNamed,
     FieldsUnnamed, Ident, LitStr, Member, Path, Result, Token, Type, Variant, WherePredicate,
 };
@@ -646,98 +645,15 @@ fn get_newtype_field(data: &DataStruct) -> Option<String> {
     }
 }
 
-mod kw {
-    use syn::custom_keyword;
-
-    custom_keyword!(bound);
-    custom_keyword!(style);
-    custom_keyword!(regex);
-    custom_keyword!(new);
-    custom_keyword!(default);
-    custom_keyword!(default_fields);
+#[derive(StructMeta)]
+struct DisplayArgs {
+    #[struct_meta(unnamed)]
+    format: Option<LitStr>,
+    style: Option<LitStr>,
+    bound: Option<Vec<Quotable<Bound>>>,
 }
 
-enum DisplayArg {
-    Format {
-        format: LitStr,
-    },
-    Style {
-        style_token: kw::style,
-        eq_token: Token![=],
-        style: LitStr,
-    },
-    Bound(BoundArg),
-}
-impl Parse for DisplayArg {
-    fn parse(input: ParseStream) -> Result<Self> {
-        let value = if input.peek(LitStr) {
-            Self::Format {
-                format: input.parse()?,
-            }
-        } else if input.peek(kw::style) {
-            let style_token = input.parse()?;
-            let eq_token = input.parse()?;
-            let style = input.parse()?;
-            Self::Style {
-                style_token,
-                eq_token,
-                style,
-            }
-        } else if input.peek(kw::bound) {
-            Self::Bound(input.parse()?)
-        } else {
-            return Err(input.error(DISPLAY_HELPER_USAGE));
-        };
-        Ok(value)
-    }
-}
-impl ToTokens for DisplayArg {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        match self {
-            DisplayArg::Format { format } => {
-                format.to_tokens(tokens);
-            }
-            DisplayArg::Style {
-                style_token,
-                eq_token,
-                style,
-            } => {
-                style_token.to_tokens(tokens);
-                eq_token.to_tokens(tokens);
-                style.to_tokens(tokens);
-            }
-            DisplayArg::Bound(bound) => bound.to_tokens(tokens),
-        }
-    }
-}
-
-struct BoundArg {
-    bound_token: kw::bound,
-    paren_token: Paren,
-    bounds: ArgsOf<Quotable<Bound>>,
-}
-impl Parse for BoundArg {
-    fn parse(input: ParseStream) -> Result<Self> {
-        let bound_token = input.parse()?;
-        let content;
-        let paren_token = parenthesized!(content in input);
-        let bounds = content.parse()?;
-        Ok(Self {
-            bound_token,
-            paren_token,
-            bounds,
-        })
-    }
-}
-impl ToTokens for BoundArg {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        self.bound_token.to_tokens(tokens);
-        self.paren_token
-            .surround(tokens, |tokens| self.bounds.to_tokens(tokens));
-    }
-}
-
-#[derive(Clone)]
+#[derive(Clone, ToTokens)]
 struct DefaultField(Member);
 
 impl Parse for DefaultField {
@@ -749,108 +665,14 @@ impl Parse for DefaultField {
         }
     }
 }
-impl ToTokens for DefaultField {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        self.0.to_tokens(tokens)
-    }
-}
 
-enum FromStrArg {
-    Regex {
-        regex_token: kw::regex,
-        eq_token: Token![=],
-        regex: LitStr,
-    },
-    New {
-        new_token: kw::new,
-        eq_token: Token![=],
-        expr: Expr,
-    },
-    Bound(BoundArg),
-    Default {
-        default_token: kw::default,
-    },
-    DefaultFields {
-        default_fields_token: kw::default_fields,
-        paren_token: Paren,
-        fields: ArgsOf<Quotable<DefaultField>>,
-    },
-}
-impl Parse for FromStrArg {
-    fn parse(input: ParseStream) -> Result<Self> {
-        let value = if input.peek(kw::bound) {
-            Self::Bound(input.parse()?)
-        } else if input.peek(kw::regex) {
-            let regex_token = input.parse()?;
-            let eq_token = input.parse()?;
-            let regex = input.parse()?;
-            Self::Regex {
-                regex_token,
-                eq_token,
-                regex,
-            }
-        } else if input.peek(kw::new) {
-            let new_token = input.parse()?;
-            let eq_token = input.parse()?;
-            let expr = input.parse()?;
-            Self::New {
-                new_token,
-                eq_token,
-                expr,
-            }
-        } else if input.peek(kw::default) {
-            Self::Default {
-                default_token: input.parse()?,
-            }
-        } else if input.peek(kw::default_fields) {
-            let default_fields_token = input.parse()?;
-            let content;
-            let paren_token = parenthesized!(content in input);
-            let fields = content.parse()?;
-            Self::DefaultFields {
-                default_fields_token,
-                paren_token,
-                fields,
-            }
-        } else {
-            return Err(input.error(FROM_STR_HELPER_USAGE));
-        };
-        Ok(value)
-    }
-}
-impl ToTokens for FromStrArg {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        match self {
-            Self::Regex {
-                regex_token,
-                eq_token,
-                regex,
-            } => {
-                regex_token.to_tokens(tokens);
-                eq_token.to_tokens(tokens);
-                regex.to_tokens(tokens);
-            }
-            Self::New {
-                new_token,
-                eq_token,
-                expr,
-            } => {
-                new_token.to_tokens(tokens);
-                eq_token.to_tokens(tokens);
-                expr.to_tokens(tokens);
-            }
-            Self::Bound(bound) => bound.to_tokens(tokens),
-            Self::Default { default_token } => default_token.to_tokens(tokens),
-            Self::DefaultFields {
-                default_fields_token,
-                paren_token,
-                fields,
-            } => {
-                default_fields_token.to_tokens(tokens);
-                paren_token.surround(tokens, |tokens| fields.to_tokens(tokens));
-            }
-        }
-    }
+#[derive(StructMeta)]
+struct FromStrArgs {
+    regex: Option<LitStr>,
+    new: Option<Expr>,
+    bound: Option<Vec<Quotable<Bound>>>,
+    default: Flag,
+    default_fields: Option<Vec<Quotable<DefaultField>>>,
 }
 
 #[derive(Clone)]
@@ -865,16 +687,6 @@ struct HelperAttributes {
     debug_mode: bool,
     new_expr: Option<Expr>,
 }
-const DISPLAY_HELPER_USAGE: &str = "The following syntax are available.
-#[display(\"...\")]
-#[display(style = \"...\")]
-#[display(bound(...)]";
-const FROM_STR_HELPER_USAGE: &str = "The following syntax are available.
-#[from_str(regex = \"...\")]
-#[from_str(new = ...)]
-#[from_str(bound(...)]
-#[from_str(default)]
-#[from_str(default_fields(...))]";
 impl HelperAttributes {
     fn from(attrs: &[Attribute]) -> Result<Self> {
         let mut hattrs = Self {
@@ -890,16 +702,10 @@ impl HelperAttributes {
         };
         for a in attrs {
             if a.path.is_ident("display") {
-                let args: ArgsOf<DisplayArg> = a.parse_args()?;
-                for m in args.into_iter() {
-                    hattrs.set_display_arg(m)?;
-                }
+                hattrs.set_display_args(a.parse_args()?)?;
             }
             if a.path.is_ident("from_str") {
-                let args: ArgsOf<FromStrArg> = a.parse_args()?;
-                for arg in args.into_iter() {
-                    hattrs.set_from_str_arg(arg)?;
-                }
+                hattrs.set_from_str_args(a.parse_args()?)?;
             }
             if a.path.is_ident("debug_mode") {
                 hattrs.debug_mode = true;
@@ -907,68 +713,44 @@ impl HelperAttributes {
         }
         Ok(hattrs)
     }
-    fn set_display_arg(&mut self, arg: DisplayArg) -> Result<()> {
-        match arg {
-            DisplayArg::Format { format } => {
-                if self.format.is_some() {
-                    let span = format.span();
-                    bail!(span, "display format can be specified only once.");
-                }
-                self.format = Some(DisplayFormat::parse_lit_str(&format)?);
-            }
-            DisplayArg::Style {
-                style_token, style, ..
-            } => {
-                if self.style.is_some() {
-                    let span = style_token.span();
-                    bail!(span, "display style can be specified only once.");
-                }
-                self.style = Some(DisplayStyle::parse_lit_str(&style)?);
-            }
-            DisplayArg::Bound(BoundArg { bounds, .. }) => {
-                let list = self.bound_display.get_or_insert(Vec::new());
-                for bound in bounds.into_flatten() {
+    fn set_display_args(&mut self, args: DisplayArgs) -> Result<()> {
+        if let Some(format) = &args.format {
+            self.format = Some(DisplayFormat::parse_lit_str(&format)?);
+        }
+        if let Some(style) = &args.style {
+            self.style = Some(DisplayStyle::parse_lit_str(&style)?);
+        }
+        if let Some(bounds) = args.bound {
+            let list = self.bound_display.get_or_insert(Vec::new());
+            for bound in bounds {
+                for bound in bound.into_iter() {
                     list.push(bound);
                 }
             }
         }
         Ok(())
     }
-    fn set_from_str_arg(&mut self, arg: FromStrArg) -> Result<()> {
-        match arg {
-            FromStrArg::Regex {
-                regex_token, regex, ..
-            } => {
-                if self.regex.is_some() {
-                    bail!(
-                        regex_token.span(),
-                        "`#[from_str(regex = ...)]` can be specified only once."
-                    );
-                }
-                self.regex = Some(regex);
-            }
-            FromStrArg::New {
-                new_token, expr, ..
-            } => {
-                if self.new_expr.is_some() {
-                    bail!(
-                        new_token.span(),
-                        "`#[from_str(new = ...)]` can be specified only once."
-                    );
-                }
-                self.new_expr = Some(expr);
-            }
-            FromStrArg::Bound(BoundArg { bounds, .. }) => {
-                let list = self.bound_from_str.get_or_insert(Vec::new());
-                for bound in bounds.into_flatten() {
+    fn set_from_str_args(&mut self, args: FromStrArgs) -> Result<()> {
+        if let Some(regex) = args.regex {
+            self.regex = Some(regex);
+        }
+        if let Some(new) = args.new {
+            self.new_expr = Some(new);
+        }
+        if let Some(bound) = args.bound {
+            let list = self.bound_from_str.get_or_insert(Vec::new());
+            for bound in bound {
+                for bound in bound.into_iter() {
                     list.push(bound);
                 }
             }
-            FromStrArg::Default { default_token } => {
-                self.default_self = Some(default_token.span());
-            }
-            FromStrArg::DefaultFields { fields, .. } => {
-                for field in fields.into_flatten() {
+        }
+        if let Some(span) = args.default.span {
+            self.default_self = Some(span);
+        }
+        if let Some(fields) = args.default_fields {
+            for field in fields {
+                for field in field.into_iter() {
                     self.default_fields.push(field);
                 }
             }
@@ -1379,7 +1161,7 @@ enum ParseVariantCode {
     Statement(TokenStream),
 }
 
-#[derive(Clone)]
+#[derive(Clone, ToTokens)]
 enum Bound {
     Type(Type),
     Pred(WherePredicate),
@@ -1404,15 +1186,6 @@ impl Parse for Bound {
                     Err(e)
                 }
             }
-        }
-    }
-}
-impl ToTokens for Bound {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        match self {
-            Self::Type(ty) => ty.to_tokens(tokens),
-            Self::Pred(p) => p.to_tokens(tokens),
-            Self::Default(dot2) => dot2.to_tokens(tokens),
         }
     }
 }

@@ -110,7 +110,7 @@ impl<T: ToTokens> ToTokens for Quotable<T> {
 }
 
 impl<T> Quotable<T> {
-    fn into_iter(self) -> impl IntoIterator<Item = T> {
+    pub fn into_iter(self) -> impl IntoIterator<Item = T> {
         match self {
             Self::Direct(item) => vec![item],
             Self::Quoted { args, .. } => args.into_iter().collect(),
@@ -135,11 +135,6 @@ impl<T: ToTokens> ToTokens for ArgsOf<T> {
 impl<T> ArgsOf<T> {
     pub fn into_iter(self) -> impl Iterator<Item = T> {
         self.0.into_iter()
-    }
-}
-impl<T> ArgsOf<Quotable<T>> {
-    pub fn into_flatten(self) -> impl Iterator<Item = T> {
-        self.into_iter().flat_map(|x| x.into_iter())
     }
 }
 
