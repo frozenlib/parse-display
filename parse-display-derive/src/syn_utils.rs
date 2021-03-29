@@ -167,11 +167,11 @@ pub fn impl_trait_result(
     trait_path: &Path,
     wheres: &[WherePredicate],
     contents: TokenStream,
-    debug_mode: bool,
+    dump: bool,
 ) -> Result<TokenStream> {
     let ts = impl_trait(input, trait_path, wheres, contents);
-    if debug_mode {
-        panic!("debug mode:\n{}", ts);
+    if dump {
+        panic!("macro output:\n{}", ts);
     }
     Ok(ts)
 }

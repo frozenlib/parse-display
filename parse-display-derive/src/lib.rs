@@ -34,7 +34,7 @@ use syn::{
     FieldsUnnamed, Ident, LitStr, Member, Path, Result, Token, Type, Variant, WherePredicate,
 };
 
-#[proc_macro_derive(Display, attributes(display, debug_mode))]
+#[proc_macro_derive(Display, attributes(display))]
 pub fn derive_display(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     into_macro_output(match &input.data {
@@ -73,7 +73,7 @@ fn derive_display_for_struct(input: &DeriveInput, data: &DataStruct) -> Result<T
                 core::write!(f, #args)
             }
         },
-        hattrs.debug_mode,
+        hattrs.dump_display,
     )
 }
 fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<TokenStream> {
@@ -146,7 +146,7 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Token
         }
     };
     let wheres = bounds.build_wheres(&trait_path);
-    impl_trait_result(input, &trait_path, &wheres, contents, hattrs.debug_mode)
+    impl_trait_result(input, &trait_path, &wheres, contents, hattrs.dump_display)
 }
 
 #[proc_macro_derive(FromStr, attributes(display, from_str))]
@@ -177,7 +177,7 @@ fn derive_from_str_for_struct(input: &DeriveInput, data: &DataStruct) -> Result<
                 #body
             }
         },
-        hattrs.debug_mode,
+        hattrs.dump_from_str,
     )
 }
 fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<TokenStream> {
@@ -225,7 +225,7 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Toke
                 Err(parse_display::ParseError::new())
             }
         },
-        hattrs_enum.debug_mode,
+        hattrs_enum.dump_from_str,
     )
 }
 
@@ -653,6 +653,7 @@ struct DisplayArgs {
     format: Option<LitStr>,
     style: Option<LitStr>,
     bound: Option<Vec<Quotable<Bound>>>,
+    dump: bool,
 }
 
 #[derive(Clone, ToTokens)]
@@ -675,6 +676,7 @@ struct FromStrArgs {
     bound: Option<Vec<Quotable<Bound>>>,
     default: Flag,
     default_fields: Option<Vec<Quotable<DefaultField>>>,
+    dump: bool,
 }
 
 #[derive(Clone)]
@@ -686,8 +688,9 @@ struct HelperAttributes {
     regex: Option<LitStr>,
     default_self: Option<Span>,
     default_fields: Vec<DefaultField>,
-    debug_mode: bool,
     new_expr: Option<Expr>,
+    dump_display: bool,
+    dump_from_str: bool,
 }
 impl HelperAttributes {
     fn from(attrs: &[Attribute]) -> Result<Self> {
@@ -700,7 +703,8 @@ impl HelperAttributes {
             new_expr: None,
             default_self: None,
             default_fields: Vec::new(),
-            debug_mode: false,
+            dump_display: false,
+            dump_from_str: false,
         };
         for a in attrs {
             if a.path.is_ident("display") {
@@ -708,9 +712,6 @@ impl HelperAttributes {
             }
             if a.path.is_ident("from_str") {
                 hattrs.set_from_str_args(a.parse_args()?)?;
-            }
-            if a.path.is_ident("debug_mode") {
-                hattrs.debug_mode = true;
             }
         }
         Ok(hattrs)
@@ -730,6 +731,7 @@ impl HelperAttributes {
                 }
             }
         }
+        self.dump_from_str |= args.dump;
         Ok(())
     }
     fn set_from_str_args(&mut self, args: FromStrArgs) -> Result<()> {
@@ -757,6 +759,7 @@ impl HelperAttributes {
                 }
             }
         }
+        self.dump_from_str |= args.dump;
         Ok(())
     }
     fn from_str_format_span(&self) -> Option<Span> {
