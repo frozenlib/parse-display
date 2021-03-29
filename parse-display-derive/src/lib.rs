@@ -163,10 +163,10 @@ fn derive_from_str_for_struct(input: &DeriveInput, data: &DataStruct) -> Result<
     let p = ParserBuilder::from_struct(&hattrs, data)?;
     let body = p.build_from_str_body(parse_quote!(Self))?;
     let generics = GenericParamSet::new(&input.generics);
-    let wheres = p.build_wheres(&generics);
+    let mut bounds = Bounds::from_data(hattrs.bound_from_str_resolved());
+    p.build_bounds(&generics, &mut bounds);
     let trait_path = parse_quote!(core::str::FromStr);
-    let bounds = hattrs.bound_from_str.or(hattrs.bound_display);
-    let wheres = Bound::build_wheres(&bounds, &trait_path, wheres);
+    let wheres = bounds.build_wheres(&trait_path);
     impl_trait_result(
         input,
         &trait_path,
@@ -185,7 +185,7 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Toke
     if let Some(span) = hattrs_enum.default_self {
         bail!(span, "`#[from_str(default)]` cannot be specified for enum.");
     }
-    let mut wheres = Vec::new();
+    let mut bounds = Bounds::from_data(hattrs_enum.bound_from_str_resolved());
     let generics = GenericParamSet::new(&input.generics);
     let mut bodys = Vec::new();
     let mut arms = Vec::new();
@@ -193,8 +193,10 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Toke
         let enum_ident = &input.ident;
         let variant_ident = &variant.ident;
         let constructor = parse_quote!(#enum_ident::#variant_ident);
-        let p = ParserBuilder::from_variant(&hattrs_enum, variant)?;
-        wheres.extend(p.build_wheres(&generics));
+        let hattrs_variant = &HelperAttributes::from(&variant.attrs)?;
+        let p = ParserBuilder::from_variant(&hattrs_variant, &hattrs_enum, variant)?;
+        let mut bounds = bounds.child(hattrs_variant.bound_from_str_resolved());
+        p.build_bounds(&generics, &mut bounds);
         match p.build_parse_variant_code(constructor)? {
             ParseVariantCode::MatchArm(arm) => arms.push(arm),
             ParseVariantCode::Statement(body) => bodys.push(body),
@@ -211,8 +213,7 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Toke
         }
     };
     let trait_path = parse_quote!(core::str::FromStr);
-    let bounds = hattrs_enum.bound_from_str.or(hattrs_enum.bound_display);
-    let wheres = Bound::build_wheres(&bounds, &trait_path, wheres);
+    let wheres = bounds.build_wheres(&trait_path);
     impl_trait_result(
         input,
         &trait_path,
@@ -270,8 +271,11 @@ impl<'a> ParserBuilder<'a> {
         s.push_attrs(&hattrs, &context)?;
         Ok(s)
     }
-    fn from_variant(hattrs_enum: &HelperAttributes, variant: &'a Variant) -> Result<Self> {
-        let hattrs_variant = &HelperAttributes::from(&variant.attrs)?;
+    fn from_variant(
+        hattrs_variant: &HelperAttributes,
+        hattrs_enum: &HelperAttributes,
+        variant: &'a Variant,
+    ) -> Result<Self> {
         let mut s = Self::new(&variant.fields)?;
         let style = DisplayStyle::from_helper_attributes(hattrs_enum, hattrs_variant);
         let context = DisplayContext::Variant { variant, style };
@@ -535,17 +539,21 @@ impl<'a> ParserBuilder<'a> {
         Ok(code)
     }
 
-    fn build_wheres(&self, generics: &GenericParamSet) -> Vec<WherePredicate> {
-        let mut wheres = Vec::new();
+    fn build_bounds(&self, generics: &GenericParamSet, bounds: &mut Bounds) {
+        if !bounds.can_extend {
+            return;
+        }
         for field in self.fields.values() {
-            if field.capture.is_some() {
-                let ty = &field.source.ty;
-                if generics.contains_in_type(ty) {
-                    wheres.push(parse_quote!(#ty : core::str::FromStr));
+            let mut bounds = bounds.child(field.hattrs.bound_from_str_resolved());
+            if bounds.can_extend {
+                if field.capture.is_some() {
+                    let ty = &field.source.ty;
+                    if generics.contains_in_type(ty) {
+                        bounds.ty.push(ty.clone());
+                    }
                 }
             }
         }
-        wheres
     }
 }
 impl<'a> FieldEntry<'a> {
@@ -770,6 +778,9 @@ impl HelperAttributes {
         } else {
             None
         }
+    }
+    fn bound_from_str_resolved(&self) -> Option<Vec<Bound>> {
+        self.bound_from_str.clone().or(self.bound_display.clone())
     }
 }
 
@@ -1198,27 +1209,6 @@ impl Parse for Bound {
     }
 }
 
-impl Bound {
-    fn build_wheres(
-        bounds: &Option<Vec<Bound>>,
-        trait_path: &Path,
-        mut wheres_default: Vec<WherePredicate>,
-    ) -> Vec<WherePredicate> {
-        if let Some(bounds) = bounds {
-            let mut results = Vec::new();
-            for bound in bounds {
-                match bound {
-                    Bound::Type(ty) => results.push(parse_quote!(#ty : #trait_path)),
-                    Bound::Pred(p) => results.push(p.clone()),
-                    Bound::Default(..) => results.extend(wheres_default.drain(..)),
-                }
-            }
-            results
-        } else {
-            wheres_default
-        }
-    }
-}
 struct Bounds {
     ty: Vec<Type>,
     pred: Vec<WherePredicate>,
