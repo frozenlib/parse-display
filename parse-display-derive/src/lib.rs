@@ -60,7 +60,7 @@ fn derive_display_for_struct(input: &DeriveInput, data: &DataStruct) -> Result<T
             "`#[display(\"format\")]` is required except newtype pattern.",
         ),
     };
-    let mut bounds = Bounds::from_data(&hattrs.bound_display);
+    let mut bounds = Bounds::from_data(hattrs.bound_display);
     let args = format.format_args(ctx, &mut bounds, &generics)?;
     let trait_path = parse_quote!(core::fmt::Display);
     let wheres = bounds.build_wheres(&trait_path);
@@ -121,7 +121,7 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Token
         let variant_ident = &variant.ident;
         let args = format.format_args(
             DisplayContext::Variant { variant, style },
-            &mut bounds.child(&hattrs_variant.bound_display),
+            &mut bounds.child(hattrs_variant.bound_display),
             generics,
         )?;
         Ok(quote! {
@@ -131,7 +131,7 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Token
         })
     }
     let hattrs = HelperAttributes::from(&input.attrs)?;
-    let mut bounds = Bounds::from_data(&hattrs.bound_display);
+    let mut bounds = Bounds::from_data(hattrs.bound_display.clone());
     let generics = GenericParamSet::new(&input.generics);
     let mut arms = Vec::new();
     for variant in &data.variants {
@@ -1040,7 +1040,7 @@ impl<'a> DisplayContext<'a> {
         generics: &GenericParamSet,
     ) -> Result<TokenStream> {
         let hattrs = HelperAttributes::from(&field.attrs)?;
-        let mut bounds = bounds.child(&hattrs.bound_display);
+        let mut bounds = bounds.child(hattrs.bound_display);
         Ok(if let Some(format) = hattrs.format {
             let args = format.format_args(
                 DisplayContext::Field {
@@ -1232,11 +1232,11 @@ impl Bounds {
             can_extend,
         }
     }
-    fn from_data(bound: &Option<Vec<Bound>>) -> Self {
+    fn from_data(bound: Option<Vec<Bound>>) -> Self {
         if let Some(bound) = bound {
             let mut bs = Self::new(false);
             for b in bound {
-                bs.push(b.clone());
+                bs.push(b);
             }
             bs
         } else {
@@ -1250,7 +1250,7 @@ impl Bounds {
             Bound::Default(_) => self.can_extend = true,
         }
     }
-    fn child(&mut self, bounds: &Option<Vec<Bound>>) -> BoundsChild {
+    fn child(&mut self, bounds: Option<Vec<Bound>>) -> BoundsChild {
         let bounds = if self.can_extend {
             Self::from_data(bounds)
         } else {
