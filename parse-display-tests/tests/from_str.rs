@@ -750,6 +750,42 @@ fn bound_type_enum() {
     struct Inner<T: Default>(T);
 }
 
+#[deny(private_in_public)]
+#[test]
+fn bound_struct_field() {
+    #[derive(FromStr)]
+    struct Inner<T>(T);
+    #[derive(FromStr)]
+    pub struct Outer<T>(#[from_str(bound(T))] Inner<T>);
+}
+
+#[allow(dead_code)]
+#[test]
+fn bound_enum_variant() {
+    #[derive(FromStr)]
+    #[from_str(bound(T : core::str::FromStr + Copy ))]
+    pub struct Inner<T>(T);
+    #[derive(FromStr)]
+    pub enum Outer<T> {
+        #[display("{0}")]
+        #[from_str(bound(T : core::str::FromStr + Copy))]
+        A(Inner<T>),
+    }
+}
+
+#[allow(dead_code)]
+#[test]
+fn bound_enum_field() {
+    #[derive(FromStr)]
+    #[from_str(bound(T : core::str::FromStr + Copy ))]
+    pub struct Inner<T>(T);
+    #[derive(FromStr)]
+    pub enum Outer<T> {
+        #[display("{0}")]
+        A(#[from_str(bound(T : core::str::FromStr + Copy))] Inner<T>),
+    }
+}
+
 #[test]
 fn doc_comment_struct() {
     /// doc
