@@ -22,6 +22,7 @@ use regex_syntax::hir::Hir;
 use std::{
     collections::BTreeMap,
     fmt::{Display, Formatter},
+    ops::{Deref, DerefMut},
 };
 use structmeta::{Flag, StructMeta, ToTokens};
 use syn::{
@@ -33,7 +34,7 @@ use syn::{
     FieldsUnnamed, Ident, LitStr, Member, Path, Result, Token, Type, Variant, WherePredicate,
 };
 
-#[proc_macro_derive(Display, attributes(display))]
+#[proc_macro_derive(Display, attributes(display, debug_mode))]
 pub fn derive_display(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     into_macro_output(match &input.data {
@@ -45,7 +46,6 @@ pub fn derive_display(input: proc_macro::TokenStream) -> proc_macro::TokenStream
 
 fn derive_display_for_struct(input: &DeriveInput, data: &DataStruct) -> Result<TokenStream> {
     let hattrs = HelperAttributes::from(&input.attrs)?;
-    let mut wheres = Vec::new();
     let ctx = DisplayContext::Struct { data };
     let generics = GenericParamSet::new(&input.generics);
 
@@ -60,10 +60,10 @@ fn derive_display_for_struct(input: &DeriveInput, data: &DataStruct) -> Result<T
             "`#[display(\"format\")]` is required except newtype pattern.",
         ),
     };
-    let args = format.format_args(ctx, &mut wheres, &generics)?;
-
+    let mut bounds = Bounds::from_data(&hattrs.bound_display);
+    let args = format.format_args(ctx, &mut bounds, &generics)?;
     let trait_path = parse_quote!(core::fmt::Display);
-    let wheres = Bound::build_wheres(&hattrs.bound_display, &trait_path, wheres);
+    let wheres = bounds.build_wheres(&trait_path);
     impl_trait_result(
         input,
         &trait_path,
@@ -81,7 +81,7 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Token
         input: &DeriveInput,
         hattrs_enum: &HelperAttributes,
         variant: &Variant,
-        wheres: &mut Vec<WherePredicate>,
+        bounds: &mut Bounds,
         generics: &GenericParamSet,
     ) -> Result<TokenStream> {
         let fields = match &variant.fields {
@@ -117,11 +117,13 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Token
                 "`#[display(\"format\")]` is required except unit variant."
             ),
         };
-
         let enum_ident = &input.ident;
         let variant_ident = &variant.ident;
-        let args =
-            format.format_args(DisplayContext::Variant { variant, style }, wheres, generics)?;
+        let args = format.format_args(
+            DisplayContext::Variant { variant, style },
+            &mut bounds.child(&hattrs_variant.bound_display),
+            generics,
+        )?;
         Ok(quote! {
             & #enum_ident::#variant_ident #fields => {
                 core::write!(f, #args)
@@ -129,11 +131,11 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Token
         })
     }
     let hattrs = HelperAttributes::from(&input.attrs)?;
-    let mut wheres = Vec::new();
+    let mut bounds = Bounds::from_data(&hattrs.bound_display);
     let generics = GenericParamSet::new(&input.generics);
     let mut arms = Vec::new();
     for variant in &data.variants {
-        arms.push(make_arm(input, &hattrs, variant, &mut wheres, &generics)?);
+        arms.push(make_arm(input, &hattrs, variant, &mut bounds, &generics)?);
     }
     let trait_path = parse_quote!(core::fmt::Display);
     let contents = quote! {
@@ -143,7 +145,7 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Token
             }
         }
     };
-    let wheres = Bound::build_wheres(&hattrs.bound_display, &trait_path, wheres);
+    let wheres = bounds.build_wheres(&trait_path);
     impl_trait_result(input, &trait_path, &wheres, contents, hattrs.debug_mode)
 }
 
@@ -933,7 +935,7 @@ impl DisplayFormat {
     fn format_args(
         &self,
         context: DisplayContext,
-        wheres: &mut Vec<WherePredicate>,
+        bounds: &mut Bounds,
         generics: &GenericParamSet,
     ) -> Result<TokenStream> {
         let mut format_str = String::new();
@@ -952,7 +954,7 @@ impl DisplayFormat {
                         &name,
                         &parameters,
                         self.span,
-                        wheres,
+                        bounds,
                         generics,
                     )?);
                 }
@@ -991,7 +993,7 @@ impl<'a> DisplayContext<'a> {
         name: &str,
         parameters: &str,
         span: Span,
-        wheres: &mut Vec<WherePredicate>,
+        bounds: &mut Bounds,
         generics: &GenericParamSet,
     ) -> Result<TokenStream> {
         let keys = FieldKey::from_str_deep(name);
@@ -999,7 +1001,7 @@ impl<'a> DisplayContext<'a> {
             return Ok(match self {
                 DisplayContext::Struct { .. } => bail!(span, "{} is not allowed in struct format."),
                 DisplayContext::Field { parent, field, key } => parent
-                    .format_arg_by_field_expr(key, field, parameters, span, wheres, generics)?,
+                    .format_arg_by_field_expr(key, field, parameters, span, bounds, generics)?,
                 DisplayContext::Variant { variant, style } => {
                     let s = style.apply(&variant.ident);
                     quote! { #s }
@@ -1016,7 +1018,7 @@ impl<'a> DisplayContext<'a> {
                 } else {
                     bail!(span, "unknown field '{}'.", key);
                 };
-                return self.format_arg_of_field(key, field, parameters, span, wheres, generics);
+                return self.format_arg_of_field(key, field, parameters, span, bounds, generics);
             }
         }
         let mut expr = self.field_expr(&keys[0]);
@@ -1031,10 +1033,11 @@ impl<'a> DisplayContext<'a> {
         field: &Field,
         parameters: &str,
         span: Span,
-        wheres: &mut Vec<WherePredicate>,
+        bounds: &mut Bounds,
         generics: &GenericParamSet,
     ) -> Result<TokenStream> {
         let hattrs = HelperAttributes::from(&field.attrs)?;
+        let mut bounds = bounds.child(&hattrs.bound_display);
         Ok(if let Some(format) = hattrs.format {
             let args = format.format_args(
                 DisplayContext::Field {
@@ -1042,12 +1045,12 @@ impl<'a> DisplayContext<'a> {
                     field,
                     key,
                 },
-                wheres,
+                &mut bounds,
                 generics,
             )?;
             quote! { format_args!(#args) }
         } else {
-            self.format_arg_by_field_expr(key, field, parameters, span, wheres, generics)?
+            self.format_arg_by_field_expr(key, field, parameters, span, &mut bounds, generics)?
         })
     }
     fn format_arg_by_field_expr(
@@ -1056,7 +1059,7 @@ impl<'a> DisplayContext<'a> {
         field: &Field,
         parameters: &str,
         span: Span,
-        wheres: &mut Vec<WherePredicate>,
+        bounds: &mut Bounds,
         generics: &GenericParamSet,
     ) -> Result<TokenStream> {
         let ty = &field.ty;
@@ -1067,7 +1070,9 @@ impl<'a> DisplayContext<'a> {
             };
             let tr = ps.format_type.trait_name();
             let tr: Ident = parse_str(tr).unwrap();
-            wheres.push(parse_quote!(#ty : core::fmt::#tr));
+            if bounds.can_extend {
+                bounds.pred.push(parse_quote!(#ty : core::fmt::#tr));
+            }
         }
         Ok(self.field_expr(key))
     }
@@ -1208,6 +1213,80 @@ impl Bound {
             results
         } else {
             wheres_default
+        }
+    }
+}
+struct Bounds {
+    ty: Vec<Type>,
+    pred: Vec<WherePredicate>,
+    can_extend: bool,
+}
+impl Bounds {
+    fn new(can_extend: bool) -> Self {
+        Bounds {
+            ty: Vec::new(),
+            pred: Vec::new(),
+            can_extend,
+        }
+    }
+    fn from_data(bound: &Option<Vec<Bound>>) -> Self {
+        if let Some(bound) = bound {
+            let mut bs = Self::new(false);
+            for b in bound {
+                bs.push(b.clone());
+            }
+            bs
+        } else {
+            Self::new(true)
+        }
+    }
+    fn push(&mut self, bound: Bound) {
+        match bound {
+            Bound::Type(ty) => self.ty.push(ty),
+            Bound::Pred(pred) => self.pred.push(pred),
+            Bound::Default(_) => self.can_extend = true,
+        }
+    }
+    fn child(&mut self, bounds: &Option<Vec<Bound>>) -> BoundsChild {
+        let bounds = if self.can_extend {
+            Self::from_data(bounds)
+        } else {
+            Self::new(false)
+        };
+        BoundsChild {
+            owner: self,
+            bounds,
+        }
+    }
+    fn build_wheres(self, trait_path: &Path) -> Vec<WherePredicate> {
+        let mut pred = self.pred;
+        for ty in self.ty {
+            pred.push(parse_quote!(#ty : #trait_path));
+        }
+        pred
+    }
+}
+struct BoundsChild<'a> {
+    owner: &'a mut Bounds,
+    bounds: Bounds,
+}
+impl<'a> Deref for BoundsChild<'a> {
+    type Target = Bounds;
+
+    fn deref(&self) -> &Self::Target {
+        &self.bounds
+    }
+}
+impl<'a> DerefMut for BoundsChild<'a> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.bounds
+    }
+}
+impl<'a> Drop for BoundsChild<'a> {
+    fn drop(&mut self) {
+        if self.owner.can_extend {
+            self.owner.ty.extend(self.bounds.ty.drain(..));
+            self.owner.pred.extend(self.bounds.pred.drain(..));
         }
     }
 }

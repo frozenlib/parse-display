@@ -784,6 +784,40 @@ fn bound_by_hand_with_auto() {
     assert_display(Outer(Inner(10), 20), "10,20");
 }
 
+#[deny(private_in_public)]
+#[test]
+fn bound_struct_field() {
+    #[derive(Display)]
+    struct Inner<T>(T);
+    #[derive(Display)]
+    pub struct Outer<T>(#[display(bound(T))] Inner<T>);
+}
+#[allow(dead_code)]
+#[test]
+fn bound_enum_variant() {
+    #[derive(Display)]
+    #[display(bound(T : core::fmt::Display + Copy ))]
+    pub struct Inner<T>(T);
+    #[derive(Display)]
+    pub enum Outer<T> {
+        #[display("{0}", bound(T : core::fmt::Display + Copy))]
+        A(Inner<T>),
+    }
+}
+
+#[allow(dead_code)]
+#[test]
+fn bound_enum_field() {
+    #[derive(Display)]
+    #[display(bound(T : core::fmt::Display + Copy ))]
+    pub struct Inner<T>(T);
+    #[derive(Display)]
+    pub enum Outer<T> {
+        #[display("{0}")]
+        A(#[display(bound(T : core::fmt::Display + Copy))] Inner<T>),
+    }
+}
+
 #[test]
 fn doc_comment_struct() {
     /// doc
