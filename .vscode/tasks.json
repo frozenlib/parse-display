@@ -60,7 +60,10 @@
       "presentation": {
         "panel": "dedicated",
         "clear": true
-      }
+      },
+      "dependsOn": [
+        "include doc"
+      ],
       // "options": {
       //   "env": {
       //     "RUST_BACKTRACE": "1"
@@ -110,26 +113,13 @@
     },
     {
       "type": "shell",
-      "label": "cargo doc",
-      "command": "cargo",
-      "args": [
-        "doc"
-      ],
-      "problemMatcher": [
-        "$rustc"
-      ],
-      "presentation": {
-        "panel": "dedicated",
-        "clear": true
-      }
-    },
-    {
-      "type": "shell",
       "label": "cargo doc open",
       "command": "cargo",
       "args": [
         "doc",
-        "--open"
+        "--open",
+        "--no-deps",
+        "--all-features"
       ],
       "problemMatcher": [
         "$rustc"
@@ -137,7 +127,10 @@
       "presentation": {
         "panel": "dedicated",
         "clear": true
-      }
+      },
+      "dependsOn": [
+        "include doc"
+      ],
     },
     {
       "type": "shell",
@@ -212,6 +205,40 @@
       ],
       "problemMatcher": [
         "$rustc"
+      ],
+      "presentation": {
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "type": "shell",
+      "label": "include doc",
+      "command": "include-doc",
+      "args": [
+        "${workspaceFolder}"
+      ],
+      "problemMatcher": [
+        {
+          "owner": "include-doc",
+          "fileLocation": [
+            "relative",
+            "${workspaceFolder}"
+          ],
+          "pattern": [
+            {
+              "regexp": "^(error): (.*)$",
+              "severity": 1,
+              "message": 2,
+            },
+            {
+              "regexp": "^--> (.*):(\\d+)\\s*$",
+              "file": 1,
+              "line": 2,
+              "loop": true,
+            },
+          ]
+        },
       ],
       "presentation": {
         "panel": "dedicated",

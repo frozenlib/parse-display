@@ -1,3 +1,4 @@
+// #![include_doc("../../README.md", start("This crate provides derive macro `Display` and `FromStr`."))]
 /*!
 This crate provides derive macro `Display` and `FromStr`.
 These macros use common helper attributes to specify the format.
@@ -51,10 +52,10 @@ Helper attributes can be written in the following positions.
 | [`#[from_str(default)]`](#from_strdefault)                    | ✔      |      |         | ✔     |
 | [`#[from_str(default_fields(...))]`](#from_strdefault_fields) | ✔      | ✔    | ✔       |       |
 
-`#[derive(Display)]` use `#[display]`.
+`#[derive(Display)]` use `#[display]`.  
 `#[derive(FromStr)]` use both `#[display]` and `#[from_str]`.
 
-`key = value` style parameter can be specified only once for each key.
+`key = value` style parameter can be specified only once for each key.  
 `key(value1, value2, ...)` style parameter can be specified multiple times.
 
 ## `#[display("...")]`
@@ -328,7 +329,7 @@ By default, the type of field used in the format is added to the trait bound.
 
 This behavior causes a compile error if you use fields of non public type in public struct.
 
-```compile_error
+```compile_fail
 #![deny(private_in_public)]
 use parse_display::Display;
 
@@ -649,7 +650,7 @@ assert_eq!("VarA-10".parse(), Ok(MyEnum::VarA { a:10, b:0, c:0 }));
 assert_eq!("VarB-10".parse(), Ok(MyEnum::VarB { a:10, b:0, c:0 }));
 ```
 */
-
+// #![include_doc("../../README.md", end("## License"))]
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use core::convert::Infallible;

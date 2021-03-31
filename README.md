@@ -333,7 +333,7 @@ By default, the type of field used in the format is added to the trait bound.
 
 This behavior causes a compile error if you use fields of non public type in public struct.
 
-```rust
+```compile_fail
 #![deny(private_in_public)]
 use parse_display::Display;
 
