@@ -1,5 +1,5 @@
 error: `#[from_str(default)]` cannot be specified for enum.
- --> $DIR/from_str_enum_default.rs:4:12
+ --> $DIR/enum_default.rs:4:12
   |
 4 | #[from_str(default)]
   |            ^^^^^^^
