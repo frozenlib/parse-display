@@ -738,6 +738,7 @@ impl HelperAttributes {
             }
         }
         self.dump_from_str |= args.dump;
+        self.dump_display |= args.dump;
         Ok(())
     }
     fn set_from_str_args(&mut self, args: FromStrArgs) {

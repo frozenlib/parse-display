@@ -52,10 +52,10 @@ Helper attributes can be written in the following positions.
 | [`#[from_str(default)]`](#from_strdefault)                    | ✔      |      |         | ✔     |
 | [`#[from_str(default_fields(...))]`](#from_strdefault_fields) | ✔      | ✔    | ✔       |       |
 
-`#[derive(Display)]` use `#[display]`.
+`#[derive(Display)]` use `#[display]`.  
 `#[derive(FromStr)]` use both `#[display]` and `#[from_str]`.
 
-`key = value` style parameter can be specified only once for each key.
+`key = value` style parameter can be specified only once for each key.  
 `key(value1, value2, ...)` style parameter can be specified multiple times.
 
 ## `#[display("...")]`
