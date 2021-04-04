@@ -19,6 +19,8 @@ jobs:
         run: cargo test --verbose
       - name: Clippy
         run: cargo clippy --all-features --tests --lib -- -W clippy::all
+        env:
+          RUSTFLAGS: -D warnings
       - name: Install latest nightly
         uses: actions-rs/toolchain@v1
         with:
