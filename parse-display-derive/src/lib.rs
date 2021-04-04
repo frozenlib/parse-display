@@ -545,12 +545,10 @@ impl<'a> ParserBuilder<'a> {
         }
         for field in self.fields.values() {
             let mut bounds = bounds.child(field.hattrs.bound_from_str_resolved());
-            if bounds.can_extend {
-                if field.capture.is_some() {
-                    let ty = &field.source.ty;
-                    if generics.contains_in_type(ty) {
-                        bounds.ty.push(ty.clone());
-                    }
+            if bounds.can_extend && field.capture.is_some() {
+                let ty = &field.source.ty;
+                if generics.contains_in_type(ty) {
+                    bounds.ty.push(ty.clone());
                 }
             }
         }
@@ -568,7 +566,7 @@ impl<'a> FieldEntry<'a> {
             source,
         })
     }
-    #[allow(clippy::collapsible_if)]
+    #[allow(clippy::collapsible_else_if)]
     fn set_capture(&mut self, keys: &[FieldKey], capture_next: &mut usize) -> String {
         let idx = if keys.is_empty() {
             if let Some(idx) = self.capture {
@@ -719,7 +717,7 @@ impl HelperAttributes {
                 hattrs.set_display_args(a.parse_args()?)?;
             }
             if a.path.is_ident("from_str") {
-                hattrs.set_from_str_args(a.parse_args()?)?;
+                hattrs.set_from_str_args(a.parse_args()?);
             }
         }
         Ok(hattrs)
@@ -742,7 +740,7 @@ impl HelperAttributes {
         self.dump_from_str |= args.dump;
         Ok(())
     }
-    fn set_from_str_args(&mut self, args: FromStrArgs) -> Result<()> {
+    fn set_from_str_args(&mut self, args: FromStrArgs) {
         if let Some(regex) = args.regex {
             self.regex = Some(regex);
         }
@@ -768,7 +766,6 @@ impl HelperAttributes {
             }
         }
         self.dump_from_str |= args.dump;
-        Ok(())
     }
     fn from_str_format_span(&self) -> Option<Span> {
         if let Some(lit) = &self.regex {
@@ -780,7 +777,9 @@ impl HelperAttributes {
         }
     }
     fn bound_from_str_resolved(&self) -> Option<Vec<Bound>> {
-        self.bound_from_str.clone().or(self.bound_display.clone())
+        self.bound_from_str
+            .clone()
+            .or_else(|| self.bound_display.clone())
     }
 }
 
@@ -1318,17 +1317,13 @@ impl FieldKey {
             s.split('.').map(Self::from_str).collect()
         }
     }
-    fn from_fields_named<'a>(
-        fields: &'a FieldsNamed,
-    ) -> impl Iterator<Item = (FieldKey, &'a Field)> + 'a {
+    fn from_fields_named(fields: &FieldsNamed) -> impl Iterator<Item = (FieldKey, &Field)> {
         fields
             .named
             .iter()
             .map(|field| (Self::from_ident(field.ident.as_ref().unwrap()), field))
     }
-    fn from_fields_unnamed<'a>(
-        fields: &'a FieldsUnnamed,
-    ) -> impl Iterator<Item = (FieldKey, &'a Field)> + 'a {
+    fn from_fields_unnamed(fields: &FieldsUnnamed) -> impl Iterator<Item = (FieldKey, &Field)> {
         fields
             .unnamed
             .iter()

@@ -168,7 +168,10 @@
         "clippy::all"
       ],
       "problemMatcher": [
-        "$rustc"
+        {
+          "base": "$rustc",
+          "owner": "clippy",
+        }
       ],
       "presentation": {
         "panel": "dedicated",
