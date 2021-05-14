@@ -116,15 +116,11 @@ impl<'a> FormatParameters<'a> {
         let c = RE.captures(s).ok_or(FormatParseError)?;
         let fill = c.name("fill").map(|m| m.as_str().chars().next().unwrap());
         let align = c.name("align").map(|m| m.as_str().parse().unwrap());
-        let sign = if let Some(m) = c.name("sign") {
-            Some(match m.as_str() {
-                "+" => Sign::Plus,
-                "-" => Sign::Minus,
-                _ => unreachable!(),
-            })
-        } else {
-            None
-        };
+        let sign = c.name("sign").map(|m| match m.as_str() {
+            "+" => Sign::Plus,
+            "-" => Sign::Minus,
+            _ => unreachable!(),
+        });
         let is_alternate = c.name("is_alternate").is_some();
         let is_zero = c.name("is_zero").is_some();
         let width = if let Some(m) = c.name("width_integer") {

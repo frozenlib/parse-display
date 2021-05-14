@@ -770,12 +770,12 @@ impl HelperAttributes {
     }
     fn from_str_format_span(&self) -> Option<Span> {
         if let Some(lit) = &self.regex {
-            Some(lit.span())
-        } else if let Some(format) = &self.format {
-            Some(format.span)
-        } else {
-            None
+            return Some(lit.span());
         }
+        if let Some(format) = &self.format {
+            return Some(format.span);
+        }
+        None
     }
     fn bound_from_str_resolved(&self) -> Option<Vec<Bound>> {
         self.bound_from_str
