@@ -50,6 +50,15 @@ fn from_str_struct_regex() {
 }
 
 #[test]
+fn from_str_tuple_struct_regex() {
+    #[derive(FromStr, Debug, Eq, PartialEq)]
+    #[from_str(regex = "(?P<0>.*),(?P<1>.*)")]
+    struct TestStruct(u32, u32);
+    assert_from_str("12,50", TestStruct(12, 50));
+    assert_from_str_err::<TestStruct>("aa,50");
+}
+
+#[test]
 fn from_str_struct_regex_keyword() {
     #[derive(FromStr, Debug, Eq, PartialEq)]
     #[from_str(regex = "(?P<fn>.*)")]

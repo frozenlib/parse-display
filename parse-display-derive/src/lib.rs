@@ -337,7 +337,7 @@ impl<'a> ParserBuilder<'a> {
             } else {
                 key.replace(".", "_")
             };
-            let key = REGEX_NUMBER.replace(&key, "_");
+            let key = REGEX_NUMBER.replace(&key, "_$0");
             format!("(?P<{}>", key)
         });
         if let Err(e) = regex_syntax::ast::parse::Parser::new().parse(&text_debug) {
