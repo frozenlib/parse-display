@@ -18,5 +18,5 @@ fn test() {
     }
 
     assert_eq!("1".parse(), Ok(MyNonZeroUSize { value: 1 }));
-    assert_eq!("0".parse::<MyNonZeroUSize>().is_err(), true);
+    assert!("0".parse::<MyNonZeroUSize>().is_err());
 }
