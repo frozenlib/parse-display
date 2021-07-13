@@ -961,8 +961,11 @@ impl DisplayFormat {
                 EscapedBeginBracket => format_str.push_str("{{"),
                 EscapedEndBracket => format_str.push_str("}}"),
                 Var { name, parameters } => {
-                    format_str.push_str("{:");
-                    format_str.push_str(&parameters);
+                    format_str.push('{');
+                    if !parameters.is_empty() {
+                        format_str.push(':');
+                        format_str.push_str(&parameters);
+                    }
                     format_str.push('}');
                     format_args.push(context.format_arg(
                         &name,

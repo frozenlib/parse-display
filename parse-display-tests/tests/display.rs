@@ -884,6 +884,13 @@ fn macro_rule_hygiene() {
     assert_display(HygieneTestType { x: 5 }, "5");
 }
 
+#[test]
+fn format_spec_is_empty() {
+    #[derive(Display)]
+    #[display("{0}>")]
+    struct TestStruct(u32);
+}
+
 fn assert_display<T: core::fmt::Display>(value: T, display: &str) {
     let value_display = alloc::format!("{}", value);
     assert_eq!(value_display, display);
