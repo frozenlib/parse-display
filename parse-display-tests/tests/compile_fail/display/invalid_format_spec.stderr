@@ -1,8 +1,8 @@
 error: unknown format trait `y`
- --> $DIR/invalid_format_spec.rs:2:13
+ --> $DIR/invalid_format_spec.rs:3:14
   |
-2 | #[derive(Display)]
-  |             ^
+3 | #[display("{0:y}")]
+  |              ^
   |
   = note: the only appropriate formatting traits are:
           - ``, which uses the `Display` trait
@@ -14,4 +14,3 @@ error: unknown format trait `y`
           - `b`, which uses the `Binary` trait
           - `x`, which uses the `LowerHex` trait
           - `X`, which uses the `UpperHex` trait
-  = note: this error originates in a derive macro (in Nightly builds, run with -Z macro-backtrace for more info)

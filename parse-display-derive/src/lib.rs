@@ -977,6 +977,7 @@ impl DisplayFormat {
                 }
             }
         }
+        let format_str = LitStr::new(&format_str, self.span);
         Ok(quote! { #format_str #(,#format_args)* })
     }
 }
