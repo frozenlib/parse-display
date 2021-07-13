@@ -919,8 +919,8 @@ impl DisplayFormat {
             }
             if let Some(c) = REGEX_VAR.captures(s) {
                 let name = c.get(1).unwrap().as_str().into();
-                let parameters = c.get(2).map_or("", |x| x.as_str()).into();
-                parts.push(DisplayFormatPart::Var { name, parameters });
+                let format_spec = c.get(2).map_or("", |x| x.as_str()).into();
+                parts.push(DisplayFormatPart::Var { name, format_spec });
                 s = &s[c.get(0).unwrap().end()..];
                 continue;
             }
@@ -931,7 +931,7 @@ impl DisplayFormat {
     fn from_newtype_struct(data: &DataStruct) -> Option<Self> {
         let p = DisplayFormatPart::Var {
             name: get_newtype_field(data)?,
-            parameters: String::new(),
+            format_spec: String::new(),
         };
         Some(Self {
             parts: vec![p],
@@ -960,16 +960,16 @@ impl DisplayFormat {
                 Str(s) => format_str.push_str(s.as_str()),
                 EscapedBeginBracket => format_str.push_str("{{"),
                 EscapedEndBracket => format_str.push_str("}}"),
-                Var { name, parameters } => {
+                Var { name, format_spec } => {
                     format_str.push('{');
-                    if !parameters.is_empty() {
+                    if !format_spec.is_empty() {
                         format_str.push(':');
-                        format_str.push_str(&parameters);
+                        format_str.push_str(&format_spec);
                     }
                     format_str.push('}');
                     format_args.push(context.format_arg(
                         &name,
-                        &parameters,
+                        &format_spec,
                         self.span,
                         bounds,
                         generics,
@@ -986,7 +986,7 @@ enum DisplayFormatPart {
     Str(String),
     EscapedBeginBracket,
     EscapedEndBracket,
-    Var { name: String, parameters: String },
+    Var { name: String, format_spec: String },
 }
 
 enum DisplayContext<'a> {
@@ -1008,7 +1008,7 @@ impl<'a> DisplayContext<'a> {
     fn format_arg(
         &self,
         name: &str,
-        parameters: &str,
+        format_spec: &str,
         span: Span,
         bounds: &mut Bounds,
         generics: &GenericParamSet,
@@ -1017,8 +1017,14 @@ impl<'a> DisplayContext<'a> {
         if keys.is_empty() {
             return Ok(match self {
                 DisplayContext::Struct { .. } => bail!(span, "{} is not allowed in struct format."),
-                DisplayContext::Field { parent, field, key } => parent
-                    .format_arg_by_field_expr(key, field, parameters, span, bounds, generics)?,
+                DisplayContext::Field { parent, field, key } => parent.format_arg_by_field_expr(
+                    key,
+                    field,
+                    format_spec,
+                    span,
+                    bounds,
+                    generics,
+                )?,
                 DisplayContext::Variant { variant, style } => {
                     let s = style.apply(&variant.ident);
                     quote! { #s }
@@ -1035,7 +1041,7 @@ impl<'a> DisplayContext<'a> {
                 } else {
                     bail!(span, "unknown field '{}'.", key);
                 };
-                return self.format_arg_of_field(key, field, parameters, span, bounds, generics);
+                return self.format_arg_of_field(key, field, format_spec, span, bounds, generics);
             }
         }
         let mut expr = self.field_expr(&keys[0]);
@@ -1074,16 +1080,16 @@ impl<'a> DisplayContext<'a> {
         &self,
         key: &FieldKey,
         field: &Field,
-        parameters: &str,
+        format_spec: &str,
         span: Span,
         bounds: &mut Bounds,
         generics: &GenericParamSet,
     ) -> Result<TokenStream> {
         let ty = &field.ty;
         if generics.contains_in_type(ty) {
-            let ps = match FormatParameters::parse(&parameters) {
+            let ps = match FormatSpec::parse(&format_spec) {
                 Ok(ps) => ps,
-                Err(_) => bail!(span, "invalid format parameters \"{}\".", parameters),
+                Err(_) => bail!(span, "invalid format parameters \"{}\".", format_spec),
             };
             let tr = ps.format_type.trait_name();
             let tr: Ident = parse_str(tr).unwrap();

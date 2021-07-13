@@ -18,7 +18,7 @@ pub enum Align {
 }
 
 #[derive(Debug, PartialEq, Eq, Default)]
-pub struct FormatParameters<'a> {
+pub struct FormatSpec<'a> {
     pub fill: Option<char>,
     pub align: Option<Align>,
     pub sign: Option<Sign>,
@@ -91,7 +91,7 @@ impl Display for FormatParseError {
     }
 }
 
-impl<'a> FormatParameters<'a> {
+impl<'a> FormatSpec<'a> {
     pub fn parse(s: &'a str) -> std::result::Result<Self, FormatParseError> {
         static RE: Lazy<Regex> = lazy_regex!(
             "^\
@@ -154,7 +154,7 @@ impl<'a> FormatParameters<'a> {
         };
         let format_type = c.name("format_type").unwrap().as_str().parse()?;
 
-        Ok(FormatParameters {
+        Ok(FormatSpec {
             fill,
             align,
             sign,
@@ -207,21 +207,21 @@ mod tests {
     fn align() {
         assert_ps(
             "<",
-            FormatParameters {
+            FormatSpec {
                 align: Some(Align::Left),
                 ..Default::default()
             },
         );
         assert_ps(
             "^",
-            FormatParameters {
+            FormatSpec {
                 align: Some(Align::Center),
                 ..Default::default()
             },
         );
         assert_ps(
             ">",
-            FormatParameters {
+            FormatSpec {
                 align: Some(Align::Right),
                 ..Default::default()
             },
@@ -232,7 +232,7 @@ mod tests {
     fn fill_align() {
         assert_ps(
             "x<",
-            FormatParameters {
+            FormatSpec {
                 fill: Some('x'),
                 align: Some(Align::Left),
                 ..Default::default()
@@ -240,7 +240,7 @@ mod tests {
         );
         assert_ps(
             "0>",
-            FormatParameters {
+            FormatSpec {
                 fill: Some('0'),
                 align: Some(Align::Right),
                 ..Default::default()
@@ -252,14 +252,14 @@ mod tests {
     fn sign() {
         assert_ps(
             "+",
-            FormatParameters {
+            FormatSpec {
                 sign: Some(Sign::Plus),
                 ..Default::default()
             },
         );
         assert_ps(
             "-",
-            FormatParameters {
+            FormatSpec {
                 sign: Some(Sign::Minus),
                 ..Default::default()
             },
@@ -269,7 +269,7 @@ mod tests {
     fn alternate() {
         assert_ps(
             "#",
-            FormatParameters {
+            FormatSpec {
                 is_alternate: true,
                 ..Default::default()
             },
@@ -280,7 +280,7 @@ mod tests {
     fn zero() {
         assert_ps(
             "0",
-            FormatParameters {
+            FormatSpec {
                 is_zero: true,
                 ..Default::default()
             },
@@ -291,7 +291,7 @@ mod tests {
     fn width_value() {
         assert_ps(
             "5",
-            FormatParameters {
+            FormatSpec {
                 width: Some(SubArg::Value(5)),
                 ..Default::default()
             },
@@ -302,7 +302,7 @@ mod tests {
     fn width_arg_index() {
         assert_ps(
             "5$",
-            FormatParameters {
+            FormatSpec {
                 width: Some(SubArg::Index(5)),
                 ..Default::default()
             },
@@ -313,7 +313,7 @@ mod tests {
     fn width_arg_name() {
         assert_ps(
             "field$",
-            FormatParameters {
+            FormatSpec {
                 width: Some(SubArg::Name("field")),
                 ..Default::default()
             },
@@ -324,7 +324,7 @@ mod tests {
     fn zero_width() {
         assert_ps(
             "05",
-            FormatParameters {
+            FormatSpec {
                 is_zero: true,
                 width: Some(SubArg::Value(5)),
                 ..Default::default()
@@ -336,7 +336,7 @@ mod tests {
     fn precision_value() {
         assert_ps(
             ".5",
-            FormatParameters {
+            FormatSpec {
                 precision: Some(SubArg::Value(5)),
                 ..Default::default()
             },
@@ -347,7 +347,7 @@ mod tests {
     fn precision_arg_index() {
         assert_ps(
             ".5$",
-            FormatParameters {
+            FormatSpec {
                 precision: Some(SubArg::Index(5)),
                 ..Default::default()
             },
@@ -358,7 +358,7 @@ mod tests {
     fn precision_arg_name() {
         assert_ps(
             ".field$",
-            FormatParameters {
+            FormatSpec {
                 precision: Some(SubArg::Name("field")),
                 ..Default::default()
             },
@@ -369,7 +369,7 @@ mod tests {
     fn precision_arg_input() {
         assert_ps(
             ".*",
-            FormatParameters {
+            FormatSpec {
                 precision: Some(SubArg::Input),
                 ..Default::default()
             },
@@ -380,35 +380,35 @@ mod tests {
     fn format_type() {
         assert_ps(
             "?",
-            FormatParameters {
+            FormatSpec {
                 format_type: FormatType::Debug,
                 ..Default::default()
             },
         );
         assert_ps(
             "x?",
-            FormatParameters {
+            FormatSpec {
                 format_type: FormatType::DebugLowerHex,
                 ..Default::default()
             },
         );
         assert_ps(
             "x",
-            FormatParameters {
+            FormatSpec {
                 format_type: FormatType::LowerHex,
                 ..Default::default()
             },
         );
         assert_ps(
             "X",
-            FormatParameters {
+            FormatSpec {
                 format_type: FormatType::UpperHex,
                 ..Default::default()
             },
         );
         assert_ps(
             "b",
-            FormatParameters {
+            FormatSpec {
                 format_type: FormatType::Binary,
                 ..Default::default()
             },
@@ -419,7 +419,7 @@ mod tests {
     fn all() {
         assert_ps(
             "_>+#05$.name$x?",
-            FormatParameters {
+            FormatSpec {
                 fill: Some('_'),
                 align: Some(Align::Right),
                 sign: Some(Sign::Plus),
@@ -432,7 +432,7 @@ mod tests {
         );
     }
 
-    fn assert_ps<'a>(s: &'a str, ps: FormatParameters<'a>) {
-        assert_eq!(FormatParameters::parse(s), Ok(ps), "input : {}", s);
+    fn assert_ps<'a>(s: &'a str, ps: FormatSpec<'a>) {
+        assert_eq!(FormatSpec::parse(s), Ok(ps), "input : {}", s);
     }
 }
