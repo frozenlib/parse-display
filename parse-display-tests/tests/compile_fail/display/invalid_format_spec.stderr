@@ -1,0 +1,17 @@
+error: unknown format trait `y`
+ --> $DIR/invalid_format_spec.rs:2:13
+  |
+2 | #[derive(Display)]
+  |             ^
+  |
+  = note: the only appropriate formatting traits are:
+          - ``, which uses the `Display` trait
+          - `?`, which uses the `Debug` trait
+          - `e`, which uses the `LowerExp` trait
+          - `E`, which uses the `UpperExp` trait
+          - `o`, which uses the `Octal` trait
+          - `p`, which uses the `Pointer` trait
+          - `b`, which uses the `Binary` trait
+          - `x`, which uses the `LowerHex` trait
+          - `X`, which uses the `UpperHex` trait
+  = note: this error originates in a derive macro (in Nightly builds, run with -Z macro-backtrace for more info)
