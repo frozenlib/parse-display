@@ -384,8 +384,8 @@ impl<'a> ParserBuilder<'a> {
                 DisplayFormatPart::Str(s) => self.push_str(s),
                 DisplayFormatPart::EscapedBeginBracket => self.push_str("{"),
                 DisplayFormatPart::EscapedEndBracket => self.push_str("}"),
-                DisplayFormatPart::Var { name, .. } => {
-                    let keys = FieldKey::from_str_deep(&name);
+                DisplayFormatPart::Var { arg, .. } => {
+                    let keys = FieldKey::from_str_deep(&arg);
                     if let DisplayContext::Variant { variant, style } = context {
                         if keys.is_empty() {
                             self.push_str(&style.apply(&variant.ident));
@@ -918,9 +918,9 @@ impl DisplayFormat {
                 continue;
             }
             if let Some(c) = REGEX_VAR.captures(s) {
-                let name = c.get(1).unwrap().as_str().into();
+                let arg = c.get(1).unwrap().as_str().into();
                 let format_spec = c.get(2).map_or("", |x| x.as_str()).into();
-                parts.push(DisplayFormatPart::Var { name, format_spec });
+                parts.push(DisplayFormatPart::Var { arg, format_spec });
                 s = &s[c.get(0).unwrap().end()..];
                 continue;
             }
@@ -930,7 +930,7 @@ impl DisplayFormat {
     }
     fn from_newtype_struct(data: &DataStruct) -> Option<Self> {
         let p = DisplayFormatPart::Var {
-            name: get_newtype_field(data)?,
+            arg: get_newtype_field(data)?,
             format_spec: String::new(),
         };
         Some(Self {
@@ -960,7 +960,7 @@ impl DisplayFormat {
                 Str(s) => format_str.push_str(s.as_str()),
                 EscapedBeginBracket => format_str.push_str("{{"),
                 EscapedEndBracket => format_str.push_str("}}"),
-                Var { name, format_spec } => {
+                Var { arg, format_spec } => {
                     format_str.push('{');
                     if !format_spec.is_empty() {
                         format_str.push(':');
@@ -968,7 +968,7 @@ impl DisplayFormat {
                     }
                     format_str.push('}');
                     format_args.push(context.format_arg(
-                        &name,
+                        &arg,
                         &format_spec,
                         self.span,
                         bounds,
@@ -986,7 +986,7 @@ enum DisplayFormatPart {
     Str(String),
     EscapedBeginBracket,
     EscapedEndBracket,
-    Var { name: String, format_spec: String },
+    Var { arg: String, format_spec: String },
 }
 
 enum DisplayContext<'a> {
@@ -1007,13 +1007,13 @@ enum DisplayContext<'a> {
 impl<'a> DisplayContext<'a> {
     fn format_arg(
         &self,
-        name: &str,
+        arg: &str,
         format_spec: &str,
         span: Span,
         bounds: &mut Bounds,
         generics: &GenericParamSet,
     ) -> Result<TokenStream> {
-        let keys = FieldKey::from_str_deep(name);
+        let keys = FieldKey::from_str_deep(arg);
         if keys.is_empty() {
             return Ok(match self {
                 DisplayContext::Struct { .. } => bail!(span, "{} is not allowed in struct format."),
