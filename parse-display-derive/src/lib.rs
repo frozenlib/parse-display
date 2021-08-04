@@ -108,7 +108,7 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Token
             format = hattrs_enum.format.clone();
         }
         if format.is_none() {
-            format = DisplayFormat::from_unit_variant(&variant)?;
+            format = DisplayFormat::from_unit_variant(variant)?;
         }
         let format = match format {
             Some(x) => x,
@@ -193,7 +193,7 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Toke
         let enum_ident = &input.ident;
         let variant_ident = &variant.ident;
         let constructor = parse_quote!(#enum_ident::#variant_ident);
-        let hattrs_variant = &HelperAttributes::from(&variant.attrs)?;
+        let hattrs_variant = HelperAttributes::from(&variant.attrs)?;
         let p = ParserBuilder::from_variant(&hattrs_variant, &hattrs_enum, variant)?;
         let mut bounds = bounds.child(hattrs_variant.bound_from_str_resolved());
         p.build_bounds(&generics, &mut bounds);
@@ -267,8 +267,8 @@ impl<'a> ParserBuilder<'a> {
         let mut s = Self::new(&data.fields)?;
         let context = DisplayContext::Struct { data };
         s.new_expr = hattrs.new_expr.clone();
-        s.apply_attrs(&hattrs)?;
-        s.push_attrs(&hattrs, &context)?;
+        s.apply_attrs(hattrs)?;
+        s.push_attrs(hattrs, &context)?;
         Ok(s)
     }
     fn from_variant(
@@ -385,7 +385,7 @@ impl<'a> ParserBuilder<'a> {
                 DisplayFormatPart::EscapedBeginBracket => self.push_str("{"),
                 DisplayFormatPart::EscapedEndBracket => self.push_str("}"),
                 DisplayFormatPart::Var { arg, .. } => {
-                    let keys = FieldKey::from_str_deep(&arg);
+                    let keys = FieldKey::from_str_deep(arg);
                     if let DisplayContext::Variant { variant, style } = context {
                         if keys.is_empty() {
                             self.push_str(&style.apply(&variant.ident));
@@ -426,10 +426,10 @@ impl<'a> ParserBuilder<'a> {
         context: &DisplayContext,
     ) -> Result<bool> {
         Ok(if let Some(regex) = &hattrs.regex {
-            self.push_regex(&regex, context)?;
+            self.push_regex(regex, context)?;
             true
         } else if let Some(format) = &hattrs.format {
-            self.push_format(&format, context)?;
+            self.push_format(format, context)?;
             true
         } else {
             false
@@ -470,7 +470,7 @@ impl<'a> ParserBuilder<'a> {
         let code = if let Some(new_expr) = &self.new_expr {
             let mut code = TokenStream::new();
             for (key, field) in &self.fields {
-                let expr = field.build_field_init_expr(&key, self.span)?;
+                let expr = field.build_field_init_expr(key, self.span)?;
                 let var = key.new_arg_var();
                 code.extend(quote! { let #var = #expr; });
             }
@@ -496,7 +496,7 @@ impl<'a> ParserBuilder<'a> {
                 Fields::Named(..) => {
                     let mut fields_code = Vec::new();
                     for (key, field) in &self.fields {
-                        let expr = field.build_field_init_expr(&key, self.span)?;
+                        let expr = field.build_field_init_expr(key, self.span)?;
                         fields_code.push(quote! { #key : #expr })
                     }
                     quote! { { #(#fields_code,)* } }
@@ -504,7 +504,7 @@ impl<'a> ParserBuilder<'a> {
                 Fields::Unnamed(..) => {
                     let mut fields_code = Vec::new();
                     for (key, field) in &self.fields {
-                        fields_code.push(field.build_field_init_expr(&key, self.span)?);
+                        fields_code.push(field.build_field_init_expr(key, self.span)?);
                     }
                     quote! { ( #(#fields_code,)* ) }
                 }
@@ -724,10 +724,10 @@ impl HelperAttributes {
     }
     fn set_display_args(&mut self, args: DisplayArgs) -> Result<()> {
         if let Some(format) = &args.format {
-            self.format = Some(DisplayFormat::parse_lit_str(&format)?);
+            self.format = Some(DisplayFormat::parse_lit_str(format)?);
         }
         if let Some(style) = &args.style {
-            self.style = Some(DisplayStyle::parse_lit_str(&style)?);
+            self.style = Some(DisplayStyle::parse_lit_str(style)?);
         }
         if let Some(bounds) = args.bound {
             let list = self.bound_display.get_or_insert(Vec::new());
@@ -964,12 +964,12 @@ impl DisplayFormat {
                     format_str.push('{');
                     if !format_spec.is_empty() {
                         format_str.push(':');
-                        format_str.push_str(&format_spec);
+                        format_str.push_str(format_spec);
                     }
                     format_str.push('}');
                     format_args.push(context.format_arg(
-                        &arg,
-                        &format_spec,
+                        arg,
+                        format_spec,
                         self.span,
                         bounds,
                         generics,
@@ -1088,7 +1088,7 @@ impl<'a> DisplayContext<'a> {
     ) -> Result<TokenStream> {
         let ty = &field.ty;
         if generics.contains_in_type(ty) {
-            let ps = match FormatSpec::parse(&format_spec) {
+            let ps = match FormatSpec::parse(format_spec) {
                 Ok(ps) => ps,
                 Err(_) => bail!(span, "invalid format parameters \"{}\".", format_spec),
             };
@@ -1359,7 +1359,7 @@ impl FieldKey {
     }
     fn new_arg_var(&self) -> Ident {
         match self {
-            Self::Named(s) => parse_str(&s),
+            Self::Named(s) => parse_str(s),
             Self::Unnamed(idx) => parse_str(&format!("_{}", idx)),
         }
         .unwrap()
@@ -1415,7 +1415,7 @@ fn field_of<'a, 'b>(
     key: &FieldKey,
     span: Span,
 ) -> Result<&'a mut FieldEntry<'b>> {
-    if let Some(f) = fields.get_mut(&key) {
+    if let Some(f) = fields.get_mut(key) {
         Ok(f)
     } else {
         bail!(span, "field `{}` not found.", key);
