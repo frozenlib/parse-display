@@ -1288,8 +1288,8 @@ impl<'a> DerefMut for BoundsChild<'a> {
 impl<'a> Drop for BoundsChild<'a> {
     fn drop(&mut self) {
         if self.owner.can_extend {
-            self.owner.ty.extend(self.bounds.ty.drain(..));
-            self.owner.pred.extend(self.bounds.pred.drain(..));
+            self.owner.ty.append(&mut self.bounds.ty);
+            self.owner.pred.append(&mut self.bounds.pred);
         }
     }
 }
