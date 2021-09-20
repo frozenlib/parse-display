@@ -209,9 +209,9 @@ assert_eq!("a is 10, b is 20".parse(), Ok(MyStruct { a:10, b:20 }));
 
 #[derive(Display, FromStr, PartialEq, Debug)]
 #[display("{0}, {1}")]
-struct MyTyple(#[display("first is {}")] u32, #[display("next is {}")] u32);
-assert_eq!(MyTyple(10, 20).to_string(), "first is 10, next is 20");
-assert_eq!("first is 10, next is 20".parse(), Ok(MyTyple(10, 20)));
+struct MyTuple(#[display("first is {}")] u32, #[display("next is {}")] u32);
+assert_eq!(MyTuple(10, 20).to_string(), "first is 10, next is 20");
+assert_eq!("first is 10, next is 20".parse(), Ok(MyTuple(10, 20)));
 
 #[derive(Display, FromStr, PartialEq, Debug)]
 enum MyEnum {
@@ -549,7 +549,7 @@ assert_eq!("abcdef".parse(), Ok(MyStruct { a:"".into(), b:"abcdef".into() }));
 
 ### Variant name
 
-In the regex speficied for enum or variant, empty name capture means variant name.
+In the regex specified for enum or variant, empty name capture means variant name.
 
 ```rust
 use parse_display::FromStr;
