@@ -278,8 +278,8 @@ The following styles are available.
 - `KEBAB-CASE`
 - `Title Case`
 - `Title case`
-- `TITLE CASE`
 - `title case`
+- `TITLE CASE`
 
 ```rust
 use parse_display::{Display, FromStr};
@@ -321,9 +321,9 @@ enum StyleExample {
   VarJ,
   #[display(style = "Title case")]
   VarK,
-  #[display(style = "TITLE CASE")]
-  VarL,
   #[display(style = "title case")]
+  VarL,
+  #[display(style = "TITLE CASE")]
   VarM,
 }
 assert_eq!(StyleExample::VarA1.to_string(), "VarA1");
@@ -339,8 +339,8 @@ assert_eq!(StyleExample::VarH.to_string(), "var-h");
 assert_eq!(StyleExample::VarI.to_string(), "VAR-I");
 assert_eq!(StyleExample::VarJ.to_string(), "Var J");
 assert_eq!(StyleExample::VarK.to_string(), "Var k");
-assert_eq!(StyleExample::VarL.to_string(), "VAR L");
-assert_eq!(StyleExample::VarM.to_string(), "var m");
+assert_eq!(StyleExample::VarL.to_string(), "var l");
+assert_eq!(StyleExample::VarM.to_string(), "VAR M");
 ```
 
 ## `#[display(bound(...))]`
