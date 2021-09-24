@@ -814,7 +814,10 @@ impl DisplayStyle {
         \"CamelCase\", \
         \"kebab-case\", \
         \"KEBAB-CASE\", \
-        \"Title Case\"";
+        \"Title Case\", \
+        \"Title case\", \
+        \"TITLE CASE\", \
+        \"title Case\"";
         match Self::parse(&s.value()) {
             Err(_) => bail!(s.span(), ERROR_MESSAGE),
             Ok(value) => Ok(value),
