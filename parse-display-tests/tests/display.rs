@@ -379,6 +379,66 @@ fn display_enum_upper_title_case() {
 }
 
 #[test]
+fn display_enum_upper_title_case_upper() {
+    #[derive(Display)]
+    #[display(style = "TITLE CASE")]
+    enum TestEnum {
+        AbcDef,
+        XyzXyz,
+        Abc1,
+        Abc1Abc2,
+        Xxx1xxx,
+        _Xxx,
+    }
+    assert_display(TestEnum::AbcDef, "ABC DEF");
+    assert_display(TestEnum::XyzXyz, "XYZ XYZ");
+    assert_display(TestEnum::Abc1, "ABC1");
+    assert_display(TestEnum::Abc1Abc2, "ABC1 ABC2");
+    assert_display(TestEnum::Xxx1xxx, "XXX1XXX");
+    assert_display(TestEnum::_Xxx, "XXX");
+}
+
+#[test]
+fn display_enum_upper_title_case_lower() {
+    #[derive(Display)]
+    #[display(style = "title case")]
+    enum TestEnum {
+        AbcDef,
+        XyzXyz,
+        Abc1,
+        Abc1Abc2,
+        Xxx1xxx,
+        _Xxx,
+    }
+    assert_display(TestEnum::AbcDef, "abc def");
+    assert_display(TestEnum::XyzXyz, "xyz xyz");
+    assert_display(TestEnum::Abc1, "abc1");
+    assert_display(TestEnum::Abc1Abc2, "abc1 abc2");
+    assert_display(TestEnum::Xxx1xxx, "xxx1xxx");
+    assert_display(TestEnum::_Xxx, "xxx");
+}
+
+#[test]
+fn display_enum_upper_title_case_head() {
+    #[derive(Display)]
+    #[display(style = "Title case")]
+    enum TestEnum {
+        AbcDef,
+        XyzXyz,
+        Abc1,
+        Abc1Abc2,
+        Xxx1xxx,
+        _Xxx,
+    }
+    assert_display(TestEnum::AbcDef, "Abc def");
+    assert_display(TestEnum::XyzXyz, "Xyz xyz");
+    assert_display(TestEnum::Abc1, "Abc1");
+    assert_display(TestEnum::Abc1Abc2, "Abc1 abc2");
+    assert_display(TestEnum::Xxx1xxx, "Xxx1xxx");
+    assert_display(TestEnum::_Xxx, "Xxx");
+}
+
+#[test]
 fn display_enum_lower_case() {
     #[derive(Display)]
     #[display(style = "lowercase")]

@@ -796,6 +796,9 @@ enum DisplayStyle {
     LowerKebabCase,
     UpperKebabCase,
     TitleCase,
+    TitleCaseUpper,
+    TitleCaseLower,
+    TitleCaseHead,
 }
 
 impl DisplayStyle {
@@ -830,6 +833,9 @@ impl DisplayStyle {
             "kebab-case" => LowerKebabCase,
             "KEBAB-CASE" => UpperKebabCase,
             "Title Case" => TitleCase,
+            "TITLE CASE" => TitleCaseUpper,
+            "title case" => TitleCaseLower,
+            "Title case" => TitleCaseHead,
             _ => return Err(ParseDisplayStyleError),
         })
     }
@@ -865,9 +871,12 @@ impl DisplayStyle {
             DisplayStyle::LowerKebabCase => (false, false, false, "-"),
             DisplayStyle::UpperKebabCase => (true, true, true, "-"),
             DisplayStyle::TitleCase => (true, true, false, " "),
+            DisplayStyle::TitleCaseUpper => (true, true, true, " "),
+            DisplayStyle::TitleCaseLower => (false, false, false, " "),
+            DisplayStyle::TitleCaseHead => (true, false, false, " "),
         };
         let mut is_line_head = true;
-        let mut is_word_head = true;    
+        let mut is_word_head = true;
         let mut last = '\0';
 
         let mut r = String::new();
