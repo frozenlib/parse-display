@@ -436,9 +436,12 @@ fn from_str_enum_style() {
     enum TestEnum {
         AaaBbb,
         XyzXyz,
+        #[display(style = "Title Case")]
+        TitleAbc,
     }
     assert_from_str("aaa_bbb", TestEnum::AaaBbb);
     assert_from_str("xyz_xyz", TestEnum::XyzXyz);
+    assert_from_str("Title Abc", TestEnum::TitleAbc);
 }
 
 #[test]

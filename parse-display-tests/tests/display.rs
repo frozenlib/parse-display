@@ -359,6 +359,26 @@ fn display_enum_upper_kebab_case() {
 }
 
 #[test]
+fn display_enum_upper_title_case() {
+    #[derive(Display)]
+    #[display(style = "Title Case")]
+    enum TestEnum {
+        AbcDef,
+        XyzXyz,
+        Abc1,
+        Abc1Abc2,
+        Xxx1xxx,
+        _Xxx,
+    }
+    assert_display(TestEnum::AbcDef, "Abc Def");
+    assert_display(TestEnum::XyzXyz, "Xyz Xyz");
+    assert_display(TestEnum::Abc1, "Abc1");
+    assert_display(TestEnum::Abc1Abc2, "Abc1 Abc2");
+    assert_display(TestEnum::Xxx1xxx, "Xxx1xxx");
+    assert_display(TestEnum::_Xxx, "Xxx");
+}
+
+#[test]
 fn display_enum_lower_case() {
     #[derive(Display)]
     #[display(style = "lowercase")]

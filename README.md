@@ -267,15 +267,16 @@ assert_eq!(WithFormatParameter { a:5 }.to_string(), "0005");
 By writing `#[display(style = "...")]`, you can specify the variant name style.
 The following styles are available.
 
-- none
-- lowercase
-- UPPERCASE
-- snake_case
-- SNAKE_CASE
-- camelCase
-- CamelCase
-- kebab-case
-- KEBAB-CASE
+- `none`
+- `lowercase`
+- `UPPERCASE`
+- `snake_case`
+- `SNAKE_CASE`
+- `camelCase`
+- `CamelCase`
+- `kebab-case`
+- `KEBAB-CASE`
+- `Title Case`
 
 ```rust
 use parse_display::{Display, FromStr};
@@ -313,6 +314,8 @@ enum StyleExample {
   VarH,
   #[display(style = "KEBAB-CASE")]
   VarI,
+  #[display(style = "Title Case")]
+  VarJ,
 }
 assert_eq!(StyleExample::VarA1.to_string(), "VarA1");
 assert_eq!(StyleExample::varA2.to_string(), "varA2");
@@ -325,6 +328,7 @@ assert_eq!(StyleExample::VarG1.to_string(), "VarG1");
 assert_eq!(StyleExample::varG2.to_string(), "VarG2");
 assert_eq!(StyleExample::VarH.to_string(), "var-h");
 assert_eq!(StyleExample::VarI.to_string(), "VAR-I");
+assert_eq!(StyleExample::VarJ.to_string(), "Var J");
 ```
 
 ## `#[display(bound(...))]`
