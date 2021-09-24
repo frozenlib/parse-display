@@ -796,9 +796,9 @@ enum DisplayStyle {
     LowerKebabCase,
     UpperKebabCase,
     TitleCase,
-    TitleCaseUpper,
-    TitleCaseLower,
     TitleCaseHead,
+    TitleCaseLower,
+    TitleCaseUpper,
 }
 
 impl DisplayStyle {
@@ -816,8 +816,8 @@ impl DisplayStyle {
         \"KEBAB-CASE\", \
         \"Title Case\", \
         \"Title case\", \
-        \"TITLE CASE\", \
-        \"title Case\"";
+        \"title case\", \
+        \"TITLE CASE\"";
         match Self::parse(&s.value()) {
             Err(_) => bail!(s.span(), ERROR_MESSAGE),
             Ok(value) => Ok(value),
@@ -836,9 +836,9 @@ impl DisplayStyle {
             "kebab-case" => LowerKebabCase,
             "KEBAB-CASE" => UpperKebabCase,
             "Title Case" => TitleCase,
-            "TITLE CASE" => TitleCaseUpper,
-            "title case" => TitleCaseLower,
             "Title case" => TitleCaseHead,
+            "title case" => TitleCaseLower,
+            "TITLE CASE" => TitleCaseUpper,
             _ => return Err(ParseDisplayStyleError),
         })
     }
