@@ -13,10 +13,6 @@
       "problemMatcher": [
         "$rustc"
       ],
-      // "group": {
-      //     "kind": "build",
-      //     "isDefault": true
-      // },
       "presentation": {
         "panel": "dedicated",
         "clear": true
@@ -64,35 +60,6 @@
       "dependsOn": [
         "include doc"
       ],
-      // "options": {
-      //   "env": {
-      //     "RUST_BACKTRACE": "1"
-      //   }
-      // }
-    },
-    {
-      "type": "shell",
-      "label": "update compile error",
-      "command": "cargo",
-      "args": [
-        "test",
-        "--test",
-        "compile_fail",
-        "--",
-        "--ignored"
-      ],
-      "problemMatcher": [
-        "$rustc"
-      ],
-      "presentation": {
-        "panel": "dedicated",
-        "clear": true
-      },
-      "options": {
-        "env": {
-          "TRYBUILD": "overwrite"
-        }
-      }
     },
     {
       "type": "shell",
@@ -178,6 +145,18 @@
     },
     {
       "type": "shell",
+      "label": "cargo fix & fmt",
+      "command": "cargo fix && cargo fmt",
+      "problemMatcher": [
+        "$rustc"
+      ],
+      "presentation": {
+        "panel": "dedicated",
+        "clear": true,
+      }
+    },
+    {
+      "type": "shell",
       "label": "cargo bench",
       "command": "cargo",
       "args": [
@@ -210,6 +189,30 @@
       "presentation": {
         "panel": "dedicated",
         "clear": true
+      }
+    },
+    {
+      "type": "shell",
+      "label": "update compile error",
+      "command": "cargo",
+      "args": [
+        "test",
+        "--test",
+        "compile_fail",
+        "--",
+        "--ignored"
+      ],
+      "problemMatcher": [
+        "$rustc"
+      ],
+      "presentation": {
+        "panel": "dedicated",
+        "clear": true
+      },
+      "options": {
+        "env": {
+          "TRYBUILD": "overwrite"
+        }
       }
     },
     {
