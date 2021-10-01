@@ -9,7 +9,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! parse-display = "0.5.1"
+//! parse-display = "0.5.2"
 //! ```
 //!
 //! ## Example
