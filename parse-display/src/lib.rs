@@ -1,5 +1,4 @@
 // #![include_doc("../../README.md", start("This crate provides derive macro `Display` and `FromStr`."))]
-
 //! This crate provides derive macro `Display` and `FromStr`.
 //! These macros use common helper attributes to specify the format.
 //!
@@ -665,7 +664,6 @@
 //! assert_eq!("VarA-10".parse(), Ok(MyEnum::VarA { a:10, b:0, c:0 }));
 //! assert_eq!("VarB-10".parse(), Ok(MyEnum::VarB { a:10, b:0, c:0 }));
 //! ```
-
 // #![include_doc("../../README.md", end("## License"))]
 #![cfg_attr(not(feature = "std"), no_std)]
 
