@@ -9,7 +9,7 @@ documentation = "https://docs.rs/parse-display/"
 keywords = ["derive", "enum", "from_str", "display", "regex"]
 categories = ["parsing"]
 description = "Procedural macro to implement Display and FromStr using common settings."
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 parse-display-derive = { version = "=0.5.3", path = "../parse-display-derive" }

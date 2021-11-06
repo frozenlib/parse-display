@@ -2,7 +2,7 @@
 name = "parse-display-tests"
 version = "0.0.0"
 authors = ["frozenlib <frozenlib@users.noreply.github.com>"]
-edition = "2018"
+edition = "2021"
 publish = false
 
 [dependencies]
