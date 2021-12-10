@@ -30,6 +30,6 @@ jobs:
       - name: Set minimal versions
         run: cargo +nightly update -Z minimal-versions
       - name: Build tests (minimal versions)
-        run: cargo test --verbose --no-run
+        run: cargo +stable test --verbose --no-run
       - name: Run tests (minimal versions)
-        run: cargo test --verbose
+        run: cargo +stable test --verbose
