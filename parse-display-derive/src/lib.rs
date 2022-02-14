@@ -78,7 +78,6 @@ fn derive_display_for_struct(input: &DeriveInput, data: &DataStruct) -> Result<T
 }
 fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<TokenStream> {
     fn make_arm(
-        input: &DeriveInput,
         hattrs_enum: &HelperAttributes,
         variant: &Variant,
         bounds: &mut Bounds,
@@ -117,7 +116,6 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Token
                 "`#[display(\"format\")]` is required except unit variant."
             ),
         };
-        let enum_ident = &input.ident;
         let variant_ident = &variant.ident;
         let args = format.format_args(
             DisplayContext::Variant { variant, style },
@@ -125,7 +123,7 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Token
             generics,
         )?;
         Ok(quote! {
-            & #enum_ident::#variant_ident #fields => {
+            & Self::#variant_ident #fields => {
                 core::write!(f, #args)
             },
         })
@@ -135,7 +133,7 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Token
     let generics = GenericParamSet::new(&input.generics);
     let mut arms = Vec::new();
     for variant in &data.variants {
-        arms.push(make_arm(input, &hattrs, variant, &mut bounds, &generics)?);
+        arms.push(make_arm(&hattrs, variant, &mut bounds, &generics)?);
     }
     let trait_path = parse_quote!(core::fmt::Display);
     let contents = quote! {
@@ -190,9 +188,8 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Toke
     let mut bodys = Vec::new();
     let mut arms = Vec::new();
     for variant in data.variants.iter() {
-        let enum_ident = &input.ident;
         let variant_ident = &variant.ident;
-        let constructor = parse_quote!(#enum_ident::#variant_ident);
+        let constructor = parse_quote!(Self::#variant_ident);
         let hattrs_variant = HelperAttributes::from(&variant.attrs)?;
         let p = ParserBuilder::from_variant(&hattrs_variant, &hattrs_enum, variant)?;
         let mut bounds = bounds.child(hattrs_variant.bound_from_str_resolved());
