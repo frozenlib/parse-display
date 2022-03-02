@@ -332,7 +332,7 @@ impl<'a> ParserBuilder<'a> {
             let key = if key.is_empty() {
                 "self".into()
             } else {
-                key.replace(".", "_")
+                key.replace('.', "_")
             };
             let key = REGEX_NUMBER.replace(&key, "_$0");
             format!("(?P<{}>", key)
