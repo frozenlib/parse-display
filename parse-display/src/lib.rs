@@ -342,9 +342,9 @@
 //!
 //! By default, the type of field used in the format is added to the trait bound.
 //!
-//! This behavior causes a compile error if you use fields of non public type in public struct.
+//! In Rust prior to 1.59, this behavior causes a compile error if you use fields of non public type in public struct.
 //!
-//! ```compile_fail
+//! ```rust
 //! #![deny(private_in_public)]
 //! use parse_display::Display;
 //!
