@@ -18,7 +18,7 @@ proc-macro = true
 syn = { version = "1.0.68", features = ["visit"] }
 quote = "1.0.9"
 proc-macro2 = "1.0.26"
-regex = "1.4.5"
+regex = "1.5.5"
 regex-syntax = "0.6.23"
 once_cell = "1.7.2"
 structmeta = "0.1.4"
