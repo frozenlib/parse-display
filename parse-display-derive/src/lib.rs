@@ -293,7 +293,7 @@ impl<'a> ParserBuilder<'a> {
             let span = field.span();
             self.field(&key, span)?.use_default = true;
         }
-        if let Some(span) = hattrs.from_str_format_span() {
+        if let Some(span) = hattrs.span_of_from_str_format() {
             self.span = span;
         }
         Ok(())
@@ -765,7 +765,7 @@ impl HelperAttributes {
         }
         self.dump_from_str |= args.dump;
     }
-    fn from_str_format_span(&self) -> Option<Span> {
+    fn span_of_from_str_format(&self) -> Option<Span> {
         if let Some(lit) = &self.regex {
             return Some(lit.span());
         }
