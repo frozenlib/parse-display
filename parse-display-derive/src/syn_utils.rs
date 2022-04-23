@@ -8,7 +8,7 @@ use syn::{
     parse::ParseStream,
     parse2, parse_str,
     punctuated::Punctuated,
-    visit::{visit_path, visit_type, Visit},
+    visit::{visit_path, Visit},
     DeriveInput, GenericParam, Generics, Ident, LitStr, Path, Result, Token, Type, WherePredicate,
 };
 
@@ -77,7 +77,7 @@ impl GenericParamSet {
             generics: self,
             result: false,
         };
-        visit_type(&mut visitor, ty);
+        visitor.visit_type(ty);
         visitor.result
     }
 }
