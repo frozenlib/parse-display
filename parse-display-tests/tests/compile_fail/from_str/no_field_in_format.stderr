@@ -1,5 +1,5 @@
 error: field `x` is not appear in format.
- --> $DIR/no_field_in_format.rs:4:11
+ --> tests/compile_fail/from_str/no_field_in_format.rs:4:11
   |
 4 | #[display("abc")]
   |           ^^^^^

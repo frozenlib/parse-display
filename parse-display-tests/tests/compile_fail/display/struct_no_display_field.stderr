@@ -1,10 +1,9 @@
 error[E0277]: `NoDisplay` doesn't implement `std::fmt::Display`
- --> $DIR/struct_no_display_field.rs:3:10
+ --> tests/compile_fail/display/struct_no_display_field.rs:3:10
   |
 3 | #[derive(Display)]
   |          ^^^^^^^ `NoDisplay` cannot be formatted with the default formatter
   |
   = help: the trait `std::fmt::Display` is not implemented for `NoDisplay`
   = note: in format strings you may be able to use `{:?}` (or {:#?} for pretty-print) instead
-  = note: required by `std::fmt::Display::fmt`
-  = note: this error originates in a macro (in Nightly builds, run with -Z macro-backtrace for more info)
+  = note: this error originates in the macro `$crate::format_args` (in Nightly builds, run with -Z macro-backtrace for more info)

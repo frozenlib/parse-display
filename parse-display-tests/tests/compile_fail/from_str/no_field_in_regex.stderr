@@ -1,5 +1,5 @@
 error: field `x` is not appear in format.
- --> $DIR/no_field_in_regex.rs:4:20
+ --> tests/compile_fail/from_str/no_field_in_regex.rs:4:20
   |
 4 | #[from_str(regex = "abc")]
   |                    ^^^^^

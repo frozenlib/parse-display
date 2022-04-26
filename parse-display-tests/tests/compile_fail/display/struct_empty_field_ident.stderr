@@ -1,5 +1,5 @@
 error: {} is not allowed in struct format.
- --> $DIR/struct_empty_field_ident.rs:4:11
+ --> tests/compile_fail/display/struct_empty_field_ident.rs:4:11
   |
 4 | #[display("{}")]
   |           ^^^^
