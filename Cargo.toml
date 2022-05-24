@@ -1,7 +1,3 @@
 [workspace]
-members = [
-    "parse-display",
-    "parse-display-derive",
-    "parse-display-tests",
-]
-
+resolver = "2"
+members = ["parse-display", "parse-display-derive", "parse-display-tests"]
