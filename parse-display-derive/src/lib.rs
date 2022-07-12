@@ -881,7 +881,7 @@ impl DisplayStyle {
 
         let mut r = String::new();
         for c in s.chars() {
-            if !c.is_alphanumeric() && !c.is_digit(10) {
+            if !c.is_alphanumeric() && !c.is_ascii_digit() {
                 is_word_head = true;
                 continue;
             }
