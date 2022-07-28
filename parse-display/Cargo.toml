@@ -17,5 +17,5 @@ once_cell = { version = "1.7.2", optional = true }
 regex = { version = "1.5.5", optional = true }
 
 [features]
-default = ["std", "regex", "once_cell"]
-std = []
+default = ["std"]
+std = ["regex", "once_cell"]

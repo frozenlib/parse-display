@@ -670,7 +670,7 @@
 use core::convert::Infallible;
 use core::fmt::{Display, Formatter, Result};
 
-#[cfg(feature = "regex")]
+#[cfg(feature = "std")]
 pub mod helpers {
     pub use once_cell;
     pub use regex;
