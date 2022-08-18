@@ -456,80 +456,6 @@ assert_eq!(Outer(Inner(10)).to_string(), "10");
 assert_eq!("10".parse(), Ok(Outer(Inner(10))));
 ```
 
-## `#[from_str(new = ...)]`
-
-If `#[from_str(new = ...)]` is specified, the value will be initialized with the specified expression instead of the constructor.
-
-The expression must return a value that implement [`IntoResult`] (e.g. `Self`, `Option<Self>`, `Result<Self, E>`).
-
-In the expression, you can use a variable with the same name as the field name.
-
-```rust
-use parse_display::FromStr;
-#[derive(FromStr, Debug, PartialEq)]
-#[from_str(new = Self::new(value))]
-struct MyNonZeroUSize {
-    value: usize,
-}
-
-impl MyNonZeroUSize {
-    fn new(value: usize) -> Option<Self> {
-        if value == 0 {
-            None
-        } else {
-            Some(Self { value })
-        }
-    }
-}
-
-assert_eq!("1".parse(), Ok(MyNonZeroUSize { value: 1 }));
-assert_eq!("0".parse::<MyNonZeroUSize>().is_err(), true);
-```
-
-In tuple struct, variables are named with a leading underscore and their index. (e.g. `_0`, `_1`).
-
-```rust
-use parse_display::FromStr;
-#[derive(FromStr, Debug, PartialEq)]
-#[from_str(new = Self::new(_0))]
-struct MyNonZeroUSize(usize);
-
-impl MyNonZeroUSize {
-    fn new(value: usize) -> Option<Self> {
-        if value == 0 {
-            None
-        } else {
-            Some(Self(value))
-        }
-    }
-}
-
-assert_eq!("1".parse(), Ok(MyNonZeroUSize(1)));
-assert_eq!("0".parse::<MyNonZeroUSize>().is_err(), true);
-```
-
-## `#[from_str(ignore)]`
-
-Specifying this attribute for a variant will not generate `FromStr` implementation for that variant.
-
-```rust
-use parse_display::FromStr;
-
-#[derive(Debug, Eq, PartialEq)]
-struct CanNotFromStr;
-
-#[derive(FromStr, Debug, Eq, PartialEq)]
-#[allow(dead_code)]
-enum HasIgnore {
-    #[from_str(ignore)]
-    A(CanNotFromStr),
-    #[display("{0}")]
-    B(u32),
-}
-
-assert_eq!("1".parse(), Ok(HasIgnore::B(1)));
-```
-
 ## `#[from_str(regex = "...")]`
 
 Specify the format of the string to be input with `FromStr`.
@@ -627,6 +553,80 @@ assert_eq!("___10".parse(), Ok(FieldChain { x:MyStruct { a:10 } }));
 ```
 
 When using "field chain", you need to use [`#[from_str(default)]`](#from_strdefault).
+
+## `#[from_str(new = ...)]`
+
+If `#[from_str(new = ...)]` is specified, the value will be initialized with the specified expression instead of the constructor.
+
+The expression must return a value that implement [`IntoResult`] (e.g. `Self`, `Option<Self>`, `Result<Self, E>`).
+
+In the expression, you can use a variable with the same name as the field name.
+
+```rust
+use parse_display::FromStr;
+#[derive(FromStr, Debug, PartialEq)]
+#[from_str(new = Self::new(value))]
+struct MyNonZeroUSize {
+    value: usize,
+}
+
+impl MyNonZeroUSize {
+    fn new(value: usize) -> Option<Self> {
+        if value == 0 {
+            None
+        } else {
+            Some(Self { value })
+        }
+    }
+}
+
+assert_eq!("1".parse(), Ok(MyNonZeroUSize { value: 1 }));
+assert_eq!("0".parse::<MyNonZeroUSize>().is_err(), true);
+```
+
+In tuple struct, variables are named with a leading underscore and their index. (e.g. `_0`, `_1`).
+
+```rust
+use parse_display::FromStr;
+#[derive(FromStr, Debug, PartialEq)]
+#[from_str(new = Self::new(_0))]
+struct MyNonZeroUSize(usize);
+
+impl MyNonZeroUSize {
+    fn new(value: usize) -> Option<Self> {
+        if value == 0 {
+            None
+        } else {
+            Some(Self(value))
+        }
+    }
+}
+
+assert_eq!("1".parse(), Ok(MyNonZeroUSize(1)));
+assert_eq!("0".parse::<MyNonZeroUSize>().is_err(), true);
+```
+
+## `#[from_str(ignore)]`
+
+Specifying this attribute for a variant will not generate `FromStr` implementation for that variant.
+
+```rust
+use parse_display::FromStr;
+
+#[derive(Debug, Eq, PartialEq)]
+struct CanNotFromStr;
+
+#[derive(FromStr, Debug, Eq, PartialEq)]
+#[allow(dead_code)]
+enum HasIgnore {
+    #[from_str(ignore)]
+    A(CanNotFromStr),
+    #[display("{0}")]
+    B(u32),
+}
+
+assert_eq!("1".parse(), Ok(HasIgnore::B(1)));
+```
 
 ## `#[from_str(default)]`
 
