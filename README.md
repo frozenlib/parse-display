@@ -53,6 +53,7 @@ Helper attributes can be written in the following positions.
 | [`#[from_str(bound(...))]`](#from_strbound)                   | ✔      | ✔    | ✔       | ✔     |
 | [`#[from_str(regex = "...")]`](#from_strregex--)              | ✔      | ✔    | ✔       | ✔     |
 | [`#[from_str(new = ...)]`](#from_strnew--)                    | ✔      |      | ✔       |       |
+| [`#[from_str(ignore)]`](#from_strignore)                      |        |      | ✔       |       |
 | [`#[from_str(default)]`](#from_strdefault)                    | ✔      |      |         | ✔     |
 | [`#[from_str(default_fields(...))]`](#from_strdefault_fields) | ✔      | ✔    | ✔       |       |
 
@@ -505,6 +506,28 @@ impl MyNonZeroUSize {
 
 assert_eq!("1".parse(), Ok(MyNonZeroUSize(1)));
 assert_eq!("0".parse::<MyNonZeroUSize>().is_err(), true);
+```
+
+## `#[from_str(ignore)]`
+
+Specifying this attribute for a variant will not generate `FromStr` implementation for that variant.
+
+```rust
+use parse_display::FromStr;
+
+#[derive(Debug, Eq, PartialEq)]
+struct CanNotFromStr;
+
+#[derive(FromStr, Debug, Eq, PartialEq)]
+#[allow(dead_code)]
+enum HasIgnore {
+    #[from_str(ignore)]
+    A(CanNotFromStr),
+    #[display("{0}")]
+    B(u32),
+}
+
+assert_eq!("1".parse(), Ok(HasIgnore::B(1)));
 ```
 
 ## `#[from_str(regex = "...")]`
