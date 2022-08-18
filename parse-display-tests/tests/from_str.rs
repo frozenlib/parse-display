@@ -1046,7 +1046,7 @@ fn variant_ignore() {
     #[allow(dead_code)]
     enum HasIgnore {
         #[from_str(ignore)]
-        Y(CanNotFromStr),
+        A(CanNotFromStr),
         #[display("{0}")]
         B(String),
     }
