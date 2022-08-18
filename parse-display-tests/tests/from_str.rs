@@ -1037,6 +1037,22 @@ fn new_enum() {
     assert_from_str_err::<NonZeroEnum>("Y 0");
 }
 
+#[test]
+fn variant_ignore() {
+    #[derive(Debug, Eq, PartialEq)]
+    struct CanNotFromStr;
+
+    #[derive(FromStr, Debug, Eq, PartialEq)]
+    #[allow(dead_code)]
+    enum HasIgnore {
+        #[from_str(ignore)]
+        Y(CanNotFromStr),
+        #[display("{0}")]
+        B(String),
+    }
+    assert_from_str("123", HasIgnore::B("123".to_string()));
+}
+
 fn assert_from_str<T: FromStr + Debug + PartialEq>(s: &str, value: T)
 where
     <T as FromStr>::Err: Display,

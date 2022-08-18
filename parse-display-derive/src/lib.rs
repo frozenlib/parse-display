@@ -188,9 +188,12 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Toke
     let mut bodys = Vec::new();
     let mut arms = Vec::new();
     for variant in data.variants.iter() {
+        let hattrs_variant = HelperAttributes::from(&variant.attrs)?;
+        if hattrs_variant.ignore.value() {
+            continue;
+        }
         let variant_ident = &variant.ident;
         let constructor = parse_quote!(Self::#variant_ident);
-        let hattrs_variant = HelperAttributes::from(&variant.attrs)?;
         let p = ParserBuilder::from_variant(&hattrs_variant, &hattrs_enum, variant)?;
         let mut bounds = bounds.child(hattrs_variant.bound_from_str_resolved());
         p.build_bounds(&generics, &mut bounds);
@@ -679,6 +682,7 @@ struct FromStrArgs {
     bound: Option<Vec<Quotable<Bound>>>,
     default: Flag,
     default_fields: Option<Vec<Quotable<DefaultField>>>,
+    ignore: Flag,
     dump: bool,
 }
 
@@ -692,6 +696,7 @@ struct HelperAttributes {
     default_self: Option<Span>,
     default_fields: Vec<DefaultField>,
     new_expr: Option<Expr>,
+    ignore: Flag,
     dump_display: bool,
     dump_from_str: bool,
 }
@@ -706,6 +711,7 @@ impl HelperAttributes {
             new_expr: None,
             default_self: None,
             default_fields: Vec::new(),
+            ignore: Flag::NONE,
             dump_display: false,
             dump_from_str: false,
         };
@@ -762,6 +768,9 @@ impl HelperAttributes {
                     self.default_fields.push(field);
                 }
             }
+        }
+        if args.ignore.value() {
+            self.ignore = args.ignore;
         }
         self.dump_from_str |= args.dump;
     }
