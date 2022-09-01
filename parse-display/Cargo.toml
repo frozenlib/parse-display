@@ -13,8 +13,8 @@ edition = "2021"
 
 [dependencies]
 parse-display-derive = { version = "=0.5.5", path = "../parse-display-derive" }
-once_cell = { version = "1.7.2", optional = true }
-regex = { version = "1.5.5", optional = true }
+once_cell = { version = "1.13.1", optional = true }
+regex = { version = "1.6.0", optional = true }
 
 [features]
 default = ["std"]
