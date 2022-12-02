@@ -440,7 +440,7 @@ impl<'a> ParserBuilder<'a> {
         let code = self.build_parse_code(constructor)?;
         Ok(quote! {
             #code
-            Err(parse_display::ParseError::new())
+            core::result::Result::Err(parse_display::ParseError::new())
         })
     }
     fn build_parse_variant_code(&self, constructor: Path) -> Result<ParseVariantCode> {
@@ -452,8 +452,8 @@ impl<'a> ParserBuilder<'a> {
                     let #fn_ident = |s: &str| -> core::result::Result<Self, parse_display::ParseError> {
                         #code
                     };
-                    if let Ok(value) = #fn_ident(s) {
-                        return Ok(value);
+                    if let core::result::Result::Ok(value) = #fn_ident(s) {
+                        return core::result::Result::Ok(value);
                     }
                 };
                 Ok(ParseVariantCode::Statement(code))
@@ -475,8 +475,8 @@ impl<'a> ParserBuilder<'a> {
                 code.extend(quote! { let #var = #expr; });
             }
             code.extend(quote! {
-                if let Ok(value) = ::parse_display::IntoResult::into_result(#new_expr) {
-                    return Ok(value);
+                if let core::result::Result::Ok(value) = ::parse_display::IntoResult::into_result(#new_expr) {
+                    return core::result::Result::Ok(value);
                 }
             });
             code
@@ -489,7 +489,7 @@ impl<'a> ParserBuilder<'a> {
             quote! {
                 let mut value = <Self as core::default::Default>::default();
                 #(#setters)*
-                return Ok(value);
+                return core::result::Result::Ok(value);
             }
         } else {
             let ps = match &self.source {
@@ -510,7 +510,7 @@ impl<'a> ParserBuilder<'a> {
                 }
                 Fields::Unit => quote! {},
             };
-            quote! { return Ok(#constructor #ps); }
+            quote! { return core::result::Result::Ok(#constructor #ps); }
         };
         Ok(code)
     }
