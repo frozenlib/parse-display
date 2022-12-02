@@ -223,7 +223,7 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Toke
             fn from_str(s: &str) -> core::result::Result<Self, Self::Err> {
                 #match_body
                 #({ #bodys })*
-                Err(parse_display::ParseError::new())
+                core::result::Result::Err(parse_display::ParseError::new())
             }
         },
         hattrs_enum.dump_from_str,
