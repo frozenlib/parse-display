@@ -62,15 +62,15 @@ fn derive_display_for_struct(input: &DeriveInput, data: &DataStruct) -> Result<T
     };
     let mut bounds = Bounds::from_data(hattrs.bound_display);
     let args = format.format_args(ctx, &mut bounds, &generics)?;
-    let trait_path = parse_quote!(core::fmt::Display);
+    let trait_path = parse_quote!(::core::fmt::Display);
     let wheres = bounds.build_wheres(&trait_path);
     impl_trait_result(
         input,
         &trait_path,
         &wheres,
         quote! {
-            fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-                core::write!(f, #args)
+            fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
+                ::core::write!(f, #args)
             }
         },
         hattrs.dump_display,
@@ -124,7 +124,7 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Token
         )?;
         Ok(quote! {
             & Self::#variant_ident #fields => {
-                core::write!(f, #args)
+                ::core::write!(f, #args)
             },
         })
     }
@@ -135,9 +135,9 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Token
     for variant in &data.variants {
         arms.push(make_arm(&hattrs, variant, &mut bounds, &generics)?);
     }
-    let trait_path = parse_quote!(core::fmt::Display);
+    let trait_path = parse_quote!(::core::fmt::Display);
     let contents = quote! {
-        fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
             match self {
                 #(#arms)*
             }
@@ -163,15 +163,15 @@ fn derive_from_str_for_struct(input: &DeriveInput, data: &DataStruct) -> Result<
     let generics = GenericParamSet::new(&input.generics);
     let mut bounds = Bounds::from_data(hattrs.bound_from_str_resolved());
     p.build_bounds(&generics, &mut bounds);
-    let trait_path = parse_quote!(core::str::FromStr);
+    let trait_path = parse_quote!(::core::str::FromStr);
     let wheres = bounds.build_wheres(&trait_path);
     impl_trait_result(
         input,
         &trait_path,
         &wheres,
         quote! {
-            type Err = parse_display::ParseError;
-            fn from_str(s: &str) -> core::result::Result<Self, Self::Err> {
+            type Err = ::parse_display::ParseError;
+            fn from_str(s: &str) -> ::core::result::Result<Self, Self::Err> {
                 #body
             }
         },
@@ -212,18 +212,18 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Toke
             }
         }
     };
-    let trait_path = parse_quote!(core::str::FromStr);
+    let trait_path = parse_quote!(::core::str::FromStr);
     let wheres = bounds.build_wheres(&trait_path);
     impl_trait_result(
         input,
         &trait_path,
         &wheres,
         quote! {
-            type Err = parse_display::ParseError;
-            fn from_str(s: &str) -> core::result::Result<Self, Self::Err> {
+            type Err = ::parse_display::ParseError;
+            fn from_str(s: &str) -> ::core::result::Result<Self, Self::Err> {
                 #match_body
                 #({ #bodys })*
-                core::result::Result::Err(parse_display::ParseError::new())
+                ::core::result::Result::Err(::parse_display::ParseError::new())
             }
         },
         hattrs_enum.dump_from_str,
@@ -440,7 +440,7 @@ impl<'a> ParserBuilder<'a> {
         let code = self.build_parse_code(constructor)?;
         Ok(quote! {
             #code
-            core::result::Result::Err(parse_display::ParseError::new())
+            ::core::result::Result::Err(::parse_display::ParseError::new())
         })
     }
     fn build_parse_variant_code(&self, constructor: Path) -> Result<ParseVariantCode> {
@@ -449,11 +449,11 @@ impl<'a> ParserBuilder<'a> {
                 let fn_ident: Ident = format_ident!("parse_variant");
                 let code = self.build_from_str_body(constructor)?;
                 let code = quote! {
-                    let #fn_ident = |s: &str| -> core::result::Result<Self, parse_display::ParseError> {
+                    let #fn_ident = |s: &str| -> ::core::result::Result<Self, ::parse_display::ParseError> {
                         #code
                     };
-                    if let core::result::Result::Ok(value) = #fn_ident(s) {
-                        return core::result::Result::Ok(value);
+                    if let ::core::result::Result::Ok(value) = #fn_ident(s) {
+                        return ::core::result::Result::Ok(value);
                     }
                 };
                 Ok(ParseVariantCode::Statement(code))
@@ -475,8 +475,8 @@ impl<'a> ParserBuilder<'a> {
                 code.extend(quote! { let #var = #expr; });
             }
             code.extend(quote! {
-                if let core::result::Result::Ok(value) = ::parse_display::IntoResult::into_result(#new_expr) {
-                    return core::result::Result::Ok(value);
+                if let ::core::result::Result::Ok(value) = ::parse_display::IntoResult::into_result(#new_expr) {
+                    return ::core::result::Result::Ok(value);
                 }
             });
             code
@@ -487,9 +487,9 @@ impl<'a> ParserBuilder<'a> {
                 setters.push(field.build_setters(key, left_expr, true));
             }
             quote! {
-                let mut value = <Self as core::default::Default>::default();
+                let mut value = <Self as ::core::default::Default>::default();
                 #(#setters)*
-                return core::result::Result::Ok(value);
+                return ::core::result::Result::Ok(value);
             }
         } else {
             let ps = match &self.source {
@@ -510,7 +510,7 @@ impl<'a> ParserBuilder<'a> {
                 }
                 Fields::Unit => quote! {},
             };
-            quote! { return core::result::Result::Ok(#constructor #ps); }
+            quote! { return ::core::result::Result::Ok(#constructor #ps); }
         };
         Ok(code)
     }
@@ -521,8 +521,8 @@ impl<'a> ParserBuilder<'a> {
                 let regex = to_regex_string(hirs);
                 quote! {
                     #[allow(clippy::trivial_regex)]
-                    static RE: parse_display::helpers::once_cell::sync::Lazy<parse_display::helpers::regex::Regex> =
-                        parse_display::helpers::once_cell::sync::Lazy::new(|| parse_display::helpers::regex::Regex::new(#regex).unwrap());
+                    static RE: ::parse_display::helpers::once_cell::sync::Lazy<::parse_display::helpers::regex::Regex> =
+                        ::parse_display::helpers::once_cell::sync::Lazy::new(|| ::parse_display::helpers::regex::Regex::new(#regex).unwrap());
                     if let Some(c) = RE.captures(&s) {
                          #code
                     }
@@ -596,7 +596,7 @@ impl<'a> FieldEntry<'a> {
         if let Some(capture_name) = self.capture() {
             Some(build_parse_capture_expr(&key.to_string(), &capture_name))
         } else if self.use_default {
-            Some(quote! { core::default::Default::default() })
+            Some(quote! { ::core::default::Default::default() })
         } else {
             None
         }
@@ -1117,7 +1117,7 @@ impl<'a> DisplayContext<'a> {
             let tr = ps.format_type.trait_name();
             let tr: Ident = parse_str(tr).unwrap();
             if bounds.can_extend {
-                bounds.pred.push(parse_quote!(#ty : core::fmt::#tr));
+                bounds.pred.push(parse_quote!(#ty : ::core::fmt::#tr));
             }
         }
         Ok(self.field_expr(key))
@@ -1455,6 +1455,6 @@ fn build_parse_capture_expr(field_name: &str, capture_name: &str) -> TokenStream
         c.name(#capture_name)
             .map_or("", |m| m.as_str())
             .parse()
-            .map_err(|e| parse_display::ParseError::with_message(#msg))?
+            .map_err(|e| ::parse_display::ParseError::with_message(#msg))?
     }
 }
