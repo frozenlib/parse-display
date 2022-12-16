@@ -398,7 +398,7 @@ impl<'a> ParserBuilder<'a> {
                     }
                     let c = self.set_capture(context, &keys, format.span)?;
                     self.parse_format
-                        .push_hir(to_hir(&format!("(?P<{}>.*?)", c)));
+                        .push_hir(to_hir(&format!("(?P<{}>(?s:.*?))", c)));
                 }
             }
         }

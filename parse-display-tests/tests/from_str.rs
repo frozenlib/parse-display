@@ -696,6 +696,26 @@ fn private_in_public_non_generic() {
     assert_from_str("5", TestStructPrivateInPublic(TestStructPrivate(5)));
 }
 
+#[test]
+fn newline_struct() {
+    #[derive(FromStr, Debug, Eq, PartialEq)]
+    #[display("{0}")]
+    struct X(String);
+
+    assert_from_str("\n", X("\n".into()));
+}
+
+#[test]
+fn newline_enum() {
+    #[derive(FromStr, Debug, Eq, PartialEq)]
+    enum X {
+        #[display("{0}")]
+        A(String),
+    }
+
+    assert_from_str("\n", X::A("\n".into()));
+}
+
 #[derive(FromStr, Debug, Eq, PartialEq)]
 pub struct TestStructPrivateInPublic(TestStructPrivate);
 

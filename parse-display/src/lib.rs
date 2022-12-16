@@ -493,7 +493,7 @@
 //! ```
 //!
 //! If `#[from_str(regex = "...")]` is not set to field ,
-//! it operates in the same way as when `#[from_str(regex = ".*?")]` is set.
+//! it operates in the same way as when `#[from_str(regex = "(?s:.*?)")]` is set.
 //!
 //! ```rust
 //! use parse_display::FromStr;
