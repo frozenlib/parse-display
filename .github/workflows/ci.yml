@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Build
         run: cargo build --verbose
       - name: Build tests
@@ -21,12 +21,8 @@ jobs:
         run: cargo clippy --all-features --tests --lib -- -W clippy::all
         env:
           RUSTFLAGS: -D warnings
-      - name: Install latest nightly
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly
-          override: true
-          components: rustfmt, clippy
+      - name: Rustup toolchain install nightly
+        run: rustup toolchain install nightly
       - name: Set minimal versions
         run: cargo +nightly update -Z minimal-versions
       - name: Build tests (minimal versions)
