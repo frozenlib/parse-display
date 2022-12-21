@@ -2,5 +2,8 @@
     "cSpell.words": [
         "varb",
         "VARC"
-    ]
+    ],
+    "markdownlint.config": {
+        "MD024": false
+    },
 }
