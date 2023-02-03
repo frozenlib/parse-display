@@ -146,7 +146,7 @@
     {
       "type": "shell",
       "label": "cargo fix & fmt",
-      "command": "cargo fix && cargo fmt",
+      "command": "cargo fix && cargo clippy --fix --allow-dirty && cargo fmt",
       "problemMatcher": [
         "$rustc"
       ],
