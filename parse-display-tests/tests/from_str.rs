@@ -1078,15 +1078,12 @@ where
     <T as FromStr>::Err: Display,
 {
     match s.parse::<T>() {
-        Ok(a) => assert_eq!(a, value, "input = \"{}\"", s),
-        Err(e) => panic!("\"{}\" parse failed. ({})", s, e),
+        Ok(a) => assert_eq!(a, value, "input = \"{s}\""),
+        Err(e) => panic!("\"{s}\" parse failed. ({e})"),
     }
 }
 fn assert_from_str_err<T: FromStr + Debug>(s: &str) {
     if let Ok(a) = s.parse::<T>() {
-        panic!(
-            "from_str(\"{}\") should return Err. but return `{:?}`.",
-            s, a
-        );
+        panic!("from_str(\"{s}\") should return Err. but return `{a:?}`.");
     }
 }

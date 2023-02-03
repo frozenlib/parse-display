@@ -972,6 +972,6 @@ fn format_spec_is_empty() {
 }
 
 fn assert_display<T: core::fmt::Display>(value: T, display: &str) {
-    let value_display = alloc::format!("{}", value);
+    let value_display = alloc::format!("{value}");
     assert_eq!(value_display, display);
 }

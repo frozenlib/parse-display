@@ -433,6 +433,6 @@ mod tests {
     }
 
     fn assert_ps<'a>(s: &'a str, ps: FormatSpec<'a>) {
-        assert_eq!(FormatSpec::parse(s), Ok(ps), "input : {}", s);
+        assert_eq!(FormatSpec::parse(s), Ok(ps), "input : {s}");
     }
 }

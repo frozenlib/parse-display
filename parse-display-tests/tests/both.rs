@@ -26,11 +26,11 @@ fn assert_both<T: Display + FromStr + PartialEq + Debug>(s: &str, value: T)
 where
     <T as FromStr>::Err: Display,
 {
-    let value_display = format!("{}", value);
+    let value_display = format!("{value}");
     assert_eq!(value_display, s);
 
     match s.parse::<T>() {
-        Ok(a) => assert_eq!(a, value, "input = \"{}\"", s),
-        Err(e) => panic!("\"{}\" parse failed. ({})", s, e),
+        Ok(a) => assert_eq!(a, value, "input = \"{s}\""),
+        Err(e) => panic!("\"{s}\" parse failed. ({e})"),
     }
 }

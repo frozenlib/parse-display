@@ -338,7 +338,7 @@ impl<'a> ParserBuilder<'a> {
                 key.replace('.', "_")
             };
             let key = REGEX_NUMBER.replace(&key, "_$0");
-            format!("(?P<{}>", key)
+            format!("(?P<{key}>")
         });
         if let Err(e) = regex_syntax::ast::parse::Parser::new().parse(&text_debug) {
             bail!(s.span(), "{}", e)
@@ -353,7 +353,7 @@ impl<'a> ParserBuilder<'a> {
             if name == CAPTURE_NAME_EMPTY {
                 has_capture_empty = true;
             }
-            Ok(format!("(?P<{}>", name))
+            Ok(format!("(?P<{name}>"))
         })?;
 
         if has_capture_empty {
@@ -398,7 +398,7 @@ impl<'a> ParserBuilder<'a> {
                     }
                     let c = self.set_capture(context, &keys, format.span)?;
                     self.parse_format
-                        .push_hir(to_hir(&format!("(?P<{}>(?s:.*?))", c)));
+                        .push_hir(to_hir(&format!("(?P<{c}>(?s:.*?))")));
                 }
             }
         }
@@ -1373,16 +1373,16 @@ impl FieldKey {
     fn to_member(&self) -> Member {
         match self {
             FieldKey::Named(s) => Member::Named(format_ident!("r#{}", s)),
-            FieldKey::Unnamed(idx) => Member::Unnamed(parse_str(&format!("{}", idx)).unwrap()),
+            FieldKey::Unnamed(idx) => Member::Unnamed(parse_str(&format!("{idx}")).unwrap()),
         }
     }
     fn binding_var(&self) -> Ident {
-        parse_str(&format!("_value_{}", self)).unwrap()
+        parse_str(&format!("_value_{self}")).unwrap()
     }
     fn new_arg_var(&self) -> Ident {
         match self {
             Self::Named(s) => parse_str(s),
-            Self::Unnamed(idx) => parse_str(&format!("_{}", idx)),
+            Self::Unnamed(idx) => parse_str(&format!("_{idx}")),
         }
         .unwrap()
     }
@@ -1390,8 +1390,8 @@ impl FieldKey {
 impl std::fmt::Display for FieldKey {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            FieldKey::Named(s) => write!(f, "{}", s),
-            FieldKey::Unnamed(idx) => write!(f, "{}", idx),
+            FieldKey::Named(s) => write!(f, "{s}"),
+            FieldKey::Unnamed(idx) => write!(f, "{idx}"),
         }
     }
 }
@@ -1419,7 +1419,7 @@ fn join<T: std::fmt::Display>(s: impl IntoIterator<Item = T>, sep: &str) -> Stri
     let mut sep_current = "";
     let mut buf = String::new();
     for i in s.into_iter() {
-        write!(&mut buf, "{}{}", sep_current, i).unwrap();
+        write!(&mut buf, "{sep_current}{i}").unwrap();
         sep_current = sep;
     }
     buf
@@ -1446,11 +1446,11 @@ fn field_of<'a, 'b>(
 
 const CAPTURE_NAME_EMPTY: &str = "empty";
 fn capture_name(idx: usize) -> String {
-    format!("value_{}", idx)
+    format!("value_{idx}")
 }
 
 fn build_parse_capture_expr(field_name: &str, capture_name: &str) -> TokenStream {
-    let msg = format!("field `{}` parse failed.", field_name);
+    let msg = format!("field `{field_name}` parse failed.");
     quote! {
         c.name(#capture_name)
             .map_or("", |m| m.as_str())
