@@ -37,8 +37,9 @@ pub enum SubArg<'a, T> {
     Input,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Default)]
 pub enum FormatType {
+    #[default]
     Display,
     Debug,
     DebugUpperHex,
@@ -64,12 +65,6 @@ impl FormatType {
             FormatType::LowerExp => "LowerExp",
             FormatType::UpperExp => "UpperExp",
         }
-    }
-}
-
-impl Default for FormatType {
-    fn default() -> Self {
-        FormatType::Display
     }
 }
 
