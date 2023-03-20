@@ -159,18 +159,19 @@ pub fn derive_from_str(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
 fn derive_from_str_for_struct(input: &DeriveInput, data: &DataStruct) -> Result<TokenStream> {
     let hattrs = HelperAttributes::from(&input.attrs)?;
     let p = ParserBuilder::from_struct(&hattrs, data)?;
-    let body = p.build_from_str_body(parse_quote!(Self))?;
+    let crate_path = &hattrs.crate_path;
+    let trait_path = parse_quote!(::core::str::FromStr);
+    let body = p.build_from_str_body(crate_path, parse_quote!(Self))?;
     let generics = GenericParamSet::new(&input.generics);
     let mut bounds = Bounds::from_data(hattrs.bound_from_str_resolved());
     p.build_bounds(&generics, &mut bounds);
-    let trait_path = parse_quote!(::core::str::FromStr);
     let wheres = bounds.build_wheres(&trait_path);
     impl_trait_result(
         input,
         &trait_path,
         &wheres,
         quote! {
-            type Err = ::parse_display::ParseError;
+            type Err = #crate_path::ParseError;
             fn from_str(s: &str) -> ::core::result::Result<Self, Self::Err> {
                 #body
             }
@@ -183,6 +184,8 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Toke
     if let Some(span) = hattrs_enum.default_self {
         bail!(span, "`#[from_str(default)]` cannot be specified for enum.");
     }
+    let crate_path = &hattrs_enum.crate_path;
+    let trait_path = parse_quote!(::core::str::FromStr);
     let mut bounds = Bounds::from_data(hattrs_enum.bound_from_str_resolved());
     let generics = GenericParamSet::new(&input.generics);
     let mut bodys = Vec::new();
@@ -197,7 +200,7 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Toke
         let p = ParserBuilder::from_variant(&hattrs_variant, &hattrs_enum, variant)?;
         let mut bounds = bounds.child(hattrs_variant.bound_from_str_resolved());
         p.build_bounds(&generics, &mut bounds);
-        match p.build_parse_variant_code(constructor)? {
+        match p.build_parse_variant_code(crate_path, constructor)? {
             ParseVariantCode::MatchArm(arm) => arms.push(arm),
             ParseVariantCode::Statement(body) => bodys.push(body),
         }
@@ -212,18 +215,17 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Toke
             }
         }
     };
-    let trait_path = parse_quote!(::core::str::FromStr);
     let wheres = bounds.build_wheres(&trait_path);
     impl_trait_result(
         input,
         &trait_path,
         &wheres,
         quote! {
-            type Err = ::parse_display::ParseError;
+            type Err = #crate_path::ParseError;
             fn from_str(s: &str) -> ::core::result::Result<Self, Self::Err> {
                 #match_body
                 #({ #bodys })*
-                ::core::result::Result::Err(::parse_display::ParseError::new())
+                ::core::result::Result::Err(#crate_path::ParseError::new())
             }
         },
         hattrs_enum.dump_from_str,
@@ -436,20 +438,24 @@ impl<'a> ParserBuilder<'a> {
         })
     }
 
-    fn build_from_str_body(&self, constructor: Path) -> Result<TokenStream> {
-        let code = self.build_parse_code(constructor)?;
+    fn build_from_str_body(&self, crate_path: &Path, constructor: Path) -> Result<TokenStream> {
+        let code = self.build_parse_code(crate_path, constructor)?;
         Ok(quote! {
             #code
-            ::core::result::Result::Err(::parse_display::ParseError::new())
+            ::core::result::Result::Err(#crate_path::ParseError::new())
         })
     }
-    fn build_parse_variant_code(&self, constructor: Path) -> Result<ParseVariantCode> {
+    fn build_parse_variant_code(
+        &self,
+        crate_path: &Path,
+        constructor: Path,
+    ) -> Result<ParseVariantCode> {
         match &self.parse_format {
             ParseFormat::Hirs(_) => {
                 let fn_ident: Ident = format_ident!("parse_variant");
-                let code = self.build_from_str_body(constructor)?;
+                let code = self.build_from_str_body(crate_path, constructor)?;
                 let code = quote! {
-                    let #fn_ident = |s: &str| -> ::core::result::Result<Self, ::parse_display::ParseError> {
+                    let #fn_ident = |s: &str| -> ::core::result::Result<Self, #crate_path::ParseError> {
                         #code
                     };
                     if let ::core::result::Result::Ok(value) = #fn_ident(s) {
@@ -459,23 +465,23 @@ impl<'a> ParserBuilder<'a> {
                 Ok(ParseVariantCode::Statement(code))
             }
             ParseFormat::String(s) => {
-                let code = self.build_construct_code(constructor)?;
+                let code = self.build_construct_code(crate_path, constructor)?;
                 let code = quote! { #s  => { #code }};
                 Ok(ParseVariantCode::MatchArm(code))
             }
         }
     }
 
-    fn build_construct_code(&self, constructor: Path) -> Result<TokenStream> {
+    fn build_construct_code(&self, crate_path: &Path, constructor: Path) -> Result<TokenStream> {
         let code = if let Some(new_expr) = &self.new_expr {
             let mut code = TokenStream::new();
             for (key, field) in &self.fields {
-                let expr = field.build_field_init_expr(key, self.span)?;
+                let expr = field.build_field_init_expr(crate_path, key, self.span)?;
                 let var = key.new_arg_var();
                 code.extend(quote! { let #var = #expr; });
             }
             code.extend(quote! {
-                if let ::core::result::Result::Ok(value) = ::parse_display::IntoResult::into_result(#new_expr) {
+                if let ::core::result::Result::Ok(value) = #crate_path::IntoResult::into_result(#new_expr) {
                     return ::core::result::Result::Ok(value);
                 }
             });
@@ -484,7 +490,7 @@ impl<'a> ParserBuilder<'a> {
             let mut setters = Vec::new();
             for (key, field) in &self.fields {
                 let left_expr = quote! { value . #key };
-                setters.push(field.build_setters(key, left_expr, true));
+                setters.push(field.build_setters(crate_path, key, left_expr, true));
             }
             quote! {
                 let mut value = <Self as ::core::default::Default>::default();
@@ -496,7 +502,7 @@ impl<'a> ParserBuilder<'a> {
                 Fields::Named(..) => {
                     let mut fields_code = Vec::new();
                     for (key, field) in &self.fields {
-                        let expr = field.build_field_init_expr(key, self.span)?;
+                        let expr = field.build_field_init_expr(crate_path, key, self.span)?;
                         fields_code.push(quote! { #key : #expr })
                     }
                     quote! { { #(#fields_code,)* } }
@@ -504,7 +510,7 @@ impl<'a> ParserBuilder<'a> {
                 Fields::Unnamed(..) => {
                     let mut fields_code = Vec::new();
                     for (key, field) in &self.fields {
-                        fields_code.push(field.build_field_init_expr(key, self.span)?);
+                        fields_code.push(field.build_field_init_expr(crate_path, key, self.span)?);
                     }
                     quote! { ( #(#fields_code,)* ) }
                 }
@@ -514,15 +520,15 @@ impl<'a> ParserBuilder<'a> {
         };
         Ok(code)
     }
-    fn build_parse_code(&self, constructor: Path) -> Result<TokenStream> {
-        let code = self.build_construct_code(constructor)?;
+    fn build_parse_code(&self, crate_path: &Path, constructor: Path) -> Result<TokenStream> {
+        let code = self.build_construct_code(crate_path, constructor)?;
         let code = match &self.parse_format {
             ParseFormat::Hirs(hirs) => {
                 let regex = to_regex_string(hirs);
                 quote! {
                     #[allow(clippy::trivial_regex)]
-                    static RE: ::parse_display::helpers::once_cell::sync::Lazy<::parse_display::helpers::regex::Regex> =
-                        ::parse_display::helpers::once_cell::sync::Lazy::new(|| ::parse_display::helpers::regex::Regex::new(#regex).unwrap());
+                    static RE: #crate_path::helpers::once_cell::sync::Lazy<#crate_path::helpers::regex::Regex> =
+                        #crate_path::helpers::once_cell::sync::Lazy::new(|| #crate_path::helpers::regex::Regex::new(#regex).unwrap());
                     if let Some(c) = RE.captures(&s) {
                          #code
                     }
@@ -592,9 +598,13 @@ impl<'a> FieldEntry<'a> {
     fn capture(&self) -> Option<String> {
         self.capture.map(capture_name)
     }
-    fn build_expr(&self, key: &FieldKey) -> Option<TokenStream> {
+    fn build_expr(&self, crate_path: &Path, key: &FieldKey) -> Option<TokenStream> {
         if let Some(capture_name) = self.capture() {
-            Some(build_parse_capture_expr(&key.to_string(), &capture_name))
+            Some(build_parse_capture_expr(
+                crate_path,
+                &key.to_string(),
+                &capture_name,
+            ))
         } else if self.use_default {
             Some(quote! { ::core::default::Default::default() })
         } else {
@@ -603,28 +613,34 @@ impl<'a> FieldEntry<'a> {
     }
     fn build_setters(
         &self,
+        crate_path: &Path,
         key: &FieldKey,
         left_expr: TokenStream,
         include_self: bool,
     ) -> TokenStream {
         let mut setters = Vec::new();
         if include_self {
-            if let Some(expr) = self.build_expr(key) {
+            if let Some(expr) = self.build_expr(crate_path, key) {
                 setters.push(quote! { #left_expr = #expr; });
             }
         }
         for (keys, idx) in &self.deep_captures {
             let field_name = key.to_string() + &join(keys, ".");
-            let expr = build_parse_capture_expr(&field_name, &capture_name(*idx));
+            let expr = build_parse_capture_expr(crate_path, &field_name, &capture_name(*idx));
             setters.push(quote! { #left_expr #(.#keys)* = #expr; });
         }
         quote! { #(#setters)* }
     }
 
-    fn build_field_init_expr(&self, key: &FieldKey, span: Span) -> Result<TokenStream> {
-        if let Some(mut expr) = self.build_expr(key) {
+    fn build_field_init_expr(
+        &self,
+        crate_path: &Path,
+        key: &FieldKey,
+        span: Span,
+    ) -> Result<TokenStream> {
+        if let Some(mut expr) = self.build_expr(crate_path, key) {
             if !self.deep_captures.is_empty() {
-                let setters = self.build_setters(key, quote!(field_value), false);
+                let setters = self.build_setters(crate_path, key, quote!(field_value), false);
                 let ty = &self.source.ty;
                 expr = quote! {
                     {
@@ -659,6 +675,8 @@ struct DisplayArgs {
     format: Option<LitStr>,
     style: Option<LitStr>,
     bound: Option<Vec<Quotable<Bound>>>,
+    #[struct_meta(name = "crate")]
+    crate_path: Option<Path>,
     dump: bool,
 }
 
@@ -699,6 +717,7 @@ struct HelperAttributes {
     ignore: Flag,
     dump_display: bool,
     dump_from_str: bool,
+    crate_path: Path,
 }
 impl HelperAttributes {
     fn from(attrs: &[Attribute]) -> Result<Self> {
@@ -714,6 +733,7 @@ impl HelperAttributes {
             ignore: Flag::NONE,
             dump_display: false,
             dump_from_str: false,
+            crate_path: parse_quote!(::parse_display),
         };
         for a in attrs {
             if a.path.is_ident("display") {
@@ -739,6 +759,9 @@ impl HelperAttributes {
                     list.push(bound);
                 }
             }
+        }
+        if let Some(crate_path) = &args.crate_path {
+            self.crate_path = crate_path.clone();
         }
         self.dump_from_str |= args.dump;
         self.dump_display |= args.dump;
@@ -1048,7 +1071,7 @@ impl<'a> DisplayContext<'a> {
                     bounds,
                     generics,
                 )?,
-                DisplayContext::Variant { variant, style } => {
+                DisplayContext::Variant { variant, style, .. } => {
                     let s = style.apply(&variant.ident);
                     quote! { #s }
                 }
@@ -1449,12 +1472,16 @@ fn capture_name(idx: usize) -> String {
     format!("value_{idx}")
 }
 
-fn build_parse_capture_expr(field_name: &str, capture_name: &str) -> TokenStream {
+fn build_parse_capture_expr(
+    crate_path: &Path,
+    field_name: &str,
+    capture_name: &str,
+) -> TokenStream {
     let msg = format!("field `{field_name}` parse failed.");
     quote! {
         c.name(#capture_name)
             .map_or("", |m| m.as_str())
             .parse()
-            .map_err(|e| ::parse_display::ParseError::with_message(#msg))?
+            .map_err(|e| #crate_path::ParseError::with_message(#msg))?
     }
 }

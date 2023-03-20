@@ -693,6 +693,9 @@
 use core::convert::Infallible;
 use core::fmt::{Display, Formatter, Result};
 
+#[cfg(test)]
+mod tests;
+
 #[cfg(feature = "std")]
 pub mod helpers {
     pub use once_cell;
