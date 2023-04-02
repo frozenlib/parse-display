@@ -736,10 +736,10 @@ impl HelperAttributes {
             crate_path: parse_quote!(::parse_display),
         };
         for a in attrs {
-            if a.path.is_ident("display") {
+            if a.path().is_ident("display") {
                 hattrs.set_display_args(a.parse_args()?)?;
             }
-            if a.path.is_ident("from_str") {
+            if a.path().is_ident("from_str") {
                 hattrs.set_from_str_args(a.parse_args()?);
             }
         }

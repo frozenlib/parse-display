@@ -15,10 +15,10 @@ edition = "2021"
 proc-macro = true
 
 [dependencies]
-syn = { version = "1.0.99", features = ["visit"] }
-quote = "1.0.21"
-proc-macro2 = "1.0.43"
-regex = "1.6.0"
-regex-syntax = "0.6.27"
-once_cell = "1.13.1"
-structmeta = "0.1.5"
+syn = { version = "2.0.13", features = ["visit"] }
+quote = "1.0.26"
+proc-macro2 = "1.0.55"
+regex = "1.7.3"
+regex-syntax = "0.6.29"
+once_cell = "1.17.1"
+structmeta = "0.2.0"
