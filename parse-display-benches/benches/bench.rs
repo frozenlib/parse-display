@@ -69,6 +69,10 @@ fn parse_non_regex_format_struct_derive(b: &mut test::Bencher) {
         c: 30,
     }
     .to_string();
+
+    // The first run is excluded from the benchmark because of the time required to initialize the regex.
+    let _ = input.parse::<TestInput>().unwrap();
+
     b.iter(|| {
         black_box(input.parse::<TestInput>().unwrap());
     });
