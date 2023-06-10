@@ -49,6 +49,7 @@ Helper attributes can be written in the following positions.
 | ------------------------------------------------------------- | ------ | ---- | ------- | ----- |
 | [`#[display("...")]`](#display)                               | ✔      | ✔    | ✔       | ✔     |
 | [`#[display(style = "...")]`](#displaystyle--)                |        | ✔    | ✔       |       |
+| [`#[display(crate = ...)]`](#displaycrate--)                  | ✔      | ✔    |         |       |
 | [`#[display(bound(...))]`](#displaybound)                     | ✔      | ✔    | ✔       | ✔     |
 | [`#[from_str(bound(...))]`](#from_strbound)                   | ✔      | ✔    | ✔       | ✔     |
 | [`#[from_str(regex = "...")]`](#from_strregex--)              | ✔      | ✔    | ✔       | ✔     |
@@ -343,6 +344,12 @@ assert_eq!(StyleExample::VarK.to_string(), "Var k");
 assert_eq!(StyleExample::VarL.to_string(), "var l");
 assert_eq!(StyleExample::VarM.to_string(), "VAR M");
 ```
+
+## `#[display(crate = ...)]`
+
+Specify a path to the `parse-display` crate instance.
+
+Used when `::parse_display` is not an instance of `parse-display`, such as when a macro is re-exported or used from another macro.
 
 ## `#[display(bound(...))]`
 
