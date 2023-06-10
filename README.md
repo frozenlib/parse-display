@@ -13,7 +13,7 @@ Add this to your Cargo.toml:
 
 ```toml
 [dependencies]
-parse-display = "0.8.0"
+parse-display = "0.8.1"
 ```
 
 ## Example
