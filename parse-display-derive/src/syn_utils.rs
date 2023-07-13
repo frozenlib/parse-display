@@ -13,14 +13,14 @@ use syn::{
 };
 
 macro_rules! bail {
-    ($span:expr, $message:literal $(,)?) => {
-        return std::result::Result::Err(syn::Error::new($span, $message))
+    (_, $($arg:tt)*) => {
+        bail!(::proc_macro2::Span::call_site(), $($arg)*)
     };
-    ($span:expr, $err:expr $(,)?) => {
-        return std::result::Result::Err(syn::Error::new($span, $err))
+    ($span:expr, $fmt:literal $(,)?) => {
+        return ::std::result::Result::Err(::syn::Error::new($span, ::std::format!($fmt)))
     };
-    ($span:expr, $fmt:expr, $($arg:tt)*) => {
-        return std::result::Result::Err(syn::Error::new($span, std::format!($fmt, $($arg)*)))
+    ($span:expr, $fmt:literal, $($arg:tt)*) => {
+        return ::std::result::Result::Err(::syn::Error::new($span, ::std::format!($fmt, $($arg)*)))
     };
 }
 

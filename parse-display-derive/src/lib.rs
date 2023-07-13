@@ -329,18 +329,18 @@ impl<'a> ParserBuilder<'a> {
     }
 
     fn push_regex(&mut self, s: &LitStr, context: &DisplayContext) -> Result<()> {
-        static REGEX_CAPTURE: Lazy<Regex> = lazy_regex!(r"\(\?P?<([_0-9a-zA-Z.]*)>");
+        static REGEX_CAPTURE: Lazy<Regex> = lazy_regex!(r"\(\?(P?)<([_0-9a-zA-Z.]*)>");
         static REGEX_NUMBER: Lazy<Regex> = lazy_regex!("^[0-9]+$");
         let text = s.value();
         let text_debug = REGEX_CAPTURE.replace_all(&text, |c: &Captures| {
-            let key = c.get(1).unwrap().as_str();
+            let key = c.get(2).unwrap().as_str();
             let key = if key.is_empty() {
                 "self".into()
             } else {
                 key.replace('.', "_")
             };
             let key = REGEX_NUMBER.replace(&key, "_$0");
-            format!("(?P<{key}>")
+            format!("(?<{key}>")
         });
         if let Err(e) = regex_syntax::ast::parse::Parser::new().parse(&text_debug) {
             bail!(s.span(), "{}", e)
@@ -348,14 +348,19 @@ impl<'a> ParserBuilder<'a> {
 
         let mut has_capture = false;
         let mut has_capture_empty = false;
+        let mut p = "";
         let mut text = try_replace_all(&REGEX_CAPTURE, &text, |c: &Captures| -> Result<String> {
             has_capture = true;
-            let keys = FieldKey::from_str_deep(c.get(1).unwrap().as_str());
+            let cp = c.get(1).unwrap().as_str();
+            let keys = FieldKey::from_str_deep(c.get(2).unwrap().as_str());
             let name = self.set_capture(context, &keys, s.span())?;
             if name == CAPTURE_NAME_EMPTY {
+                if !cp.is_empty() {
+                    p = "P";
+                }
                 has_capture_empty = true;
             }
-            Ok(format!("(?P<{name}>"))
+            Ok(format!("(?<{name}>"))
         })?;
 
         if has_capture_empty {
@@ -367,14 +372,14 @@ impl<'a> ParserBuilder<'a> {
             } else {
                 bail!(
                     s.span(),
-                    "`(?P<>)` (empty capture name) is not allowed in struct's regex."
+                    "`(?{p}<>)` (empty capture name) is not allowed in struct's regex."
                 );
             }
         }
         if let DisplayContext::Field { .. } = context {
             if !has_capture {
                 let name = self.set_capture(context, &[], s.span())?;
-                text = format!("(?P<{}>{})", name, &text);
+                text = format!("(?<{}>{})", name, &text);
             }
         }
         self.parse_format.push_hir(to_hir(&text));
@@ -400,7 +405,7 @@ impl<'a> ParserBuilder<'a> {
                     }
                     let c = self.set_capture(context, &keys, format.span)?;
                     self.parse_format
-                        .push_hir(to_hir(&format!("(?P<{c}>(?s:.*?))")));
+                        .push_hir(to_hir(&format!("(?<{c}>(?s:.*?))")));
                 }
             }
         }
@@ -848,7 +853,7 @@ impl DisplayStyle {
         \"title case\", \
         \"TITLE CASE\"";
         match Self::parse(&s.value()) {
-            Err(_) => bail!(s.span(), ERROR_MESSAGE),
+            Err(_) => bail!(s.span(), "{ERROR_MESSAGE}"),
             Ok(value) => Ok(value),
         }
     }
@@ -1062,7 +1067,9 @@ impl<'a> DisplayContext<'a> {
         let keys = FieldKey::from_str_deep(arg);
         if keys.is_empty() {
             return Ok(match self {
-                DisplayContext::Struct { .. } => bail!(span, "{} is not allowed in struct format."),
+                DisplayContext::Struct { .. } => {
+                    bail!(span, "{{}} is not allowed in struct format.")
+                }
                 DisplayContext::Field { parent, field, key } => parent.format_arg_by_field_expr(
                     key,
                     field,

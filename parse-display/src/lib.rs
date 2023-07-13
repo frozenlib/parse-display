@@ -471,7 +471,7 @@
 //! use parse_display::FromStr;
 //!
 //! #[derive(FromStr, PartialEq, Debug)]
-//! #[from_str(regex = "(?P<a>[0-9]+)__(?P<b>[0-9]+)")]
+//! #[from_str(regex = "(?<a>[0-9]+)__(?<b>[0-9]+)")]
 //! struct MyStruct {
 //!   a: u8,
 //!   b: u8,
@@ -522,11 +522,11 @@
 //! use parse_display::FromStr;
 //!
 //! #[derive(FromStr, PartialEq, Debug)]
-//! #[from_str(regex = "___(?P<>)___")]
+//! #[from_str(regex = "___(?<>)___")]
 //! enum MyEnum {
 //!   VarA,
 //!
-//!   #[from_str(regex = "xxx(?P<>)xxx")]
+//!   #[from_str(regex = "xxx(?<>)xxx")]
 //!   VarB,
 //! }
 //! assert_eq!("___VarA___".parse(), Ok(MyEnum::VarA));
@@ -546,7 +546,7 @@
 //! }
 //!
 //! #[derive(FromStr, PartialEq, Debug)]
-//! #[from_str(regex = "___(?P<x.a>[0-9]+)")]
+//! #[from_str(regex = "___(?<x.a>[0-9]+)")]
 //! struct FieldChain {
 //!   #[from_str(default)]
 //!   x: MyStruct,

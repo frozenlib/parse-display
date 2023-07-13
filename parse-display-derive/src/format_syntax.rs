@@ -90,21 +90,21 @@ impl<'a> FormatSpec<'a> {
     pub fn parse(s: &'a str) -> std::result::Result<Self, FormatParseError> {
         static RE: Lazy<Regex> = lazy_regex!(
             "^\
-             ((?P<fill>.)?\
-             (?P<align>[<>^]))??\
-             (?P<sign>[+-])?\
-             (?P<is_alternate>#)?\
-             (?P<is_zero>0)?\
+             ((?<fill>.)?\
+             (?<align>[<>^]))??\
+             (?<sign>[+-])?\
+             (?<is_alternate>#)?\
+             (?<is_zero>0)?\
              (\
-             (?P<width_integer>[0-9]+)|\
-             ((?P<width_arg>[a-zA-Z0-9_]+)\\$)\
+             (?<width_integer>[0-9]+)|\
+             ((?<width_arg>[a-zA-Z0-9_]+)\\$)\
              )?\
              (\\.(\
-             (?P<precision_input>\\*)|\
-             (?P<precision_integer>[0-9]+)|\
-             ((?P<precision_arg>[a-zA-Z0-9_]+)\\$)\
+             (?<precision_input>\\*)|\
+             (?<precision_integer>[0-9]+)|\
+             ((?<precision_arg>[a-zA-Z0-9_]+)\\$)\
              ))?\
-             (?P<format_type>[a-zA-Z0-9_]*\\??)\
+             (?<format_type>[a-zA-Z0-9_]*\\??)\
              $"
         );
 
