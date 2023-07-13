@@ -329,7 +329,7 @@ impl<'a> ParserBuilder<'a> {
     }
 
     fn push_regex(&mut self, s: &LitStr, context: &DisplayContext) -> Result<()> {
-        static REGEX_CAPTURE: Lazy<Regex> = lazy_regex!(r"\(\?P<([_0-9a-zA-Z.]*)>");
+        static REGEX_CAPTURE: Lazy<Regex> = lazy_regex!(r"\(\?P?<([_0-9a-zA-Z.]*)>");
         static REGEX_NUMBER: Lazy<Regex> = lazy_regex!("^[0-9]+$");
         let text = s.value();
         let text_debug = REGEX_CAPTURE.replace_all(&text, |c: &Captures| {
