@@ -26,13 +26,11 @@ fn to_ast(s: &str) -> Ast {
 }
 
 pub fn push_str(hirs: &mut Vec<Hir>, s: &str) {
-    for c in s.chars() {
-        hirs.push(Hir::literal(regex_syntax::hir::Literal::Unicode(c)));
-    }
+    hirs.push(Hir::literal(s.as_bytes()));
 }
 pub fn to_regex_string(hirs: &[Hir]) -> String {
     let mut hirs = hirs.to_vec();
-    hirs.push(Hir::anchor(regex_syntax::hir::Anchor::EndText));
+    hirs.push(Hir::look(regex_syntax::hir::Look::End));
     Hir::concat(hirs).to_string()
 }
 
@@ -64,7 +62,7 @@ fn expand_capture(ast: &mut Ast, mut f: impl FnMut(&str) -> Option<Ast>) {
     replace_ast(ast, &mut |ast| {
         use regex_syntax::ast::*;
         if let Ast::Group(g) = &ast {
-            if let GroupKind::CaptureName(name) = &g.kind {
+            if let GroupKind::CaptureName { name, .. } = &g.kind {
                 if let Some(ast_new) = f(&name.name) {
                     *ast = ast_new;
                     return false;

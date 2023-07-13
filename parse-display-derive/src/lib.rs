@@ -1208,7 +1208,7 @@ impl ParseFormat {
         match self {
             Self::Hirs(_) => {}
             Self::String(s) => {
-                let mut hirs = vec![Hir::anchor(regex_syntax::hir::Anchor::StartText)];
+                let mut hirs = vec![Hir::look(regex_syntax::hir::Look::Start)];
                 push_str(&mut hirs, s);
                 std::mem::swap(self, &mut Self::Hirs(hirs));
             }
