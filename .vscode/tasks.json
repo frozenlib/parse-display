@@ -160,7 +160,10 @@
       "label": "cargo bench",
       "command": "cargo",
       "args": [
-        "bench"
+        "+nightly",
+        "bench",
+        "--target-dir",
+        "target/bench",
       ],
       "options": {
         "cwd": "${workspaceFolder}/parse-display-benches"
