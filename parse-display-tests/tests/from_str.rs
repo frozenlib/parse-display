@@ -50,18 +50,6 @@ fn from_str_struct_regex() {
 }
 
 #[test]
-fn from_str_struct_regex_without_p() {
-    #[derive(FromStr, Debug, Eq, PartialEq)]
-    #[from_str(regex = "(?<a>.*),(?<bc>.*)")]
-    struct TestStruct {
-        a: u32,
-        bc: u32,
-    }
-    assert_from_str("12,50", TestStruct { a: 12, bc: 50 });
-    assert_from_str_err::<TestStruct>("aa,50");
-}
-
-#[test]
 fn from_str_tuple_struct_regex() {
     #[derive(FromStr, Debug, Eq, PartialEq)]
     #[from_str(regex = "(?P<0>.*),(?P<1>.*)")]
@@ -1083,6 +1071,36 @@ fn variant_ignore() {
         B(String),
     }
     assert_from_str("123", HasIgnore::B("123".to_string()));
+}
+
+#[test]
+fn regex_without_p() {
+    #[derive(FromStr, Debug, Eq, PartialEq)]
+    #[from_str(regex = "(?<a>.*)")]
+    struct TestStruct {
+        a: u32,
+    }
+    assert_from_str("12", TestStruct { a: 12 });
+    assert_from_str_err::<TestStruct>("aa");
+}
+
+#[test]
+fn regex_capture_like() {
+    #[derive(FromStr, Debug, Eq, PartialEq)]
+    #[from_str(regex = r"(\(?<a>.*)")]
+    struct TestStruct;
+    assert_from_str(r"<a>", TestStruct);
+}
+
+#[test]
+fn regex_capture_prefix_escape() {
+    #[derive(FromStr, Debug, Eq, PartialEq)]
+    #[from_str(regex = r"\\(?<a>.*)")]
+    struct TestStruct {
+        a: u32,
+    }
+    assert_from_str(r"\12", TestStruct { a: 12 });
+    assert_from_str_err::<TestStruct>("aa");
 }
 
 fn assert_from_str<T: FromStr + Debug + PartialEq>(s: &str, value: T)

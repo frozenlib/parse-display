@@ -329,18 +329,30 @@ impl<'a> ParserBuilder<'a> {
     }
 
     fn push_regex(&mut self, s: &LitStr, context: &DisplayContext) -> Result<()> {
-        static REGEX_CAPTURE: Lazy<Regex> = lazy_regex!(r"\(\?(P?)<([_0-9a-zA-Z.]*)>");
         static REGEX_NUMBER: Lazy<Regex> = lazy_regex!("^[0-9]+$");
+        static REGEX_CAPTURE: Lazy<Regex> =
+            lazy_regex!(r"(?<esc>\\*)\(\?(?<p>P?)<(?<key>[_0-9a-zA-Z.]*)>");
+        const IDX_ESC: usize = 1;
+        const IDX_P: usize = 2;
+        const IDX_KEY: usize = 3;
+        fn is_escaped(s: &str) -> bool {
+            s.len() % 2 == 1
+        }
+
         let text = s.value();
         let text_debug = REGEX_CAPTURE.replace_all(&text, |c: &Captures| {
-            let key = c.get(2).unwrap().as_str();
+            let esc = &c[IDX_ESC];
+            if is_escaped(esc) {
+                return c[0].to_owned();
+            }
+            let key = &c[IDX_KEY];
             let key = if key.is_empty() {
                 "self".into()
             } else {
                 key.replace('.', "_")
             };
             let key = REGEX_NUMBER.replace(&key, "_$0");
-            format!("(?<{key}>")
+            format!("{esc}(?<{key}>")
         });
         if let Err(e) = regex_syntax::ast::parse::Parser::new().parse(&text_debug) {
             bail!(s.span(), "{}", e)
@@ -350,9 +362,13 @@ impl<'a> ParserBuilder<'a> {
         let mut has_capture_empty = false;
         let mut p = "";
         let mut text = try_replace_all(&REGEX_CAPTURE, &text, |c: &Captures| -> Result<String> {
+            let esc = &c[IDX_ESC];
+            if is_escaped(esc) {
+                return Ok(c[0].to_owned());
+            }
             has_capture = true;
-            let cp = c.get(1).unwrap().as_str();
-            let keys = FieldKey::from_str_deep(c.get(2).unwrap().as_str());
+            let cp = &c[IDX_P];
+            let keys = FieldKey::from_str_deep(&c[IDX_KEY]);
             let name = self.set_capture(context, &keys, s.span())?;
             if name == CAPTURE_NAME_EMPTY {
                 if !cp.is_empty() {
@@ -360,7 +376,7 @@ impl<'a> ParserBuilder<'a> {
                 }
                 has_capture_empty = true;
             }
-            Ok(format!("(?<{name}>"))
+            Ok(format!("{esc}(?<{name}>"))
         })?;
 
         if has_capture_empty {
