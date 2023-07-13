@@ -4,13 +4,19 @@
 
 ### Added
 
+- Enabled `(?<name>.*)` usage in regex alongside `(?P<name>.*)`.
+
 ### Changed
+
+- Update to `regex-syntax` 0.7.
 
 ### Deprecated
 
 ### Removed
 
 ### Fixed
+
+- Fix handling of regex that resemble, but aren't, captures (e.g. `(\(?<a>.*)`)
 
 ### Security
 
