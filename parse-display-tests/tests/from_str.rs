@@ -38,6 +38,17 @@ fn from_str_struct_format() {
 }
 
 #[test]
+fn from_str_struct_format_swap() {
+    #[derive(FromStr, Debug, Eq, PartialEq)]
+    #[display("{b},{a}")]
+    struct TestStruct {
+        a: u32,
+        b: u32,
+    }
+    assert_from_str("12,50", TestStruct { b: 12, a: 50 });
+}
+
+#[test]
 fn from_str_struct_regex() {
     #[derive(FromStr, Debug, Eq, PartialEq)]
     #[from_str(regex = "(?P<a>.*),(?P<bc>.*)")]

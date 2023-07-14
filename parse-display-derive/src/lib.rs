@@ -20,7 +20,7 @@ use quote::{format_ident, quote};
 use regex::{Captures, Regex};
 use regex_syntax::hir::Hir;
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashMap},
     fmt::{Display, Formatter},
     ops::{Deref, DerefMut},
 };
@@ -494,10 +494,24 @@ impl<'a> ParserBuilder<'a> {
     }
 
     fn build_construct_code(&self, crate_path: &Path, constructor: Path) -> Result<TokenStream> {
+        let mut names = HashMap::new();
+        let re;
+        match &self.parse_format {
+            ParseFormat::Hirs(hirs) => {
+                re = Regex::new(&to_regex_string(hirs)).unwrap();
+                for (index, name) in re.capture_names().enumerate() {
+                    if let Some(name) = name {
+                        names.insert(name, index);
+                    }
+                }
+            }
+            ParseFormat::String(_) => {}
+        }
+
         let code = if let Some(new_expr) = &self.new_expr {
             let mut code = TokenStream::new();
             for (key, field) in &self.fields {
-                let expr = field.build_field_init_expr(crate_path, key, self.span)?;
+                let expr = field.build_field_init_expr(crate_path, &names, key, self.span)?;
                 let var = key.new_arg_var();
                 code.extend(quote! { let #var = #expr; });
             }
@@ -511,7 +525,7 @@ impl<'a> ParserBuilder<'a> {
             let mut setters = Vec::new();
             for (key, field) in &self.fields {
                 let left_expr = quote! { value . #key };
-                setters.push(field.build_setters(crate_path, key, left_expr, true));
+                setters.push(field.build_setters(crate_path, &names, key, left_expr, true));
             }
             quote! {
                 let mut value = <Self as ::core::default::Default>::default();
@@ -523,7 +537,8 @@ impl<'a> ParserBuilder<'a> {
                 Fields::Named(..) => {
                     let mut fields_code = Vec::new();
                     for (key, field) in &self.fields {
-                        let expr = field.build_field_init_expr(crate_path, key, self.span)?;
+                        let expr =
+                            field.build_field_init_expr(crate_path, &names, key, self.span)?;
                         fields_code.push(quote! { #key : #expr })
                     }
                     quote! { { #(#fields_code,)* } }
@@ -531,7 +546,8 @@ impl<'a> ParserBuilder<'a> {
                 Fields::Unnamed(..) => {
                     let mut fields_code = Vec::new();
                     for (key, field) in &self.fields {
-                        fields_code.push(field.build_field_init_expr(crate_path, key, self.span)?);
+                        fields_code
+                            .push(field.build_field_init_expr(crate_path, &names, key, self.span)?);
                     }
                     quote! { ( #(#fields_code,)* ) }
                 }
@@ -616,15 +632,20 @@ impl<'a> FieldEntry<'a> {
         };
         capture_name(idx)
     }
-    fn capture(&self) -> Option<String> {
-        self.capture.map(capture_name)
+    fn capture_index(&self, names: &HashMap<&str, usize>) -> Option<usize> {
+        Some(capture_index(self.capture?, names))
     }
-    fn build_expr(&self, crate_path: &Path, key: &FieldKey) -> Option<TokenStream> {
-        if let Some(capture_name) = self.capture() {
+    fn build_expr(
+        &self,
+        crate_path: &Path,
+        names: &HashMap<&str, usize>,
+        key: &FieldKey,
+    ) -> Option<TokenStream> {
+        if let Some(capture_index) = self.capture_index(names) {
             Some(build_parse_capture_expr(
                 crate_path,
                 &key.to_string(),
-                &capture_name,
+                capture_index,
             ))
         } else if self.use_default {
             Some(quote! { ::core::default::Default::default() })
@@ -635,19 +656,21 @@ impl<'a> FieldEntry<'a> {
     fn build_setters(
         &self,
         crate_path: &Path,
+        names: &HashMap<&str, usize>,
         key: &FieldKey,
         left_expr: TokenStream,
         include_self: bool,
     ) -> TokenStream {
         let mut setters = Vec::new();
         if include_self {
-            if let Some(expr) = self.build_expr(crate_path, key) {
+            if let Some(expr) = self.build_expr(crate_path, names, key) {
                 setters.push(quote! { #left_expr = #expr; });
             }
         }
         for (keys, idx) in &self.deep_captures {
             let field_name = key.to_string() + &join(keys, ".");
-            let expr = build_parse_capture_expr(crate_path, &field_name, &capture_name(*idx));
+            let expr =
+                build_parse_capture_expr(crate_path, &field_name, capture_index(*idx, names));
             setters.push(quote! { #left_expr #(.#keys)* = #expr; });
         }
         quote! { #(#setters)* }
@@ -656,12 +679,14 @@ impl<'a> FieldEntry<'a> {
     fn build_field_init_expr(
         &self,
         crate_path: &Path,
+        names: &HashMap<&str, usize>,
         key: &FieldKey,
         span: Span,
     ) -> Result<TokenStream> {
-        if let Some(mut expr) = self.build_expr(crate_path, key) {
+        if let Some(mut expr) = self.build_expr(crate_path, names, key) {
             if !self.deep_captures.is_empty() {
-                let setters = self.build_setters(crate_path, key, quote!(field_value), false);
+                let setters =
+                    self.build_setters(crate_path, names, key, quote!(field_value), false);
                 let ty = &self.source.ty;
                 expr = quote! {
                     {
@@ -1494,15 +1519,18 @@ const CAPTURE_NAME_EMPTY: &str = "empty";
 fn capture_name(idx: usize) -> String {
     format!("value_{idx}")
 }
+fn capture_index(idx: usize, names: &HashMap<&str, usize>) -> usize {
+    names[capture_name(idx).as_str()]
+}
 
 fn build_parse_capture_expr(
     crate_path: &Path,
     field_name: &str,
-    capture_name: &str,
+    capture_index: usize,
 ) -> TokenStream {
     let msg = format!("field `{field_name}` parse failed.");
     quote! {
-        c.name(#capture_name)
+        c.get(#capture_index)
             .map_or("", |m| m.as_str())
             .parse()
             .map_err(|e| #crate_path::ParseError::with_message(#msg))?
