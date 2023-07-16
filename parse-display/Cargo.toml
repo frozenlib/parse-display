@@ -1,6 +1,6 @@
 [package]
 name = "parse-display"
-version = "0.8.1"
+version = "0.8.2"
 authors = ["frozenlib"]
 license = "MIT OR Apache-2.0"
 readme = "../README.md"
@@ -12,7 +12,7 @@ description = "Procedural macro to implement Display and FromStr using common se
 edition = "2021"
 
 [dependencies]
-parse-display-derive = { version = "=0.8.1", path = "../parse-display-derive" }
+parse-display-derive = { version = "=0.8.2", path = "../parse-display-derive" }
 once_cell = { version = "1.17.1", optional = true }
 regex = { version = "1.9.1", optional = true }
 

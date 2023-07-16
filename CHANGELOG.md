@@ -4,11 +4,7 @@
 
 ### Added
 
-- Enabled `(?<name>.*)` usage in regex alongside `(?P<name>.*)`.
-
 ### Changed
-
-- Update to `regex-syntax` 0.7.
 
 ### Deprecated
 
@@ -16,9 +12,22 @@
 
 ### Fixed
 
+### Security
+
+## [0.8.2] - 2023-06-16
+
+### Added
+
+- Enabled `(?<name>.*)` usage in regex alongside `(?P<name>.*)`.
+
+### Changed
+
+- Update to `regex-syntax` 0.7.
+
+### Fixed
+
 - Fix handling of regex that resemble, but aren't, captures (e.g. `(\(?<a>.*)`)
 
-### Security
 
 ## [0.8.1] - 2023-06-10
 
@@ -48,7 +57,8 @@
 
 - Support `#[from_str(ignore)]` for variant.
 
-[unreleased]: https://github.com/frozenlib/parse-display/compare/v0.8.0...HEAD
+[unreleased]: https://github.com/frozenlib/parse-display/compare/v0.8.2...HEAD
+[0.8.2]: https://github.com/frozenlib/parse-display/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/frozenlib/parse-display/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/frozenlib/parse-display/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/frozenlib/parse-display/compare/v0.6.0...v0.7.0

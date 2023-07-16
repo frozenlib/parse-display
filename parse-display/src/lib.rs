@@ -8,7 +8,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! parse-display = "0.8.1"
+//! parse-display = "0.8.2"
 //! ```
 //!
 //! ## Example
