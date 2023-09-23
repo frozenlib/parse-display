@@ -1,6 +1,8 @@
 #![deny(clippy::pattern_type_mismatch)]
 #![no_std]
 extern crate alloc;
+use core::mem::transmute;
+
 use parse_display::*;
 
 #[test]
@@ -969,6 +971,17 @@ fn format_spec_is_empty() {
     #[derive(Display)]
     #[display("{0}>")]
     struct TestStruct(u32);
+}
+
+#[test]
+fn dst_field() {
+    #[derive(Display)]
+    #[display("{0}")]
+    #[repr(transparent)]
+    struct DstField(str);
+
+    let x: &DstField = unsafe { transmute("abc") };
+    assert_display(x, "abc");
 }
 
 fn assert_display<T: core::fmt::Display>(value: T, display: &str) {

@@ -1058,13 +1058,9 @@ impl DisplayFormat {
                         format_str.push_str(format_spec);
                     }
                     format_str.push('}');
-                    format_args.push(context.format_arg(
-                        arg,
-                        format_spec,
-                        self.span,
-                        bounds,
-                        generics,
-                    )?);
+                    let format_arg =
+                        context.format_arg(arg, format_spec, self.span, bounds, generics)?;
+                    format_args.push(quote!(&#format_arg));
                 }
             }
         }
