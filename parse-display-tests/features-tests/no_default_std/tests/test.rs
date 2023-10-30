@@ -3,4 +3,4 @@
 struct X(String);
 
 #[test]
-fn no_defualt_std() {}
+fn no_default_std() {}

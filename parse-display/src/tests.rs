@@ -2,11 +2,11 @@
 fn test_crate() {
     #[derive(crate::Display)]
     #[display(crate = crate)]
-    struct TeseDisplay(u32);
+    struct TestDisplay(u32);
 
     #[derive(crate::FromStr)]
     #[display(crate = crate)]
-    struct TeseFromStr(u32);
+    struct TestFromStr(u32);
 }
 
 mod my_mod {
@@ -17,9 +17,9 @@ mod my_mod {
 fn test_crate_mod() {
     #[derive(crate::Display)]
     #[display(crate = my_mod::my_crate)]
-    struct TeseDisplay(u32);
+    struct TestDisplay(u32);
 
     #[derive(crate::FromStr)]
     #[display(crate = my_mod::my_crate)]
-    struct TeseFromStr(u32);
+    struct TestFromStr(u32);
 }

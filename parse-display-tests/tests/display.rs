@@ -542,7 +542,7 @@ fn display_enum_variant_format() {
 }
 
 #[test]
-fn display_enum_variant_format_typle_var() {
+fn display_enum_variant_format_tuple_var() {
     #[derive(Display)]
     enum TestEnum {
         #[display("AAA-{0}")]
