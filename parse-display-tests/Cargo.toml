@@ -7,4 +7,4 @@ publish = false
 
 [dependencies]
 parse-display = { path = "../parse-display" }
-trybuild = "1.0.81"
+trybuild = "1.0.85"
