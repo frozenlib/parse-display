@@ -1102,19 +1102,18 @@ impl<'a> DisplayContext<'a> {
         generics: &GenericParamSet,
     ) -> Result<TokenStream> {
         let keys = FieldKey::from_str_deep(arg);
+        let format_spec = FormatSpec::parse_with_span(format_spec, span)?;
         if keys.is_empty() {
+            if format_spec.format_type != FormatType::Display {
+                return Ok(quote!(self));
+            }
             return Ok(match self {
                 DisplayContext::Struct { .. } => {
                     bail!(span, "{{}} is not allowed in struct format.")
                 }
-                DisplayContext::Field { parent, field, key } => parent.format_arg_by_field_expr(
-                    key,
-                    field,
-                    format_spec,
-                    span,
-                    bounds,
-                    generics,
-                )?,
+                DisplayContext::Field { parent, field, key } => {
+                    parent.format_arg_by_field_expr(key, field, &format_spec, bounds, generics)?
+                }
                 DisplayContext::Variant { variant, style, .. } => {
                     let s = style.apply(&variant.ident);
                     quote! { #s }
@@ -1131,7 +1130,7 @@ impl<'a> DisplayContext<'a> {
                 } else {
                     bail!(span, "unknown field '{}'.", key);
                 };
-                return self.format_arg_of_field(key, field, format_spec, span, bounds, generics);
+                return self.format_arg_of_field(key, field, &format_spec, bounds, generics);
             }
         }
         let mut expr = self.field_expr(&keys[0]);
@@ -1144,8 +1143,7 @@ impl<'a> DisplayContext<'a> {
         &self,
         key: &FieldKey,
         field: &Field,
-        parameters: &str,
-        span: Span,
+        format_spec: &FormatSpec,
         bounds: &mut Bounds,
         generics: &GenericParamSet,
     ) -> Result<TokenStream> {
@@ -1163,25 +1161,20 @@ impl<'a> DisplayContext<'a> {
             )?;
             quote! { format_args!(#args) }
         } else {
-            self.format_arg_by_field_expr(key, field, parameters, span, &mut bounds, generics)?
+            self.format_arg_by_field_expr(key, field, format_spec, &mut bounds, generics)?
         })
     }
     fn format_arg_by_field_expr(
         &self,
         key: &FieldKey,
         field: &Field,
-        format_spec: &str,
-        span: Span,
+        format_spec: &FormatSpec,
         bounds: &mut Bounds,
         generics: &GenericParamSet,
     ) -> Result<TokenStream> {
         let ty = &field.ty;
         if generics.contains_in_type(ty) {
-            let ps = match FormatSpec::parse(format_spec) {
-                Ok(ps) => ps,
-                Err(_) => bail!(span, "invalid format parameters \"{}\".", format_spec),
-            };
-            let tr = ps.format_type.trait_name();
+            let tr = format_spec.format_type.trait_name();
             let tr: Ident = parse_str(tr).unwrap();
             if bounds.can_extend {
                 bounds.pred.push(parse_quote!(#ty : ::core::fmt::#tr));

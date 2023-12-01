@@ -1,4 +1,5 @@
 use once_cell::sync::Lazy;
+use proc_macro2::Span;
 use regex::*;
 
 use std::fmt::{Display, Formatter};
@@ -87,6 +88,13 @@ impl Display for FormatParseError {
 }
 
 impl<'a> FormatSpec<'a> {
+    pub fn parse_with_span(s: &'a str, span: Span) -> syn::Result<Self> {
+        match Self::parse(s) {
+            Ok(ps) => Ok(ps),
+            Err(_) => bail!(span, "Invalid format specifier `{s}`"),
+        }
+    }
+
     pub fn parse(s: &'a str) -> std::result::Result<Self, FormatParseError> {
         static RE: Lazy<Regex> = lazy_regex!(
             "^\

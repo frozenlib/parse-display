@@ -1,8 +1,9 @@
 #![deny(clippy::pattern_type_mismatch)]
 #![no_std]
 extern crate alloc;
-use core::mem::transmute;
+use core::{fmt::LowerHex, mem::transmute};
 
+use alloc::format;
 use parse_display::*;
 
 #[test]
@@ -984,7 +985,33 @@ fn dst_field() {
     assert_display(x, "abc");
 }
 
+#[test]
+fn by_hex() {
+    #[derive(Display)]
+    #[display("{:#x}")]
+    struct TestStruct(u32);
+
+    impl LowerHex for TestStruct {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+            LowerHex::fmt(&self.0, f)
+        }
+    }
+    assert_display(TestStruct(10), "0xa");
+}
+
+#[test]
+fn by_debug() {
+    #[derive(Display, Debug)]
+    #[display("{:?}")]
+    enum E {
+        A,
+        B(u8),
+    }
+    assert_display(E::A, &format!("{:?}", E::A));
+    assert_display(E::B(10), &format!("{:?}", E::B(10)));
+}
+
 fn assert_display<T: core::fmt::Display>(value: T, display: &str) {
-    let value_display = alloc::format!("{value}");
+    let value_display = format!("{value}");
     assert_eq!(value_display, display);
 }
