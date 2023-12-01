@@ -89,8 +89,9 @@ pub fn try_replace_all<R: AsRef<str>, E>(
     Ok(s)
 }
 
-macro_rules! lazy_regex {
-    ($re:expr) => {
-        once_cell::sync::Lazy::new(|| regex::Regex::new($re).unwrap())
-    };
+macro_rules! regex {
+    ($s:expr) => {{
+        static RE: ::std::sync::OnceLock<regex::Regex> = ::std::sync::OnceLock::new();
+        RE.get_or_init(|| ::regex::Regex::new($s).unwrap())
+    }};
 }

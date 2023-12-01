@@ -1,9 +1,7 @@
-use once_cell::sync::Lazy;
-use proc_macro2::Span;
-use regex::*;
-
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
+
+use proc_macro2::Span;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Sign {
@@ -96,7 +94,7 @@ impl<'a> FormatSpec<'a> {
     }
 
     pub fn parse(s: &'a str) -> std::result::Result<Self, FormatParseError> {
-        static RE: Lazy<Regex> = lazy_regex!(
+        let re = regex!(
             "^\
              ((?<fill>.)?\
              (?<align>[<>^]))??\
@@ -116,7 +114,7 @@ impl<'a> FormatSpec<'a> {
              $"
         );
 
-        let c = RE.captures(s).ok_or(FormatParseError)?;
+        let c = re.captures(s).ok_or(FormatParseError)?;
         let fill = c.name("fill").map(|m| m.as_str().chars().next().unwrap());
         let align = c.name("align").map(|m| m.as_str().parse().unwrap());
         let sign = c.name("sign").map(|m| match m.as_str() {

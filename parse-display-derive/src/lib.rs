@@ -14,7 +14,6 @@ mod syn_utils;
 mod format_syntax;
 
 use crate::{format_syntax::*, regex_utils::*, syn_utils::*};
-use once_cell::sync::Lazy;
 use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote};
 use regex::{Captures, Regex};
@@ -329,9 +328,8 @@ impl<'a> ParserBuilder<'a> {
     }
 
     fn push_regex(&mut self, s: &LitStr, context: &DisplayContext) -> Result<()> {
-        static REGEX_NUMBER: Lazy<Regex> = lazy_regex!("^[0-9]+$");
-        static REGEX_CAPTURE: Lazy<Regex> =
-            lazy_regex!(r"(?<esc>\\*)\(\?(?<p>P?)<(?<key>[_0-9a-zA-Z.]*)>");
+        let regex_number = regex!("^[0-9]+$");
+        let regex_capture = regex!(r"(?<esc>\\*)\(\?(?<p>P?)<(?<key>[_0-9a-zA-Z.]*)>");
         const IDX_ESC: usize = 1;
         const IDX_P: usize = 2;
         const IDX_KEY: usize = 3;
@@ -340,7 +338,7 @@ impl<'a> ParserBuilder<'a> {
         }
 
         let text = s.value();
-        let text_debug = REGEX_CAPTURE.replace_all(&text, |c: &Captures| {
+        let text_debug = regex_capture.replace_all(&text, |c: &Captures| {
             let esc = &c[IDX_ESC];
             if is_escaped(esc) {
                 return c[0].to_owned();
@@ -351,7 +349,7 @@ impl<'a> ParserBuilder<'a> {
             } else {
                 key.replace('.', "_")
             };
-            let key = REGEX_NUMBER.replace(&key, "_$0");
+            let key = regex_number.replace(&key, "_$0");
             format!("{esc}(?<{key}>")
         });
         if let Err(e) = regex_syntax::ast::parse::Parser::new().parse(&text_debug) {
@@ -361,7 +359,7 @@ impl<'a> ParserBuilder<'a> {
         let mut has_capture = false;
         let mut has_capture_empty = false;
         let mut p = "";
-        let mut text = try_replace_all(&REGEX_CAPTURE, &text, |c: &Captures| -> Result<String> {
+        let mut text = try_replace_all(regex_capture, &text, |c: &Captures| -> Result<String> {
             let esc = &c[IDX_ESC];
             if is_escaped(esc) {
                 return Ok(c[0].to_owned());
@@ -989,8 +987,8 @@ impl DisplayFormat {
         Self::parse(&s.value(), s.span())
     }
     fn parse(mut s: &str, span: Span) -> Result<DisplayFormat> {
-        static REGEX_STR: Lazy<Regex> = lazy_regex!(r"^[^{}]+");
-        static REGEX_VAR: Lazy<Regex> = lazy_regex!(r"^\{([^:{}]*)(?::([^}]*))?\}");
+        let regex_str = regex!(r"^[^{}]+");
+        let regex_var = regex!(r"^\{([^:{}]*)(?::([^}]*))?\}");
         let mut parts = Vec::new();
         while !s.is_empty() {
             if s.starts_with("{{") {
@@ -1003,12 +1001,12 @@ impl DisplayFormat {
                 s = &s[2..];
                 continue;
             }
-            if let Some(m) = REGEX_STR.find(s) {
+            if let Some(m) = regex_str.find(s) {
                 parts.push(DisplayFormatPart::Str(m.as_str().into()));
                 s = &s[m.end()..];
                 continue;
             }
-            if let Some(c) = REGEX_VAR.captures(s) {
+            if let Some(c) = regex_var.captures(s) {
                 let arg = c.get(1).unwrap().as_str().into();
                 let format_spec = c.get(2).map_or("", |x| x.as_str()).into();
                 parts.push(DisplayFormatPart::Var { arg, format_spec });
