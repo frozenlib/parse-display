@@ -13,7 +13,7 @@ edition = "2021"
 
 [dependencies]
 parse-display-derive = { version = "=0.8.2", path = "../parse-display-derive" }
-regex = { version = "1.9.1", optional = true }
+regex = { version = "1.10.2", optional = true }
 
 [features]
 default = ["std"]

@@ -34,6 +34,12 @@ pub fn to_regex_string(hirs: &[Hir]) -> String {
     Hir::concat(hirs).to_string()
 }
 
+fn replace_asts(asts: &mut Vec<Ast>, f: &mut impl FnMut(&mut Ast) -> bool) {
+    for ast in asts {
+        replace_ast(ast, f)
+    }
+}
+
 fn replace_ast(ast: &mut Ast, f: &mut impl FnMut(&mut Ast) -> bool) {
     if !f(ast) {
         return;
@@ -45,15 +51,13 @@ fn replace_ast(ast: &mut Ast, f: &mut impl FnMut(&mut Ast) -> bool) {
         | Ast::Literal(..)
         | Ast::Dot(..)
         | Ast::Assertion(..)
-        | Ast::Class(..) => {}
-        Ast::Repetition(Repetition { ast, .. }) | Ast::Group(Group { ast, .. }) => {
-            replace_ast(ast, f)
-        }
-        Ast::Alternation(Alternation { asts, .. }) | Ast::Concat(Concat { asts, .. }) => {
-            for ast in asts {
-                replace_ast(ast, f)
-            }
-        }
+        | Ast::ClassUnicode(..)
+        | Ast::ClassPerl(..)
+        | Ast::ClassBracketed(..) => {}
+        Ast::Repetition(rep) => replace_ast(&mut rep.ast, f),
+        Ast::Group(g) => replace_ast(&mut g.ast, f),
+        Ast::Alternation(alt) => replace_asts(&mut alt.asts, f),
+        Ast::Concat(c) => replace_asts(&mut c.asts, f),
     }
 }
 
