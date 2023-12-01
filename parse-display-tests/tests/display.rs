@@ -866,7 +866,7 @@ fn bound_by_hand_with_auto() {
     assert_display(Outer(Inner(10), 20), "10,20");
 }
 
-#[deny(private_in_public)]
+#[deny(private_bounds)]
 #[test]
 fn bound_struct_field() {
     #[derive(Display)]

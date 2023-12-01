@@ -767,7 +767,7 @@ fn bound_predicate_struct() {
 
 #[test]
 fn different_bound() {
-    #![deny(private_in_public)]
+    #![deny(private_bounds)]
 
     #[derive(Display, FromStr, PartialEq, Debug)]
     #[display(bound("T : Display"))]
@@ -793,7 +793,7 @@ fn bound_type_enum() {
     struct Inner<T: Default>(T);
 }
 
-#[deny(private_in_public)]
+#[deny(private_bounds)]
 #[test]
 fn bound_struct_field() {
     #[derive(FromStr)]
