@@ -1104,7 +1104,11 @@ impl<'a> DisplayContext<'a> {
         let keys = FieldKey::from_str_deep(arg);
         let format_spec = FormatSpec::parse_with_span(format_spec, span)?;
         if keys.is_empty() {
-            if format_spec.format_type != FormatType::Display {
+            if matches!(
+                self,
+                DisplayContext::Struct { .. } | DisplayContext::Variant { .. }
+            ) && format_spec.format_type != FormatType::Display
+            {
                 return Ok(quote!(self));
             }
             return Ok(match self {
