@@ -705,7 +705,6 @@ mod tests;
 
 #[cfg(feature = "std")]
 pub mod helpers {
-    pub use once_cell;
     pub use regex;
 }
 

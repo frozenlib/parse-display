@@ -562,9 +562,8 @@ impl<'a> ParserBuilder<'a> {
                 let regex = to_regex_string(hirs);
                 quote! {
                     #[allow(clippy::trivial_regex)]
-                    static RE: #crate_path::helpers::once_cell::sync::Lazy<#crate_path::helpers::regex::Regex> =
-                        #crate_path::helpers::once_cell::sync::Lazy::new(|| #crate_path::helpers::regex::Regex::new(#regex).unwrap());
-                    if let Some(c) = RE.captures(&s) {
+                    static RE: ::std::sync::OnceLock<#crate_path::helpers::regex::Regex> = ::std::sync::OnceLock::new();
+                    if let ::core::option::Option::Some(c) = RE.get_or_init(|| #crate_path::helpers::regex::Regex::new(#regex).unwrap()).captures(&s) {
                          #code
                     }
                 }
