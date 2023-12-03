@@ -591,10 +591,7 @@ impl<'a> ParserBuilder<'a> {
                 let helpers = quote!( #crate_path::helpers );
                 for (name, (expr, ty)) in &self.with {
                     with.push(quote! {
-                        (#name, #helpers::to_ast::<#ty,_>({
-                            use #crate_path::formats::*;
-                            &#expr
-                        }))
+                        (#name, #helpers::to_ast::<#ty,_>(&#expr))
                     });
                 }
                 quote! {
@@ -1262,11 +1259,7 @@ impl<'a> DisplayContext<'a> {
             expr = quote! {
                 #crate_path::helpers::Formatted::<'_, #ty, _> {
                     value : &#expr,
-                    format : {
-                        #[allow(unused_imports)]
-                        use #crate_path::formats::*;
-                        #with
-                    }
+                    format : #with,
                 }
             };
         }
@@ -1622,10 +1615,7 @@ fn build_parse_capture_expr(
         if let Some(with) = &field.hattrs.with {
             let ty = &field.source.ty;
             expr1 = quote! {
-                #crate_path::helpers::parse_with::<#ty, _ >({
-                    use #crate_path::formats::*;
-                    #with
-                }, #expr0)
+                #crate_path::helpers::parse_with::<#ty, _ >(#with, #expr0)
             };
         }
     }

@@ -1116,6 +1116,8 @@ fn regex_capture_prefix_escape() {
 
 #[test]
 fn delimiter_struct() {
+    use parse_display::formats::delimiter;
+
     #[derive(FromStr, Debug, Eq, PartialEq)]
     #[display("{0}")]
     struct X(#[display(with = delimiter(", "))] Vec<u32>);
@@ -1125,6 +1127,8 @@ fn delimiter_struct() {
 
 #[test]
 fn delimiter_enum() {
+    use parse_display::formats::delimiter;
+
     #[derive(FromStr, Debug, Eq, PartialEq)]
 
     enum X {

@@ -1025,6 +1025,8 @@ fn by_debug() {
 
 #[test]
 fn delimiter_struct() {
+    use parse_display::formats::delimiter;
+
     #[derive(Display)]
     #[display("{0}")]
     struct X(#[display(with = delimiter(", "))] Vec<u32>);
@@ -1034,6 +1036,8 @@ fn delimiter_struct() {
 
 #[test]
 fn delimiter_enum() {
+    use parse_display::formats::delimiter;
+
     #[derive(Display)]
     enum X {
         #[display("a : {0}")]
@@ -1049,6 +1053,8 @@ fn delimiter_enum() {
 
 #[test]
 fn delimiter_field_vec() {
+    use parse_display::formats::delimiter;
+
     #[derive(Display)]
     #[display("{0}")]
     struct X(#[display(with = delimiter(", "))] Vec<u32>);
@@ -1058,6 +1064,8 @@ fn delimiter_field_vec() {
 
 #[test]
 fn delimiter_field_array() {
+    use parse_display::formats::delimiter;
+
     #[derive(Display)]
     #[display("{0}")]
     struct X(#[display(with = delimiter(", "))] [u32; 3]);
