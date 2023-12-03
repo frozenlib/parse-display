@@ -703,10 +703,10 @@ use core::fmt::{Display, Formatter, Result};
 #[cfg(test)]
 mod tests;
 
-#[cfg(feature = "std")]
-pub mod helpers {
-    pub use regex;
-}
+#[doc(hidden)]
+pub mod helpers;
+
+pub mod formats;
 
 pub use parse_display_derive::{Display, FromStr};
 
@@ -761,5 +761,19 @@ impl<T, E> IntoResult<T> for core::result::Result<T, E> {
     type Err = E;
     fn into_result(self) -> core::result::Result<T, E> {
         self
+    }
+}
+
+pub trait DisplayFormat {
+    type Value;
+    fn write(&self, f: &mut Formatter, value: &Self::Value) -> Result;
+}
+
+pub trait FromStrFormat {
+    type Value;
+    type Err;
+    fn parse(&self, s: &str) -> core::result::Result<Self::Value, Self::Err>;
+    fn regex(&self) -> &str {
+        "(?s:.*?)"
     }
 }

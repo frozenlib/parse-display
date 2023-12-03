@@ -199,6 +199,23 @@ impl FromStr for FormatType {
         })
     }
 }
+impl Display for FormatType {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        match self {
+            FormatType::Display => write!(f, ""),
+            FormatType::Debug => write!(f, "?"),
+            FormatType::DebugLowerHex => write!(f, "x?"),
+            FormatType::DebugUpperHex => write!(f, "X?"),
+            FormatType::Octal => write!(f, "o"),
+            FormatType::LowerHex => write!(f, "x"),
+            FormatType::UpperHex => write!(f, "X"),
+            FormatType::Pointer => write!(f, "p"),
+            FormatType::Binary => write!(f, "b"),
+            FormatType::LowerExp => write!(f, "e"),
+            FormatType::UpperExp => write!(f, "E"),
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {

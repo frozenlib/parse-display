@@ -3,7 +3,7 @@
 extern crate alloc;
 use core::{fmt::LowerHex, mem::transmute};
 
-use alloc::format;
+use alloc::{format, vec::Vec};
 use parse_display::*;
 
 #[test]
@@ -1021,6 +1021,15 @@ fn by_debug() {
     }
     assert_display(E::A, &format!("{:?}", E::A));
     assert_display(E::B(10), &format!("{:?}", E::B(10)));
+}
+
+#[test]
+fn delimiter() {
+    #[derive(Display)]
+    #[display("{0}")]
+    struct X(#[display(with = delimiter(", "))] Vec<u32>);
+
+    assert_display(X(alloc::vec![10, 20, 30]), "10, 20, 30");
 }
 
 fn assert_display<T: core::fmt::Display>(value: T, display: &str) {
