@@ -61,11 +61,11 @@ pub struct Join<'a, I: ?Sized, F = Fmt> {
     _phantom: PhantomData<I>,
 }
 
-impl<I, F, T> DisplayFormat<T> for Join<'_, I, F>
+impl<T, I, F> DisplayFormat<T> for Join<'_, I, F>
 where
-    F: DisplayFormat<I>,
     T: ?Sized,
     for<'a> &'a T: IntoIterator<Item = &'a I>,
+    F: DisplayFormat<I>,
 {
     fn write(&self, f: &mut Formatter, value: &T) -> fmt::Result {
         let mut iter = value.into_iter();
@@ -79,7 +79,7 @@ where
         Ok(())
     }
 }
-impl<I, F, T> FromStrFormat<T> for Join<'_, I, F>
+impl<T, I, F> FromStrFormat<T> for Join<'_, I, F>
 where
     F: FromStrFormat<I>,
     T: FromIterator<I>,
