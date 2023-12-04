@@ -7,9 +7,9 @@ use core::{
 
 use crate::{DisplayFormat, FromStrFormat};
 
-pub struct Fmt<T>(PhantomData<fn(&T)>);
+pub struct Fmt<T: ?Sized>(PhantomData<fn(&T)>);
 
-impl<T: Display> DisplayFormat for Fmt<T> {
+impl<T: ?Sized + Display> DisplayFormat for Fmt<T> {
     type Value = T;
     fn write(&self, f: &mut Formatter, value: &T) -> fmt::Result {
         write!(f, "{value}")
@@ -23,16 +23,17 @@ impl<T: FromStr> FromStrFormat for Fmt<T> {
     }
 }
 
-pub fn fmt<T>() -> Fmt<T> {
+pub fn fmt<T: ?Sized>() -> Fmt<T> {
     Fmt(PhantomData)
 }
 
-pub fn fmt_display<T>(
+pub fn fmt_display<T: ?Sized>(
     f: impl Fn(&mut Formatter, &T) -> fmt::Result,
 ) -> impl DisplayFormat<Value = T> {
-    struct FnFmtDisplay<T, F>(F, PhantomData<fn(&T)>);
+    struct FnFmtDisplay<T: ?Sized, F>(F, PhantomData<fn(&T)>);
     impl<T, F> DisplayFormat for FnFmtDisplay<T, F>
     where
+        T: ?Sized,
         F: Fn(&mut Formatter, &T) -> fmt::Result,
     {
         type Value = T;
@@ -60,7 +61,7 @@ pub fn fmt_from_str<T, E>(
     FnFmtFromStr(f, PhantomData)
 }
 
-pub struct Join<'a, F, T> {
+pub struct Join<'a, F, T: ?Sized> {
     item_format: F,
     delimiter: &'a str,
     _phantom: core::marker::PhantomData<fn(&T) -> T>,
@@ -69,6 +70,7 @@ pub struct Join<'a, F, T> {
 impl<F, T> DisplayFormat for Join<'_, F, T>
 where
     F: DisplayFormat,
+    T: ?Sized,
     for<'a> &'a T: IntoIterator<Item = &'a F::Value>,
 {
     type Value = T;
@@ -98,7 +100,7 @@ where
     }
 }
 
-pub fn join<F, T>(item_format: F, delimiter: &str) -> Join<F, T> {
+pub fn join<F, T: ?Sized>(item_format: F, delimiter: &str) -> Join<F, T> {
     Join {
         item_format,
         delimiter,
@@ -106,7 +108,6 @@ pub fn join<F, T>(item_format: F, delimiter: &str) -> Join<F, T> {
     }
 }
 
-pub fn delimiter<I, T>(delimiter: &str) -> Join<Fmt<I>, T> {
+pub fn delimiter<I: ?Sized, T: ?Sized>(delimiter: &str) -> Join<Fmt<I>, T> {
     join(fmt(), delimiter)
 }
-

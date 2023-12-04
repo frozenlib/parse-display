@@ -767,7 +767,7 @@ impl<T, E> IntoResult<T> for core::result::Result<T, E> {
 }
 
 pub trait DisplayFormat {
-    type Value;
+    type Value: ?Sized;
     fn write(&self, f: &mut Formatter, value: &Self::Value) -> Result;
 }
 

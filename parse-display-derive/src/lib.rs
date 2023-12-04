@@ -1256,8 +1256,9 @@ impl<'a> DisplayContext<'a> {
                 );
             }
             let crate_path = self.crate_path();
+            let unref_ty = unref_ty(ty);
             expr = quote! {
-                #crate_path::helpers::Formatted::<'_, #ty, _> {
+                #crate_path::helpers::Formatted::<'_, #unref_ty, _> {
                     value : &#expr,
                     format : #with,
                 }
@@ -1621,5 +1622,13 @@ fn build_parse_capture_expr(
     }
     quote! {
         #expr1.map_err(|e| #crate_path::ParseError::with_message(#msg))?
+    }
+}
+
+fn unref_ty(ty: &Type) -> Type {
+    if let Type::Reference(ty) = ty {
+        unref_ty(&ty.elem)
+    } else {
+        ty.clone()
     }
 }
