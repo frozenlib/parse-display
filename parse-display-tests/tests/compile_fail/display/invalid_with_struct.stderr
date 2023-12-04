@@ -1,0 +1,5 @@
+error[E0425]: cannot find value `unknown` in this scope
+ --> tests/compile_fail/display/invalid_with_struct.rs:5:22
+  |
+5 |     #[display(with = unknown)]
+  |                      ^^^^^^^ not found in this scope
