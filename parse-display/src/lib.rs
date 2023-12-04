@@ -766,15 +766,13 @@ impl<T, E> IntoResult<T> for core::result::Result<T, E> {
     }
 }
 
-pub trait DisplayFormat {
-    type Value: ?Sized;
-    fn write(&self, f: &mut Formatter, value: &Self::Value) -> Result;
+pub trait DisplayFormat<T: ?Sized> {
+    fn write(&self, f: &mut Formatter, value: &T) -> Result;
 }
 
-pub trait FromStrFormat {
-    type Value;
+pub trait FromStrFormat<T> {
     type Err;
-    fn parse(&self, s: &str) -> core::result::Result<Self::Value, Self::Err>;
+    fn parse(&self, s: &str) -> core::result::Result<T, Self::Err>;
     fn regex(&self) -> Option<String> {
         None
     }

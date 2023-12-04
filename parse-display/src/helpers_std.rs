@@ -9,7 +9,7 @@ use crate::FromStrFormat;
 pub use regex;
 
 #[track_caller]
-pub fn to_ast<T, E>(format: &dyn FromStrFormat<Value = T, Err = E>) -> Option<Ast> {
+pub fn to_ast<T, E>(format: &dyn FromStrFormat<T, Err = E>) -> Option<Ast> {
     let s = format.regex()?;
     let Ok(mut ast) = regex_syntax::ast::parse::Parser::new().parse(&s) else {
         panic!("invalid regex: {s}")
