@@ -11,7 +11,7 @@ pub use regex;
 #[track_caller]
 pub fn to_ast<T, E>(format: &dyn FromStrFormat<Value = T, Err = E>) -> Ast {
     let s = format.regex();
-    let Ok(mut ast) = regex_syntax::ast::parse::Parser::new().parse(s) else {
+    let Ok(mut ast) = regex_syntax::ast::parse::Parser::new().parse(&s) else {
         panic!("invalid regex: {s}")
     };
     let e = replace_ast(&mut ast, &mut |ast| {

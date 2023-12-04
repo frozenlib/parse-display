@@ -775,7 +775,7 @@ pub trait FromStrFormat {
     type Value;
     type Err;
     fn parse(&self, s: &str) -> core::result::Result<Self::Value, Self::Err>;
-    fn regex(&self) -> &str {
-        "(?s:.*?)"
+    fn regex(&self) -> String {
+        "(?s:.*?)".into()
     }
 }
