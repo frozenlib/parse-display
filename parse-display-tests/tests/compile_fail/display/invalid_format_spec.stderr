@@ -1,16 +1,5 @@
 error: unknown format trait `y`
- --> tests/compile_fail/display/invalid_format_spec.rs:3:14
+ --> tests/compile_fail/display/invalid_format_spec.rs:3:11
   |
 3 | #[display("{0:y}")]
-  |              ^
-  |
-  = note: the only appropriate formatting traits are:
-          - ``, which uses the `Display` trait
-          - `?`, which uses the `Debug` trait
-          - `e`, which uses the `LowerExp` trait
-          - `E`, which uses the `UpperExp` trait
-          - `o`, which uses the `Octal` trait
-          - `p`, which uses the `Pointer` trait
-          - `b`, which uses the `Binary` trait
-          - `x`, which uses the `LowerHex` trait
-          - `X`, which uses the `UpperHex` trait
+  |           ^^^^^^^

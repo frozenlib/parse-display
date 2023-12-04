@@ -89,7 +89,7 @@ impl<'a> FormatSpec<'a> {
     pub fn parse_with_span(s: &'a str, span: Span) -> syn::Result<Self> {
         match Self::parse(s) {
             Ok(ps) => Ok(ps),
-            Err(_) => bail!(span, "Invalid format specifier `{s}`"),
+            Err(_) => bail!(span, "unknown format trait `{s}`"), // This message is the same as the one output by the compiler
         }
     }
 
