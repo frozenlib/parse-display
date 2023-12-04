@@ -9,8 +9,8 @@ use crate::FromStrFormat;
 pub use regex;
 
 #[track_caller]
-pub fn to_ast<T, E>(format: &dyn FromStrFormat<Value = T, Err = E>) -> Ast {
-    let s = format.regex();
+pub fn to_ast<T, E>(format: &dyn FromStrFormat<Value = T, Err = E>) -> Option<Ast> {
+    let s = format.regex()?;
     let Ok(mut ast) = regex_syntax::ast::parse::Parser::new().parse(&s) else {
         panic!("invalid regex: {s}")
     };
@@ -37,16 +37,19 @@ pub fn to_ast<T, E>(format: &dyn FromStrFormat<Value = T, Err = E>) -> Ast {
     if let Err(e) = e {
         panic!("{e}");
     }
-    ast
+    Some(ast)
 }
 
 #[track_caller]
-pub fn build_regex(s: &str, with: &[(&str, Ast)]) -> Regex {
+pub fn build_regex(s: &str, with: &[(&str, Option<Ast>)]) -> Regex {
+    let with: HashMap<&str, &Ast> = with
+        .iter()
+        .filter_map(|(name, ast)| Some((*name, ast.as_ref()?)))
+        .collect();
     let re = if with.is_empty() {
         Cow::Borrowed(s)
     } else {
         let mut ast = regex_syntax::ast::parse::Parser::new().parse(s).unwrap();
-        let with: HashMap<&str, &Ast> = with.iter().map(|(name, ast)| (*name, ast)).collect();
         let e = replace_ast(&mut ast, &mut |ast| {
             if let Ast::Group(g) = ast {
                 if let GroupKind::CaptureName { name, .. } = &g.kind {
