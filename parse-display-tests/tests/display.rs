@@ -1084,6 +1084,21 @@ fn delimiter_field_slice() {
     assert_display(X(&[10, 20, 30]), "10, 20, 30");
 }
 
+#[test]
+fn delimiter_field_dst() {
+    use parse_display::formats::delimiter;
+
+    #[repr(transparent)]
+    #[derive(Display)]
+    #[display("{0}")]
+    struct X(#[display(with = delimiter(", "))] [u32]);
+
+    let x: &[u32] = &[10, 20, 30];
+    let x: &X = unsafe { transmute(x) };
+
+    assert_display(x, "10, 20, 30");
+}
+
 fn assert_display<T: core::fmt::Display>(value: T, display: &str) {
     let value_display = format!("{value}");
     assert_eq!(value_display, display);
