@@ -1,5 +1,5 @@
-error: `#[display("format")]` is required except unit variant.
- --> tests/compile_fail/display/invalid_with_enum.rs:5:5
+error[E0425]: cannot find value `unknown` in this scope
+ --> tests/compile_fail/display/invalid_with_enum.rs:6:24
   |
-5 |     A(#[display(with = unknown)] u32),
-  |     ^
+6 |     A(#[display(with = unknown)] u32),
+  |                        ^^^^^^^ not found in this scope
