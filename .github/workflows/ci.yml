@@ -17,6 +17,14 @@ jobs:
         run: cargo test --verbose --no-run
       - name: Run tests
         run: cargo test --verbose
+
+      - name: Build no-std
+        run: cargo build --verbose --target-dir=target/no-std --no-default-features
+      - name: Build tests no-std
+        run: cargo test --verbose --target-dir=target/no-std --no-default-features --lib --tests --no-run
+      - name: Run tests no-std
+        run: cargo test --verbose --target-dir=target/no-std --no-default-features --lib --tests
+
       - name: Clippy
         run: cargo clippy --all-features --tests --lib -- -W clippy::all
         env:

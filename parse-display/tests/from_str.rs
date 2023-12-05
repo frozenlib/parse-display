@@ -1,3 +1,4 @@
+#![cfg(feature = "std")]
 #![deny(clippy::pattern_type_mismatch)]
 
 use parse_display::*;

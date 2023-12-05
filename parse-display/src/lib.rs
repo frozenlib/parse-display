@@ -706,6 +706,7 @@ mod tests;
 #[doc(hidden)]
 pub mod helpers;
 
+#[cfg(feature = "std")]
 mod helpers_std;
 
 pub mod formats;

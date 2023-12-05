@@ -63,6 +63,32 @@
     },
     {
       "type": "shell",
+      "label": "cargo test no-std",
+      "command": "cargo",
+      "args": [
+        "test",
+        "--target-dir=target/no-std",
+        "--no-default-features",
+        "--lib",
+        "--tests",
+      ],
+      "problemMatcher": [
+        "$rustc"
+      ],
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "presentation": {
+        "panel": "dedicated",
+        "clear": true
+      },
+      "dependsOn": [
+        "include doc"
+      ],
+    },
+    {
+      "type": "shell",
       "label": "cargo run exmaple",
       "command": "cargo",
       "args": [

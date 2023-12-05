@@ -1,3 +1,5 @@
+#![cfg(feature = "std")]
+
 use parse_display::*;
 use std::fmt::Debug;
 use std::fmt::Display;

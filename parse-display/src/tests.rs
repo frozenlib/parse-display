@@ -4,6 +4,7 @@ fn test_crate() {
     #[display(crate = crate)]
     struct TestDisplay(u32);
 
+    #[cfg(feature = "std")]
     #[derive(crate::FromStr)]
     #[display(crate = crate)]
     struct TestFromStr(u32);
@@ -19,6 +20,7 @@ fn test_crate_mod() {
     #[display(crate = my_mod::my_crate)]
     struct TestDisplay(u32);
 
+    #[cfg(feature = "std")]
     #[derive(crate::FromStr)]
     #[display(crate = my_mod::my_crate)]
     struct TestFromStr(u32);
