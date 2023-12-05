@@ -773,6 +773,8 @@ pub trait DisplayFormat<T: ?Sized> {
 pub trait FromStrFormat<T> {
     type Err;
     fn parse(&self, s: &str) -> core::result::Result<T, Self::Err>;
+
+    #[cfg(feature = "std")]
     fn regex(&self) -> Option<String> {
         None
     }
