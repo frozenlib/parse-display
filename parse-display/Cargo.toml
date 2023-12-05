@@ -16,6 +16,9 @@ parse-display-derive = { version = "=0.8.2", path = "../parse-display-derive" }
 regex = { version = "1.10.2", optional = true }
 regex-syntax = { version = "0.8.2", optional = true }
 
+[dev-dependencies]
+trybuild = "1.0.85"
+
 [features]
 default = ["std"]
 std = ["regex", "regex-syntax"]
