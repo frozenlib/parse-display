@@ -695,6 +695,7 @@
 //! assert_eq!("VarB-10".parse(), Ok(MyEnum::VarB { a:10, b:0, c:0 }));
 //! ```
 // #![include_doc("../../README.md", end("## License"))]
+//! [`IntoResult`]: IntoResult
 #![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(feature = "docs", feature(doc_auto_cfg))]
 
