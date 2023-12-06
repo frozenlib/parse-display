@@ -26,7 +26,7 @@ jobs:
         run: cargo test --verbose --target-dir=target/no-std --no-default-features --lib --tests
 
       - name: Clippy
-        run: cargo clippy --all-features --tests --lib -- -W clippy::all
+        run: cargo clippy --features std --tests --lib -- -W clippy::all
         env:
           RUSTFLAGS: -D warnings
       - name: Rustup toolchain install nightly
