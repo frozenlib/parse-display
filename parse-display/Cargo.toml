@@ -23,3 +23,7 @@ trybuild = "1.0.85"
 [features]
 default = ["std"]
 std = ["regex", "regex-syntax"]
+docs = []
+
+[package.metadata.docs.rs]
+features = ["docs"]

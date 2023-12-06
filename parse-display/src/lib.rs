@@ -696,6 +696,7 @@
 //! ```
 // #![include_doc("../../README.md", end("## License"))]
 #![cfg_attr(not(feature = "std"), no_std)]
+#![cfg_attr(feature = "docs", feature(doc_auto_cfg))]
 
 use core::convert::Infallible;
 use core::fmt::{Display, Formatter, Result};

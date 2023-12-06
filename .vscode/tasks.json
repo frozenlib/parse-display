@@ -109,6 +109,7 @@
       "label": "cargo doc open",
       "command": "cargo",
       "args": [
+        "+nightly",
         "doc",
         "--open",
         "--no-deps",
