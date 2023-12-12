@@ -619,7 +619,7 @@ impl<'a> ParserBuilder<'a> {
         }
         for field in self.fields.values() {
             let mut bounds = bounds.child(field.hattrs.bound_from_str_resolved());
-            if bounds.can_extend && field.capture.is_some() {
+            if bounds.can_extend && field.capture.is_some() && field.hattrs.with.is_none() {
                 let ty = &field.source.ty;
                 if generics.contains_in_type(ty) {
                     bounds.ty.push(ty.clone());
