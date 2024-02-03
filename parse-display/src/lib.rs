@@ -40,24 +40,21 @@
 //!
 //! Helper attributes can be written in the following positions.
 //!
-//! | attribute                                                     | struct | enum | variant | field |
-//! | ------------------------------------------------------------- | ------ | ---- | ------- | ----- |
-//! | [`#[display("...")]`](#display)                               | ✔      | ✔    | ✔       | ✔     |
-//! | [`#[display(style = "...")]`](#displaystyle--)                |        | ✔    | ✔       |       |
-//! | [`#[display(crate = ...)]`](#displaycrate--)                  | ✔      | ✔    |         |       |
-//! | [`#[display(bound(...))]`](#displaybound)                     | ✔      | ✔    | ✔       | ✔     |
-//! | [`#[from_str(bound(...))]`](#from_strbound)                   | ✔      | ✔    | ✔       | ✔     |
-//! | [`#[from_str(regex = "...")]`](#from_strregex--)              | ✔      | ✔    | ✔       | ✔     |
-//! | [`#[from_str(new = ...)]`](#from_strnew--)                    | ✔      |      | ✔       |       |
-//! | [`#[from_str(ignore)]`](#from_strignore)                      |        |      | ✔       |       |
-//! | [`#[from_str(default)]`](#from_strdefault)                    | ✔      |      |         | ✔     |
-//! | [`#[from_str(default_fields(...))]`](#from_strdefault_fields) | ✔      | ✔    | ✔       |       |
+//! | attribute                                                     | `#[display]` | `#[from_str]` | struct | enum | variant | field |
+//! | ------------------------------------------------------------- | ------------ | ------------- | ------ | ---- | ------- | ----- |
+//! | [`#[display("...")]`](#display)                               | ✔            |               | ✔      | ✔    | ✔       | ✔     |
+//! | [`#[display(style = "...")]`](#displaystyle--)                | ✔            |               |        | ✔    | ✔       |       |
+//! | [`#[display(with = ...)]`](#displaywith---from_strwith--)     | ✔            | ✔             |        |      |         | ✔     |
+//! | [`#[display(bound(...))]`](displaybound-from_strbound)        | ✔            | ✔             | ✔      | ✔    | ✔       | ✔     |
+//! | [`#[display(crate = ...)]`](#displaycrate--)                  | ✔            |               | ✔      | ✔    |         |       |
+//! | [`#[from_str(regex = "...")]`](#from_strregex--)              |              | ✔             | ✔      | ✔    | ✔       | ✔     |
+//! | [`#[from_str(new = ...)]`](#from_strnew--)                    |              | ✔             | ✔      |      | ✔       |       |
+//! | [`#[from_str(ignore)]`](#from_strignore)                      |              | ✔             |        |      | ✔       |       |
+//! | [`#[from_str(default)]`](#from_strdefault)                    |              | ✔             | ✔      |      |         | ✔     |
+//! | [`#[from_str(default_fields(...))]`](#from_strdefault_fields) |              | ✔             | ✔      | ✔    | ✔       |       |
 //!
-//! `#[derive(Display)]` use `#[display]`.
-//! `#[derive(FromStr)]` use both `#[display]` and `#[from_str]`.
-//!
-//! `key = value` style parameter can be specified only once for each key.
-//! `key(value1, value2, ...)` style parameter can be specified multiple times.
+//! - `#[derive(Display)]` use `#[display]`.
+//! - `#[derive(FromStr)]` use both `#[display]` and `#[from_str]`, with `#[from_str]` having priority.
 //!
 //! ## `#[display("...")]`
 //!
@@ -340,13 +337,17 @@
 //! assert_eq!(StyleExample::VarM.to_string(), "VAR M");
 //! ```
 //!
-//! ## `#[display(crate = ...)]`
+//! ## `#[display(with = "...")]`, `#[from_str(with = "...")]`
 //!
-//! Specify a path to the `parse-display` crate instance.
+//! You can customize [`Display`] and [`FromStr`] processing for a field by specifying the values that implements [`DisplayFormat`] and [`FromStrFormat`].
 //!
-//! Used when `::parse_display` is not an instance of `parse-display`, such as when a macro is re-exported or used from another macro.
+//! If [`Display`] of the field is used when this attribute is not specified, the value specified for the attribute must implement [`DisplayFormat`].
 //!
-//! ## `#[display(bound(...))]`
+//! If [`FromStr`] of the field is used when this attribute is not specified, the value specified for the attribute must implement [`FromStrFormat`].
+//!
+//! See [`DisplayFormat`] and [`FromStrFormat`] for details.
+//!
+//! ## `#[display(bound(...))]`, `#[from_str(bound(...))]`
 //!
 //! By default, the type of field used in the format is added to the trait bound.
 //!
@@ -438,8 +439,6 @@
 //! assert_eq!(Outer(Inner(10), 20).to_string(), "10, 20");
 //! ```
 //!
-//! ## `#[from_str(bound(...))]`
-//!
 //! You can use a different trait bound for `Display` and `FromStr` by specifying both `#[display(bound(...))]` and `#[from_str(bound(...))]`.
 //!
 //! ```rust
@@ -457,6 +456,12 @@
 //! assert_eq!(Outer(Inner(10)).to_string(), "10");
 //! assert_eq!("10".parse(), Ok(Outer(Inner(10))));
 //! ```
+//!
+//! ## `#[display(crate = ...)]`
+//!
+//! Specify a path to the `parse-display` crate instance.
+//!
+//! Used when `::parse_display` is not an instance of `parse-display`, such as when a macro is re-exported or used from another macro.
 //!
 //! ## `#[from_str(regex = "...")]`
 //!
@@ -769,10 +774,17 @@ impl<T, E> IntoResult<T> for core::result::Result<T, E> {
     }
 }
 
+/// A trait to customize the formatting method.
+///
+/// You can customize the field format by specifying a value that implements this trait with `#[display(with = ...)]`.
+///
+/// The expression specified for `#[display(with = ...)]` must be lightweight because the expression specified for `#[display(with = ...)]` is evaluated each time the field is formatted.
 pub trait DisplayFormat<T: ?Sized> {
+    /// Format the specified value.
     fn write(&self, f: &mut Formatter, value: &T) -> Result;
 }
 
+/// A trait to customize the parsing method.
 pub trait FromStrFormat<T> {
     type Err;
     fn parse(&self, s: &str) -> core::result::Result<T, Self::Err>;
