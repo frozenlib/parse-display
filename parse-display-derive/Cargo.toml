@@ -15,9 +15,9 @@ edition = "2021"
 proc-macro = true
 
 [dependencies]
-syn = { version = "2.0.39", features = ["visit"] }
-quote = "1.0.33"
-proc-macro2 = "1.0.70"
-regex = "1.10.2"
+syn = { version = "2.0.48", features = ["visit"] }
+quote = "1.0.35"
+proc-macro2 = "1.0.78"
+regex = "1.10.3"
 regex-syntax = "0.8.2"
-structmeta = "0.2.0"
+structmeta = "0.3.0"
