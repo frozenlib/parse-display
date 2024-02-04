@@ -5,7 +5,7 @@ use core::{
     str::FromStr,
 };
 
-use crate::{DisplayFormat, FromStrFormat};
+use parse_display::{DisplayFormat, FromStrFormat};
 
 pub struct Fmt;
 

@@ -12,6 +12,11 @@ description = "Procedural macro to implement Display and FromStr using common se
 edition = "2021"
 include = ["/src/**"]
 
+[features]
+default = ["std"]
+std = ["regex", "regex-syntax"]
+docs = []
+
 [dependencies]
 parse-display-derive = { version = "=0.8.2", path = "../parse-display-derive" }
 regex = { version = "1.10.3", optional = true }
@@ -19,11 +24,6 @@ regex-syntax = { version = "0.8.2", optional = true }
 
 [dev-dependencies]
 trybuild = "1.0.89"
-
-[features]
-default = ["std"]
-std = ["regex", "regex-syntax"]
-docs = []
 
 [package.metadata.docs.rs]
 features = ["docs"]

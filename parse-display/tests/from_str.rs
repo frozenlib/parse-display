@@ -1115,45 +1115,6 @@ fn regex_capture_prefix_escape() {
     assert_from_str_err::<TestStruct>("aa");
 }
 
-#[test]
-fn delimiter_struct() {
-    use parse_display::formats::delimiter;
-
-    #[derive(FromStr, Debug, Eq, PartialEq)]
-    #[display("{0}")]
-    struct X(#[display(with = delimiter(", "))] Vec<u32>);
-
-    assert_from_str("10, 20, 30", X(vec![10, 20, 30]));
-}
-
-#[test]
-fn delimiter_enum() {
-    use parse_display::formats::delimiter;
-
-    #[derive(FromStr, Debug, Eq, PartialEq)]
-
-    enum X {
-        #[display("a : {0}")]
-        A(#[display(with = delimiter(", "))] Vec<u32>),
-
-        #[display("b : {0}")]
-        B(#[display(with = delimiter(", "))] Vec<u32>),
-    }
-
-    assert_from_str("a : 10, 20, 30", X::A(vec![10, 20, 30]));
-    assert_from_str("b : 10, 20, 30", X::B(vec![10, 20, 30]));
-}
-
-#[test]
-fn with_and_default_bound() {
-    use parse_display::formats::delimiter;
-
-    #[derive(FromStr, Debug, Eq, PartialEq)]
-    struct X<T: FromStr>(#[from_str(with = delimiter(", "))] Vec<T>);
-
-    assert_from_str("10, 20, 30", X(vec![10, 20, 30]));
-}
-
 fn assert_from_str<T: FromStr + Debug + PartialEq>(s: &str, value: T)
 where
     <T as FromStr>::Err: Display,

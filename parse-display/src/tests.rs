@@ -11,6 +11,7 @@ fn test_crate() {
 }
 
 mod my_mod {
+    #[allow(unused_imports)]
     pub use crate as my_crate;
 }
 

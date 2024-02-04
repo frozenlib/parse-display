@@ -1,0 +1,20 @@
+[package]
+name = "parse-display-with"
+version = "0.0.1"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/frozenlib/parse-display"
+documentation = "https://docs.rs/parse-display-with/"
+keywords = ["parse-display"]
+categories = ["parsing"]
+description = "Custom formatting/parsing utilities for parse-display."
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[features]
+default = ["std"]
+std = ["parse-display/std"]
+
+[dependencies]
+parse-display = { version = "0.8.2", path = "../parse-display", default-features = false }

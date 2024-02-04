@@ -3,7 +3,7 @@
 extern crate alloc;
 use core::{fmt::LowerHex, mem::transmute};
 
-use alloc::{format, vec::Vec};
+use alloc::format;
 use parse_display::*;
 
 #[test]
@@ -1021,92 +1021,6 @@ fn by_debug() {
     }
     assert_display(E::A, &format!("{:?}", E::A));
     assert_display(E::B(10), &format!("{:?}", E::B(10)));
-}
-
-#[test]
-fn delimiter_struct() {
-    use parse_display::formats::delimiter;
-
-    #[derive(Display)]
-    #[display("{0}")]
-    struct X(#[display(with = delimiter(", "))] Vec<u32>);
-
-    assert_display(X(alloc::vec![10, 20, 30]), "10, 20, 30");
-}
-
-#[test]
-fn delimiter_enum() {
-    use parse_display::formats::delimiter;
-
-    #[derive(Display)]
-    enum X {
-        #[display("a : {0}")]
-        A(#[display(with = delimiter(", "))] Vec<u32>),
-
-        #[display("b : {0}")]
-        B(#[display(with = delimiter(", "))] Vec<u32>),
-    }
-
-    assert_display(X::A(alloc::vec![10, 20, 30]), "a : 10, 20, 30");
-    assert_display(X::B(alloc::vec![10, 20, 30]), "b : 10, 20, 30");
-}
-
-#[test]
-fn delimiter_field_vec() {
-    use parse_display::formats::delimiter;
-
-    #[derive(Display)]
-    #[display("{0}")]
-    struct X(#[display(with = delimiter(", "))] Vec<u32>);
-
-    assert_display(X(alloc::vec![10, 20, 30]), "10, 20, 30");
-}
-
-#[test]
-fn delimiter_field_array() {
-    use parse_display::formats::delimiter;
-
-    #[derive(Display)]
-    #[display("{0}")]
-    struct X(#[display(with = delimiter(", "))] [u32; 3]);
-
-    assert_display(X([10, 20, 30]), "10, 20, 30");
-}
-
-#[test]
-fn delimiter_field_slice() {
-    use parse_display::formats::delimiter;
-
-    #[derive(Display)]
-    #[display("{0}")]
-    struct X<'a>(#[display(with = delimiter(", "))] &'a [u32]);
-
-    assert_display(X(&[10, 20, 30]), "10, 20, 30");
-}
-
-#[test]
-fn delimiter_field_dst() {
-    use parse_display::formats::delimiter;
-
-    #[repr(transparent)]
-    #[derive(Display)]
-    #[display("{0}")]
-    struct X(#[display(with = delimiter(", "))] [u32]);
-
-    let x: &[u32] = &[10, 20, 30];
-    let x: &X = unsafe { transmute(x) };
-
-    assert_display(x, "10, 20, 30");
-}
-
-#[test]
-fn with_and_default_bound() {
-    use parse_display::formats::delimiter;
-
-    #[derive(Display, Debug, Eq, PartialEq)]
-    struct X<T: core::fmt::Display>(#[display(with = delimiter(", "))] Vec<T>);
-
-    assert_display(X(alloc::vec![10, 20, 30]), "10, 20, 30");
 }
 
 fn assert_display<T: core::fmt::Display>(value: T, display: &str) {

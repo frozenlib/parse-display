@@ -42,8 +42,6 @@ pub mod helpers;
 #[cfg(feature = "std")]
 mod helpers_std;
 
-pub mod formats;
-
 // #[include_doc("display.md", start)]
 /// Derive [`Display`].
 ///
