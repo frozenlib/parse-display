@@ -4,10 +4,6 @@
 
 ### Added
 
-- Support `#[display(with = ...)]`. [#36](https://github.com/frozenlib/parse-display/issues/36)
-- Support for use of format traits other than `Display` for self. [#35](https://github.com/frozenlib/parse-display/issues/35)
-- Allow DST fields with `#[derive(Display)]`.
-
 ### Changed
 
 ### Deprecated
@@ -17,6 +13,21 @@
 ### Fixed
 
 ### Security
+
+## [0.9.0] - 2024-02-04
+
+### Added
+
+- Support `#[display(with = ...)]`. [#36](https://github.com/frozenlib/parse-display/issues/36)
+- Support for use of format traits other than `Display` for self. [#35](https://github.com/frozenlib/parse-display/issues/35)
+- Allow DST fields with `#[derive(Display)]`.
+
+### Changed
+
+- Use [`std::sync::OnceLock`] in generated code and remove [`once_cell`] dependency.
+
+[`std::sync::OnceLock`]: https://doc.rust-lang.org/std/sync/struct.OnceLock.html
+[`once_cell`]: https://crates.io/crates/once_cell
 
 ## [0.8.2] - 2023-07-16
 
@@ -60,7 +71,8 @@
 
 - Support `#[from_str(ignore)]` for variant.
 
-[unreleased]: https://github.com/frozenlib/parse-display/compare/v0.8.2...HEAD
+[unreleased]: https://github.com/frozenlib/parse-display/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/frozenlib/parse-display/compare/v0.8.2...v0.9.0
 [0.8.2]: https://github.com/frozenlib/parse-display/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/frozenlib/parse-display/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/frozenlib/parse-display/compare/v0.7.0...v0.8.0
