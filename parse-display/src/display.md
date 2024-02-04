@@ -16,6 +16,7 @@ Helper attributes can be written in the following positions.
 | [`#[display(with = ...)]`](#displaywith---from_strwith--)     | ✔            | ✔             |        |      |         | ✔     |
 | [`#[display(bound(...))]`](displaybound-from_strbound)        | ✔            | ✔             | ✔      | ✔    | ✔       | ✔     |
 | [`#[display(crate = ...)]`](#displaycrate--)                  | ✔            |               | ✔      | ✔    |         |       |
+| [`#[display(dump)]`](#displaydump-from_strdump)               | ✔            | ✔             | ✔      | ✔    |         |       |
 | [`#[from_str(regex = "...")]`](#from_strregex--)              |              | ✔             | ✔      | ✔    | ✔       | ✔     |
 | [`#[from_str(new = ...)]`](#from_strnew--)                    |              | ✔             | ✔      |      | ✔       |       |
 | [`#[from_str(ignore)]`](#from_strignore)                      |              | ✔             |        |      | ✔       |       |
@@ -439,6 +440,10 @@ assert_eq!("10".parse(), Ok(Outer(Inner(10))));
 Specify a path to the `parse-display` crate instance.
 
 Used when `::parse_display` is not an instance of `parse-display`, such as when a macro is re-exported or used from another macro.
+
+## `#[display(dump)]`, `#[from_str(dump)]`
+
+Outputs the generated code as a compile error.
 
 ## `#[from_str(regex = "...")]`
 
