@@ -4,8 +4,8 @@
 
 ### Added
 
-- Support `#[display(with = ...)]`. (#36)
-- Support for use of format traits other than `Display` for self. (#35)
+- Support `#[display(with = ...)]`. [#36](https://github.com/frozenlib/parse-display/issues/36)
+- Support for use of format traits other than `Display` for self. [#35](https://github.com/frozenlib/parse-display/issues/35)
 - Allow DST fields with `#[derive(Display)]`.
 
 ### Changed
