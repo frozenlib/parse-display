@@ -28,7 +28,6 @@
 
 - Fix handling of regex that resemble, but aren't, captures (e.g. `(\(?<a>.*)`)
 
-
 ## [0.8.1] - 2023-06-10
 
 ### Added
