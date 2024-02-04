@@ -27,22 +27,22 @@ use parse_display::{Display, FromStr};
 
 #[derive(Display, FromStr, PartialEq, Debug)]
 #[display("{a}-{b}")]
-struct MyStruct {
+struct X {
   a: u32,
   b: u32,
 }
-assert_eq!(MyStruct { a:10, b:20 }.to_string(), "10-20");
-assert_eq!("10-20".parse(), Ok(MyStruct { a:10, b:20 }));
+assert_eq!(X { a:10, b:20 }.to_string(), "10-20");
+assert_eq!("10-20".parse(), Ok(X { a:10, b:20 }));
 
 
 #[derive(Display, FromStr, PartialEq, Debug)]
 #[display(style = "snake_case")]
-enum MyEnum {
+enum Y {
   VarA,
   VarB,
 }
-assert_eq!(MyEnum::VarA.to_string(), "var_a");
-assert_eq!("var_a".parse(), Ok(MyEnum::VarA));
+assert_eq!(Y::VarA.to_string(), "var_a");
+assert_eq!("var_a".parse(), Ok(Y::VarA));
 ```
 
 ## License

@@ -2,6 +2,31 @@
 //! These macros use common helper attributes to specify the format.
 //!
 //! See [`#[derive(Display)]`](derive@Display) for details.
+//!
+//! ## Examples
+//!
+//! ```rust
+//! use parse_display::{Display, FromStr};
+//!
+//! #[derive(Display, FromStr, PartialEq, Debug)]
+//! #[display("{a}-{b}")]
+//! struct X {
+//!   a: u32,
+//!   b: u32,
+//! }
+//! assert_eq!(X { a:10, b:20 }.to_string(), "10-20");
+//! assert_eq!("10-20".parse(), Ok(X { a:10, b:20 }));
+//!
+//!
+//! #[derive(Display, FromStr, PartialEq, Debug)]
+//! #[display(style = "snake_case")]
+//! enum Y {
+//!   VarA,
+//!   VarB,
+//! }
+//! assert_eq!(Y::VarA.to_string(), "var_a");
+//! assert_eq!("var_a".parse(), Ok(Y::VarA));
+//! ```
 #![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(feature = "docs", feature(doc_auto_cfg))]
 
@@ -47,7 +72,18 @@ pub mod formats;
 /// ## `#[display("...")]`
 ///
 /// Specifies the format using a syntax similar to `std::format!()`.
-/// However, unlike `std::format!()`, field name is specified in `{}`.
+///
+/// However, unlike `std::format!()`, `{}` has the following meaning.
+///
+/// | format              | struct | enum | variant | field | description                                                                         |
+/// | ------------------- | ------ | ---- | ------- | ----- | ----------------------------------------------------------------------------------- |
+/// | `{a}`, `{b}`, `{1}` | ✔      | ✔    | ✔       | ✔     | Use a field with the specified name.                                                |
+/// | `{a.b.c}`           | ✔      | ✔    | ✔       | ✔     | Use a nested field.                                                                 |
+/// | `{:x}`, `{:?}`      | ✔      | ✔    |         |       | Use format traits other than [`Display`] for `self`. (e.g. [`LowerHex`], [`Debug`]) |
+/// | `{}`                |        | ✔    | ✔       |       | Use a variant name of enum.                                                         |
+/// | `{}`                |        |      |         | ✔     | Use the field itself.                                                               |
+///
+/// [`LowerHex`]: std::fmt::LowerHex
 ///
 /// ### Struct format
 ///
@@ -204,30 +240,30 @@ pub mod formats;
 /// assert_eq!("this is A ___10___".parse(), Ok(MyEnum::VarA(10)));
 /// ```
 ///
-/// ### Display field chain
+/// ### Nested field
 ///
-/// You can use "field chain", e.g. `{x.a}` .
+/// You can use nested field, e.g. `{x.a}` .
 ///
 /// ```rust
 /// use parse_display::{Display, FromStr};
 ///
 /// #[derive(PartialEq, Debug, Default)]
-/// struct MyStruct {
-///   a: u32,
-///   b: u32,
+/// struct X {
+///     a: u32,
+///     b: u32,
 /// }
 ///
 /// #[derive(FromStr, Display, PartialEq, Debug)]
 /// #[display("{x.a}")]
-/// struct FieldChain {
-///   #[from_str(default)]
-///   x: MyStruct,
+/// struct Y {
+///     #[from_str(default)]
+///     x: X,
 /// }
-/// assert_eq!(FieldChain { x:MyStruct { a:10, b:20 } }.to_string(), "10");
-/// assert_eq!("10".parse(), Ok(FieldChain { x:MyStruct { a:10, b:0 } }));
+/// assert_eq!(Y { x: X { a: 10, b: 20 } }.to_string(), "10");
+/// assert_eq!("10".parse(), Ok(Y { x: X { a: 10, b: 0 } }));
 /// ```
 ///
-/// When using "field chain", you need to use [`#[from_str(default)]`](#from_strdefault) to implement `FromStr`.
+/// When using nested field, you need to use [`#[from_str(default)]`](#from_strdefault) to implement `FromStr`.
 ///
 /// ### Format parameter
 ///
@@ -526,28 +562,28 @@ pub mod formats;
 /// assert_eq!("xxxVarBxxx".parse(), Ok(MyEnum::VarB));
 /// ```
 ///
-/// ### Regex field chain
+/// ### Regex nested field
 ///
-/// You can use "field chain" in regex.
+/// You can use nested field in regex.
 ///
 /// ```rust
 /// use parse_display::FromStr;
 ///
 /// #[derive(PartialEq, Debug, Default)]
-/// struct MyStruct {
-///   a: u32,
+/// struct X {
+///     a: u32,
 /// }
 ///
 /// #[derive(FromStr, PartialEq, Debug)]
 /// #[from_str(regex = "___(?<x.a>[0-9]+)")]
-/// struct FieldChain {
-///   #[from_str(default)]
-///   x: MyStruct,
+/// struct Y {
+///     #[from_str(default)]
+///     x: X,
 /// }
-/// assert_eq!("___10".parse(), Ok(FieldChain { x:MyStruct { a:10 } }));
+/// assert_eq!("___10".parse(), Ok(Y { x: X { a: 10 } }));
 /// ```
 ///
-/// When using "field chain", you need to use [`#[from_str(default)]`](#from_strdefault).
+/// When using nested field, you need to use [`#[from_str(default)]`](#from_strdefault).
 ///
 /// ## `#[from_str(new = ...)]`
 ///
