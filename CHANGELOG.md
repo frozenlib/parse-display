@@ -4,6 +4,10 @@
 
 ### Added
 
+- Support `#[display(with = ...)]`. (#36)
+- Support for use of format traits other than `Display` for self. (#35)
+- Allow DST fields with `#[derive(Display)]`.
+
 ### Changed
 
 ### Deprecated
