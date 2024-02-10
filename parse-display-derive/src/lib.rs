@@ -39,7 +39,7 @@ pub fn derive_display(input: proc_macro::TokenStream) -> proc_macro::TokenStream
     into_macro_output(match &input.data {
         Data::Struct(data) => derive_display_for_struct(&input, data),
         Data::Enum(data) => derive_display_for_enum(&input, data),
-        _ => panic!("`#[derive(Display)]` supports only enum or struct."),
+        Data::Union(_) => panic!("`#[derive(Display)]` supports only enum or struct."),
     })
 }
 
@@ -55,12 +55,11 @@ fn derive_display_for_struct(input: &DeriveInput, data: &DataStruct) -> Result<T
     if format.is_none() {
         format = DisplayFormat::from_newtype_struct(data);
     }
-    let format = match format {
-        Some(x) => x,
-        None => bail!(
+    let Some(format) = format else {
+        bail!(
             input.span(),
-            "`#[display(\"format\")]` is required except newtype pattern.",
-        ),
+            r#"`#[display("format")]` is required except newtype pattern."#,
+        )
     };
     let mut bounds = Bounds::from_data(hattrs.bound_display);
     let args = format.format_args(context, &None, &mut bounds, &generics)?;
@@ -111,12 +110,11 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Token
         if format.is_none() {
             format = DisplayFormat::from_unit_variant(variant)?;
         }
-        let format = match format {
-            Some(x) => x,
-            None => bail!(
+        let Some(format) = format else {
+            bail!(
                 variant.span(),
-                "`#[display(\"format\")]` is required except unit variant."
-            ),
+                r#"`#[display(\"format\")]` is required except unit variant."#
+            )
         };
         let variant_ident = &variant.ident;
         let args = format.format_args(
@@ -160,7 +158,7 @@ pub fn derive_from_str(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
     into_macro_output(match &input.data {
         Data::Struct(data) => derive_from_str_for_struct(&input, data),
         Data::Enum(data) => derive_from_str_for_enum(&input, data),
-        _ => panic!("`#[derive(FromStr)]` supports only enum or struct."),
+        Data::Union(_) => panic!("`#[derive(FromStr)]` supports only enum or struct."),
     })
 }
 fn derive_from_str_for_struct(input: &DeriveInput, data: &DataStruct) -> Result<TokenStream> {
@@ -197,7 +195,7 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Toke
     let generics = GenericParamSet::new(&input.generics);
     let mut bodys = Vec::new();
     let mut arms = Vec::new();
-    for variant in data.variants.iter() {
+    for variant in &data.variants {
         let hattrs_variant = HelperAttributes::from(&variant.attrs)?;
         if hattrs_variant.ignore.value() {
             continue;
@@ -345,14 +343,15 @@ impl<'a> ParserBuilder<'a> {
     }
 
     fn push_regex(&mut self, s: &LitStr, context: &DisplayContext) -> Result<()> {
-        let regex_number = regex!("^[0-9]+$");
-        let regex_capture = regex!(r"(?<esc>\\*)\(\?(?<p>P?)<(?<key>[_0-9a-zA-Z.]*)>");
         const IDX_ESC: usize = 1;
         const IDX_P: usize = 2;
         const IDX_KEY: usize = 3;
         fn is_escaped(s: &str) -> bool {
             s.len() % 2 == 1
         }
+
+        let regex_number = regex!("^[0-9]+$");
+        let regex_capture = regex!(r"(?<esc>\\*)\(\?(?<p>P?)<(?<key>[_0-9a-zA-Z.]*)>");
 
         let text = s.value();
         let text_debug = regex_capture.replace_all(&text, |c: &Captures| {
@@ -370,7 +369,7 @@ impl<'a> ParserBuilder<'a> {
             format!("{esc}(?<{key}>")
         });
         if let Err(e) = regex_syntax::ast::parse::Parser::new().parse(&text_debug) {
-            bail!(s.span(), "{}", e)
+            bail!(s.span(), "{e}")
         }
 
         let mut has_capture = false;
@@ -400,17 +399,16 @@ impl<'a> ParserBuilder<'a> {
                 self.parse_format
                     .push_hir(to_hir_with_expand(&text, CAPTURE_NAME_EMPTY, &value));
                 return Ok(());
-            } else {
-                bail!(
-                    s.span(),
-                    "`(?{p}<>)` (empty capture name) is not allowed in struct's regex."
-                );
             }
+            bail!(
+                s.span(),
+                "`(?{p}<>)` (empty capture name) is not allowed in struct's regex."
+            );
         }
         if let DisplayContext::Field { .. } = context {
             if !has_capture {
                 let name = self.set_capture(context, &[], s.span())?;
-                text = format!("(?<{}>{})", name, &text);
+                text = format!("(?<{name}>{text})");
             }
         }
         self.parse_format.push_hir(to_hir(&text));
@@ -455,7 +453,7 @@ impl<'a> ParserBuilder<'a> {
         Ok(())
     }
     fn push_str(&mut self, string: &str) {
-        self.parse_format.push_str(string)
+        self.parse_format.push_str(string);
     }
     fn push_field(&mut self, context: &DisplayContext, key: &FieldKey, span: Span) -> Result<()> {
         let e = self.field(key, span)?;
@@ -565,7 +563,7 @@ impl<'a> ParserBuilder<'a> {
                     let mut fields_code = Vec::new();
                     for (key, field) in &self.fields {
                         let expr = field.build_field_init_expr(&names, key, self.span)?;
-                        fields_code.push(quote! { #key : #expr })
+                        fields_code.push(quote! { #key : #expr });
                     }
                     quote! { { #(#fields_code,)* } }
                 }
@@ -727,7 +725,7 @@ impl<'a> FieldEntry<'a> {
             }
             return Ok(expr);
         }
-        bail!(span, "field `{}` is not appear in format.", key);
+        bail!(span, "field `{key}` is not appear in format.");
     }
 }
 
@@ -1178,10 +1176,8 @@ impl<'a> DisplayContext<'a> {
             if let Some(fields) = self.fields() {
                 let key = &keys[0];
                 let m = field_map(fields);
-                let field = if let Some(field) = m.get(key) {
-                    field
-                } else {
-                    bail!(span, "unknown field '{}'.", key);
+                let Some(field) = m.get(key) else {
+                    bail!(span, "unknown field '{key}'.");
                 };
                 return self.format_arg_of_field(key, field, &format_spec, span, bounds, generics);
             }
@@ -1523,7 +1519,7 @@ impl FieldKey {
 
     fn to_member(&self) -> Member {
         match self {
-            FieldKey::Named(s) => Member::Named(format_ident!("r#{}", s)),
+            FieldKey::Named(s) => Member::Named(format_ident!("r#{s}")),
             FieldKey::Unnamed(idx) => Member::Unnamed(parse_str(&format!("{idx}")).unwrap()),
         }
     }
@@ -1548,7 +1544,7 @@ impl std::fmt::Display for FieldKey {
 }
 impl quote::ToTokens for FieldKey {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        self.to_member().to_tokens(tokens)
+        self.to_member().to_tokens(tokens);
     }
 }
 
@@ -1566,10 +1562,10 @@ fn field_map(fields: &Fields) -> BTreeMap<FieldKey, &Field> {
 }
 
 fn join<T: std::fmt::Display>(s: impl IntoIterator<Item = T>, sep: &str) -> String {
-    use std::fmt::*;
+    use std::fmt::Write as _;
     let mut sep_current = "";
     let mut buf = String::new();
-    for i in s.into_iter() {
+    for i in s {
         write!(&mut buf, "{sep_current}{i}").unwrap();
         sep_current = sep;
     }
@@ -1591,7 +1587,7 @@ fn field_of<'a, 'b>(
     if let Some(f) = fields.get_mut(key) {
         Ok(f)
     } else {
-        bail!(span, "field `{}` not found.", key);
+        bail!(span, "field `{key}` not found.");
     }
 }
 

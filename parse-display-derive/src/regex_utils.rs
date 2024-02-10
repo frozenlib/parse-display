@@ -14,7 +14,7 @@ pub fn to_hir_with_expand(s: &str, name: &str, value: &str) -> Hir {
             None
         }
     });
-    let s = format!("{}", &ast);
+    let s = format!("{ast}");
 
     regex_syntax::hir::translate::Translator::new()
         .translate(&s, &ast)
@@ -36,7 +36,7 @@ pub fn to_regex_string(hirs: &[Hir]) -> String {
 
 fn replace_asts(asts: &mut Vec<Ast>, f: &mut impl FnMut(&mut Ast) -> bool) {
     for ast in asts {
-        replace_ast(ast, f)
+        replace_ast(ast, f);
     }
 }
 
@@ -44,7 +44,6 @@ fn replace_ast(ast: &mut Ast, f: &mut impl FnMut(&mut Ast) -> bool) {
     if !f(ast) {
         return;
     }
-    use regex_syntax::ast::*;
     match ast {
         Ast::Empty(..)
         | Ast::Flags(..)
@@ -64,7 +63,7 @@ fn replace_ast(ast: &mut Ast, f: &mut impl FnMut(&mut Ast) -> bool) {
 fn expand_capture(ast: &mut Ast, mut f: impl FnMut(&str) -> Option<Ast>) {
     let f = &mut f;
     replace_ast(ast, &mut |ast| {
-        use regex_syntax::ast::*;
+        use regex_syntax::ast::GroupKind;
         if let Ast::Group(g) = &ast {
             if let GroupKind::CaptureName { name, .. } = &g.kind {
                 if let Some(ast_new) = f(&name.name) {
@@ -74,7 +73,7 @@ fn expand_capture(ast: &mut Ast, mut f: impl FnMut(&str) -> Option<Ast>) {
             }
         }
         true
-    })
+    });
 }
 pub fn try_replace_all<R: AsRef<str>, E>(
     regex: &Regex,
