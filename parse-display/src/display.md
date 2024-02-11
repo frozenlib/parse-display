@@ -97,7 +97,7 @@ assert_eq!("bbb".parse(), Ok(MyEnum::VarB));
 ```
 
 In enum format, `{}` means variant name.
-Variant name style (e.g. snake_case, camelCase, ...) can be specified by [`#[from_str(style = "...")]`](#displaystyle--).
+Variant name style (e.g. `snake_case`, `camelCase`, ...) can be specified by [`#[from_str(style = "...")]`](#displaystyle--).
 
 ```rust
 use parse_display::{Display, FromStr};
