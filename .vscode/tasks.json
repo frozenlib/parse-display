@@ -152,7 +152,6 @@
       "command": "cargo",
       "args": [
         "clippy",
-        "--all-features",
         "--tests",
         "--lib",
         "--",
