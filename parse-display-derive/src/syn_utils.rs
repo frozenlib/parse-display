@@ -47,7 +47,7 @@ impl GenericParamSet {
                 GenericParam::Const(t) => {
                     idents.insert(t.ident.unraw());
                 }
-                _ => {}
+                GenericParam::Lifetime(_) => {}
             }
         }
         Self { idents }
@@ -128,7 +128,7 @@ impl<T: Parse> Parse for ArgsOf<T> {
 }
 impl<T: ToTokens> ToTokens for ArgsOf<T> {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        self.0.to_tokens(tokens)
+        self.0.to_tokens(tokens);
     }
 }
 
@@ -170,8 +170,6 @@ pub fn impl_trait_result(
     dump: bool,
 ) -> Result<TokenStream> {
     let ts = impl_trait(input, trait_path, wheres, contents);
-    if dump {
-        panic!("macro output:\n{ts}");
-    }
+    assert!(!dump, "macro output:\n{ts}");
     Ok(ts)
 }

@@ -9,7 +9,7 @@ struct PathFormat;
 
 impl<T: ?Sized + AsRef<Path>> DisplayFormat<T> for PathFormat {
     fn write(&self, f: &mut Formatter, value: &T) -> fmt::Result {
-        write!(f, "{}", &value.as_ref().display())
+        write!(f, "{}", value.as_ref().display())
     }
 }
 fn path() -> PathFormat {

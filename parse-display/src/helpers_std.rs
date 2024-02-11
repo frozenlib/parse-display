@@ -21,13 +21,13 @@ pub fn to_ast<T, E>(format: &dyn FromStrFormat<T, Err = E>) -> Option<Ast> {
                     g.kind = GroupKind::NonCapturing(Flags {
                         span: g.span,
                         items: vec![],
-                    })
+                    });
                 }
                 GroupKind::CaptureName { name, .. } => {
                     return Err(format!(
                         "named capture group is not supported: `{}`",
                         name.name
-                    ))
+                    ));
                 }
                 GroupKind::NonCapturing(_) => {}
             }
@@ -86,7 +86,6 @@ fn replace_ast(
     if !f(ast)? {
         return Ok(());
     }
-    use regex_syntax::ast::*;
     match ast {
         Ast::Empty(..)
         | Ast::Flags(..)
