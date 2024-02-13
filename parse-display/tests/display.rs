@@ -1023,6 +1023,19 @@ fn by_debug() {
     assert_display(E::B(10), &format!("{:?}", E::B(10)));
 }
 
+#[test]
+fn escape() {
+    #[derive(Display)]
+    #[display("{{")]
+    struct X;
+    assert_display(X, "{");
+
+    #[derive(Display)]
+    #[display("}}")]
+    struct Y;
+    assert_display(Y, "}");
+}
+
 fn assert_display<T: core::fmt::Display>(value: T, display: &str) {
     let value_display = format!("{value}");
     assert_eq!(value_display, display);

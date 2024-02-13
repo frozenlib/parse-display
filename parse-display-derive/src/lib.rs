@@ -15,7 +15,7 @@ mod format_syntax;
 
 use crate::{format_syntax::*, regex_utils::*, syn_utils::*};
 use proc_macro2::{Span, TokenStream};
-use quote::{format_ident, quote};
+use quote::{format_ident, quote, ToTokens};
 use regex::{Captures, Regex};
 use regex_syntax::hir::Hir;
 use std::{
@@ -62,7 +62,9 @@ fn derive_display_for_struct(input: &DeriveInput, data: &DataStruct) -> Result<T
         )
     };
     let mut bounds = Bounds::from_data(hattrs.bound_display);
-    let args = format.format_args(context, &None, &mut bounds, &generics)?;
+    let write = format
+        .format_args(context, &None, &mut bounds, &generics)?
+        .build_write(quote!(f))?;
     let trait_path = parse_quote!(::core::fmt::Display);
     let wheres = bounds.build_wheres(&trait_path);
     impl_trait_result(
@@ -71,7 +73,7 @@ fn derive_display_for_struct(input: &DeriveInput, data: &DataStruct) -> Result<T
         &wheres,
         quote! {
             fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
-                ::core::write!(f, #args)
+                #write
             }
         },
         hattrs.dump_display,
@@ -117,19 +119,21 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Token
             )
         };
         let variant_ident = &variant.ident;
-        let args = format.format_args(
-            DisplayContext::Variant {
-                variant,
-                style,
-                crate_path: &hattrs_enum.crate_path,
-            },
-            &None,
-            &mut bounds.child(hattrs_variant.bound_display),
-            generics,
-        )?;
+        let write = format
+            .format_args(
+                DisplayContext::Variant {
+                    variant,
+                    style,
+                    crate_path: &hattrs_enum.crate_path,
+                },
+                &None,
+                &mut bounds.child(hattrs_variant.bound_display),
+                generics,
+            )?
+            .build_write(quote!(f))?;
         Ok(quote! {
             & Self::#variant_ident #fields => {
-                ::core::write!(f, #args)
+                #write
             },
         })
     }
@@ -1080,7 +1084,7 @@ impl DisplayFormat {
         with: &Option<Expr>,
         bounds: &mut Bounds,
         generics: &GenericParamSet,
-    ) -> Result<TokenStream> {
+    ) -> Result<FormatArgs> {
         let mut format_str = String::new();
         let mut format_args = Vec::new();
         for p in &self.parts {
@@ -1102,8 +1106,42 @@ impl DisplayFormat {
                 }
             }
         }
-        let format_str = LitStr::new(&format_str, self.span);
-        Ok(quote! { #format_str #(,#format_args)* })
+        Ok(FormatArgs {
+            format_str,
+            format_args,
+            span: self.span,
+        })
+    }
+
+    fn try_unescape(&self) -> Option<String> {
+        let mut s = String::new();
+        for p in &self.parts {
+            s.push_str(p.try_unescape()?);
+        }
+        Some(s)
+    }
+}
+
+struct FormatArgs {
+    format_str: String,
+    format_args: Vec<TokenStream>,
+    span: Span,
+}
+impl FormatArgs {
+    fn build_write(&self, f: TokenStream) -> Result<TokenStream> {
+        if self.format_args.is_empty() {
+            if let Some(s) = DisplayFormat::parse(&self.format_str, self.span)?.try_unescape() {
+                return Ok(quote! { #f.write_str(#s) });
+            }
+        }
+        Ok(quote! { ::core::write!(#f, #self) })
+    }
+}
+impl ToTokens for FormatArgs {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let format_str = LitStr::new(&self.format_str, self.span);
+        let format_args = &self.format_args;
+        tokens.extend(quote!(#format_str #(,#format_args)*));
     }
 }
 
@@ -1113,6 +1151,16 @@ enum DisplayFormatPart {
     EscapedBeginBracket,
     EscapedEndBracket,
     Var { arg: String, format_spec: String },
+}
+impl DisplayFormatPart {
+    fn try_unescape(&self) -> Option<&str> {
+        match self {
+            Self::Str(value) => Some(value),
+            Self::EscapedBeginBracket => Some("{"),
+            Self::EscapedEndBracket => Some("}"),
+            Self::Var { .. } => None,
+        }
+    }
 }
 
 enum DisplayContext<'a> {
@@ -1542,7 +1590,7 @@ impl std::fmt::Display for FieldKey {
         }
     }
 }
-impl quote::ToTokens for FieldKey {
+impl ToTokens for FieldKey {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         self.to_member().to_tokens(tokens);
     }
