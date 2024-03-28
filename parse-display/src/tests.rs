@@ -7,7 +7,7 @@ fn test_crate() {
     #[cfg(feature = "std")]
     #[derive(crate::FromStr)]
     #[display(crate = crate)]
-    struct TestFromStr(u32);
+    struct TestFromStr(#[allow(dead_code)] u32);
 }
 
 mod my_mod {
@@ -24,5 +24,5 @@ fn test_crate_mod() {
     #[cfg(feature = "std")]
     #[derive(crate::FromStr)]
     #[display(crate = my_mod::my_crate)]
-    struct TestFromStr(u32);
+    struct TestFromStr(#[allow(dead_code)] u32);
 }
