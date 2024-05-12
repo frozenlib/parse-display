@@ -842,6 +842,7 @@ fn bound_type_generic_x2() {
 }
 
 #[test]
+#[allow(dead_code)]
 fn bound_type_array() {
     #[derive(Display)]
     #[display(bound([T; 1]))]
@@ -984,6 +985,7 @@ fn format_spec_is_empty() {
     #[derive(Display)]
     #[display("{0}>")]
     struct TestStruct(u32);
+    assert_display(TestStruct(10), "10>");
 }
 
 #[test]

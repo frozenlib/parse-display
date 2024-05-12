@@ -107,7 +107,7 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Token
         let style = DisplayStyle::from_helper_attributes(hattrs_enum, &hattrs_variant);
         let mut format = hattrs_variant.format;
         if format.is_none() {
-            format = hattrs_enum.format.clone();
+            format.clone_from(&hattrs_enum.format);
         }
         if format.is_none() {
             format = DisplayFormat::from_unit_variant(variant)?;
@@ -283,7 +283,7 @@ impl<'a> ParserBuilder<'a> {
             data,
             crate_path: &hattrs.crate_path,
         };
-        s.new_expr = hattrs.new_expr.clone();
+        s.new_expr.clone_from(&hattrs.new_expr);
         s.apply_attrs(hattrs)?;
         s.push_attrs(hattrs, &context)?;
         Ok(s)
@@ -299,7 +299,7 @@ impl<'a> ParserBuilder<'a> {
             style: DisplayStyle::from_helper_attributes(hattrs_enum, hattrs_variant),
             crate_path: &hattrs_enum.crate_path,
         };
-        s.new_expr = hattrs_variant.new_expr.clone();
+        s.new_expr.clone_from(&hattrs_variant.new_expr);
         s.apply_attrs(hattrs_enum)?;
         s.apply_attrs(hattrs_variant)?;
         if !s.try_push_attrs(hattrs_variant, &context)? {
