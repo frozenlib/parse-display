@@ -10,6 +10,7 @@ documentation = "https://docs.rs/parse-display-with/"
 keywords = ["parse-display"]
 categories = ["parsing"]
 description = "Custom formatting/parsing utilities for parse-display."
+rust-version = "1.70.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

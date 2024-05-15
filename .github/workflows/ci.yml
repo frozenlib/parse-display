@@ -37,3 +37,6 @@ jobs:
         run: cargo +stable test --verbose --no-run
       - name: Run tests (minimal versions)
         run: cargo +stable test --verbose
+      - uses: taiki-e/install-action@cargo-hack
+      - name: Check msrv
+        run: cargo hack check --rust-version --workspace --all-targets --ignore-private
