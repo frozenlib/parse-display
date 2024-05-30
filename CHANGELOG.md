@@ -6,11 +6,21 @@
 
 ### Changed
 
-- Set `rust-version` to 1.70.0. [#42](https://github.com/frozenlib/parse-display/issues/42)
-
 ### Deprecated
 
 ### Removed
+
+### Fixed
+
+### Performance
+
+### Security
+
+## [0.9.1] - 2024-05-31
+
+### Changed
+
+- Set `rust-version` to 1.70.0. [#42](https://github.com/frozenlib/parse-display/issues/42)
 
 ### Fixed
 
@@ -19,8 +29,6 @@
 ### Performance
 
 - Optimizing runtime performance for the literal string case. [#39](https://github.com/frozenlib/parse-display/issues/39)
-
-### Security
 
 ## [0.9.0] - 2024-02-04
 
@@ -79,7 +87,8 @@
 
 - Support `#[from_str(ignore)]` for variant.
 
-[unreleased]: https://github.com/frozenlib/parse-display/compare/v0.9.0...HEAD
+[unreleased]: https://github.com/frozenlib/parse-display/compare/v0.9.1...HEAD
+[0.9.1]: https://github.com/frozenlib/parse-display/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/frozenlib/parse-display/compare/v0.8.2...v0.9.0
 [0.8.2]: https://github.com/frozenlib/parse-display/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/frozenlib/parse-display/compare/v0.8.0...v0.8.1
