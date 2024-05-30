@@ -1038,6 +1038,29 @@ fn escape() {
     assert_display(Y, "}");
 }
 
+#[test]
+fn struct_field_pointer() {
+    #[derive(Display)]
+    #[display("{0:p}")]
+    #[allow(unused)]
+    struct X(*const u32);
+    let p: *const u32 = &0;
+    assert_display(X(p), &format!("{p:p}"));
+}
+
+#[test]
+fn enum_field_pointer() {
+    #[derive(Display)]
+    #[allow(unused)]
+    enum X {
+        #[display("{0:p}")]
+        A(*const u32),
+    }
+    let p: *const u32 = &0;
+    assert_display(X::A(p), &format!("{p:p}"));
+}
+
+#[track_caller]
 fn assert_display<T: core::fmt::Display>(value: T, display: &str) {
     let value_display = format!("{value}");
     assert_eq!(value_display, display);

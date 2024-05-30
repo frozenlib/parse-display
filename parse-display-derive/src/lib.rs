@@ -1087,6 +1087,8 @@ impl DisplayFormat {
     ) -> Result<FormatArgs> {
         let mut format_str = String::new();
         let mut format_args = Vec::new();
+        let crate_path = context.crate_path();
+        let fmt_ref = quote!(#crate_path::helpers::FmtRef);
         for p in &self.parts {
             use DisplayFormatPart::*;
             match p {
@@ -1102,7 +1104,7 @@ impl DisplayFormat {
                     format_str.push('}');
                     let format_arg =
                         context.format_arg(arg, format_spec, self.span, with, bounds, generics)?;
-                    format_args.push(quote!(&#format_arg));
+                    format_args.push(quote!(#fmt_ref(&#format_arg)));
                 }
             }
         }
@@ -1316,7 +1318,7 @@ impl<'a> DisplayContext<'a> {
             DisplayContext::Struct { .. } => quote! { self.#key },
             DisplayContext::Variant { .. } => {
                 let var = key.binding_var();
-                quote! { #var }
+                quote! { (*#var) }
             }
             DisplayContext::Field {
                 parent,
