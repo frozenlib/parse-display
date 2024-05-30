@@ -6,11 +6,19 @@
 
 ### Changed
 
+- Set `rust-version` to 1.70.0. [#42](https://github.com/frozenlib/parse-display/issues/42)
+
 ### Deprecated
 
 ### Removed
 
 ### Fixed
+
+- Ensure `Pointer` format is formatted correctly.
+
+### Performance
+
+- Optimizing runtime performance for the literal string case. [#39](https://github.com/frozenlib/parse-display/issues/39)
 
 ### Security
 
