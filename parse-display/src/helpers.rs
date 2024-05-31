@@ -22,67 +22,11 @@ where
     fmt.parse(s)
 }
 
-pub struct FmtRef<'a, T: ?Sized>(pub &'a T);
+pub struct FmtPointer<'a, T: ?Sized + fmt::Pointer>(pub &'a T);
 
-impl<'a, T: ?Sized + fmt::Display> fmt::Display for FmtRef<'a, T> {
-    #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fmt::Display::fmt(self.0, f)
-    }
-}
-
-impl<'a, T: ?Sized + fmt::Debug> fmt::Debug for FmtRef<'a, T> {
-    #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fmt::Debug::fmt(self.0, f)
-    }
-}
-
-impl<'a, T: ?Sized + fmt::Binary> fmt::Binary for FmtRef<'a, T> {
-    #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fmt::Binary::fmt(self.0, f)
-    }
-}
-
-impl<'a, T: ?Sized + fmt::Octal> fmt::Octal for FmtRef<'a, T> {
-    #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fmt::Octal::fmt(self.0, f)
-    }
-}
-
-impl<'a, T: ?Sized + fmt::LowerHex> fmt::LowerHex for FmtRef<'a, T> {
-    #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fmt::LowerHex::fmt(self.0, f)
-    }
-}
-
-impl<'a, T: ?Sized + fmt::UpperHex> fmt::UpperHex for FmtRef<'a, T> {
-    #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fmt::UpperHex::fmt(self.0, f)
-    }
-}
-
-impl<'a, T: ?Sized + fmt::Pointer> fmt::Pointer for FmtRef<'a, T> {
+impl<'a, T: ?Sized + fmt::Pointer> fmt::Pointer for FmtPointer<'a, T> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Pointer::fmt(self.0, f)
-    }
-}
-
-impl<'a, T: ?Sized + fmt::LowerExp> fmt::LowerExp for FmtRef<'a, T> {
-    #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fmt::LowerExp::fmt(self.0, f)
-    }
-}
-
-impl<'a, T: ?Sized + fmt::UpperExp> fmt::UpperExp for FmtRef<'a, T> {
-    #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fmt::UpperExp::fmt(&self.0, f)
     }
 }

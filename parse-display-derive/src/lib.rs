@@ -1087,8 +1087,6 @@ impl DisplayFormat {
     ) -> Result<FormatArgs> {
         let mut format_str = String::new();
         let mut format_args = Vec::new();
-        let crate_path = context.crate_path();
-        let fmt_ref = quote!(#crate_path::helpers::FmtRef);
         for p in &self.parts {
             use DisplayFormatPart::*;
             match p {
@@ -1102,9 +1100,15 @@ impl DisplayFormat {
                         format_str.push_str(format_spec);
                     }
                     format_str.push('}');
+                    let format_spec = FormatSpec::parse_with_span(format_spec, self.span)?;
                     let format_arg =
-                        context.format_arg(arg, format_spec, self.span, with, bounds, generics)?;
-                    format_args.push(quote!(#fmt_ref(&#format_arg)));
+                        context.format_arg(arg, &format_spec, self.span, with, bounds, generics)?;
+                    let mut expr = quote!(&#format_arg);
+                    if format_spec.format_type == FormatType::Pointer {
+                        let crate_path = context.crate_path();
+                        expr = quote!(#crate_path::helpers::FmtPointer(#expr));
+                    }
+                    format_args.push(expr);
                 }
             }
         }
@@ -1186,14 +1190,13 @@ impl<'a> DisplayContext<'a> {
     fn format_arg(
         &self,
         arg: &str,
-        format_spec: &str,
+        format_spec: &FormatSpec,
         span: Span,
         with: &Option<Expr>,
         bounds: &mut Bounds,
         generics: &GenericParamSet,
     ) -> Result<TokenStream> {
         let keys = FieldKey::from_str_deep(arg);
-        let format_spec = FormatSpec::parse_with_span(format_spec, span)?;
         if keys.is_empty() {
             if matches!(
                 self,
@@ -1209,7 +1212,7 @@ impl<'a> DisplayContext<'a> {
                 DisplayContext::Field { parent, field, key } => parent.format_arg_by_field_expr(
                     key,
                     field,
-                    &format_spec,
+                    format_spec,
                     span,
                     with,
                     bounds,
@@ -1229,7 +1232,7 @@ impl<'a> DisplayContext<'a> {
                 let Some(field) = m.get(key) else {
                     bail!(span, "unknown field '{key}'.");
                 };
-                return self.format_arg_of_field(key, field, &format_spec, span, bounds, generics);
+                return self.format_arg_of_field(key, field, format_spec, span, bounds, generics);
             }
         }
         let mut expr = self.field_expr(&keys[0]);
