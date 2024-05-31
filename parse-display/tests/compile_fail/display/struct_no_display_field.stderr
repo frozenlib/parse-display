@@ -4,6 +4,7 @@ error[E0277]: `NoDisplay` doesn't implement `std::fmt::Display`
 3 | #[derive(Display)]
   |          ^^^^^^^ `NoDisplay` cannot be formatted with the default formatter
   |
-  = help: the trait `std::fmt::Display` is not implemented for `NoDisplay`
+  = help: the trait `std::fmt::Display` is not implemented for `NoDisplay`, which is required by `FmtRef<'_, NoDisplay>: std::fmt::Display`
   = note: in format strings you may be able to use `{:?}` (or {:#?} for pretty-print) instead
+  = help: the trait `std::fmt::Display` is implemented for `FmtRef<'a, T>`
   = note: this error originates in the macro `$crate::format_args` which comes from the expansion of the derive macro `Display` (in Nightly builds, run with -Z macro-backtrace for more info)
