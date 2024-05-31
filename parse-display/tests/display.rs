@@ -1049,6 +1049,28 @@ fn struct_field_pointer() {
 }
 
 #[test]
+fn struct_field_pointer_field_format() {
+    #[derive(Display)]
+    #[display("{0}")]
+    #[allow(unused)]
+    struct X(#[display("{:p}")] *const u32);
+    let p: *const u32 = &0;
+    assert_display(X(p), &format!("{p:p}"));
+}
+
+#[test]
+fn struct_field_pointer_deep() {
+    #[derive(Display)]
+    #[display("{0.0:p}")]
+    #[allow(unused)]
+    struct X(Y);
+
+    struct Y(*const u32);
+    let p: *const u32 = &0;
+    assert_display(X(Y(p)), &format!("{p:p}"));
+}
+
+#[test]
 fn enum_field_pointer() {
     #[derive(Display)]
     #[allow(unused)]
@@ -1058,6 +1080,32 @@ fn enum_field_pointer() {
     }
     let p: *const u32 = &0;
     assert_display(X::A(p), &format!("{p:p}"));
+}
+
+#[test]
+fn enum_field_pointer_field_format() {
+    #[derive(Display)]
+    #[allow(unused)]
+    enum X {
+        #[display("{0}")]
+        A(#[display("{:p}")] *const u32),
+    }
+    let p: *const u32 = &0;
+    assert_display(X::A(p), &format!("{p:p}"));
+}
+
+#[test]
+fn enum_field_pointer_deep() {
+    #[derive(Display)]
+    #[allow(unused)]
+    enum X {
+        #[display("{0.0:p}")]
+        A(Y),
+    }
+    struct Y(*const u32);
+
+    let p: *const u32 = &0;
+    assert_display(X::A(Y(p)), &format!("{p:p}"));
 }
 
 #[track_caller]
