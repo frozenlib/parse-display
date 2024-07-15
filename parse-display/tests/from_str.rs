@@ -1115,6 +1115,42 @@ fn regex_capture_prefix_escape() {
     assert_from_str_err::<TestStruct>("aa");
 }
 
+#[test]
+fn with() {
+    struct Plus1;
+    impl FromStrFormat<i32> for Plus1 {
+        type Err = std::num::ParseIntError;
+        fn parse(&self, s: &str) -> core::result::Result<i32, Self::Err> {
+            s.parse::<i32>().map(|x| x + 1)
+        }
+    }
+
+    #[derive(FromStr, Debug, Eq, PartialEq)]
+    struct X {
+        #[from_str(with = Plus1)]
+        a: i32,
+    }
+    assert_from_str("12", X { a: 13 });
+}
+
+#[test]
+fn from_with_display_no_apply_display() {
+    struct Plus1;
+    impl FromStrFormat<i32> for Plus1 {
+        type Err = std::num::ParseIntError;
+        fn parse(&self, s: &str) -> core::result::Result<i32, Self::Err> {
+            s.parse::<i32>().map(|x| x + 1)
+        }
+    }
+
+    #[derive(Display, FromStr, Debug, Eq, PartialEq)]
+    struct X {
+        #[from_str(with = Plus1)]
+        a: i32,
+    }
+    assert_from_str("12", X { a: 13 });
+}
+
 fn assert_from_str<T: FromStr + Debug + PartialEq>(s: &str, value: T)
 where
     <T as FromStr>::Err: Display,

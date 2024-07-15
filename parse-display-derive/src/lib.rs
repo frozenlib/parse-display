@@ -44,7 +44,7 @@ pub fn derive_display(input: proc_macro::TokenStream) -> proc_macro::TokenStream
 }
 
 fn derive_display_for_struct(input: &DeriveInput, data: &DataStruct) -> Result<TokenStream> {
-    let hattrs = HelperAttributes::from(&input.attrs)?;
+    let hattrs = HelperAttributes::from(&input.attrs, false)?;
     let context = DisplayContext::Struct {
         data,
         crate_path: &hattrs.crate_path,
@@ -103,7 +103,7 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Token
             }
             Fields::Unit => quote! {},
         };
-        let hattrs_variant = HelperAttributes::from(&variant.attrs)?;
+        let hattrs_variant = HelperAttributes::from(&variant.attrs, false)?;
         let style = DisplayStyle::from_helper_attributes(hattrs_enum, &hattrs_variant);
         let mut format = hattrs_variant.format;
         if format.is_none() {
@@ -137,7 +137,7 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Token
             },
         })
     }
-    let hattrs = HelperAttributes::from(&input.attrs)?;
+    let hattrs = HelperAttributes::from(&input.attrs, false)?;
     let mut bounds = Bounds::from_data(hattrs.bound_display.clone());
     let generics = GenericParamSet::new(&input.generics);
     let mut arms = Vec::new();
@@ -166,7 +166,7 @@ pub fn derive_from_str(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
     })
 }
 fn derive_from_str_for_struct(input: &DeriveInput, data: &DataStruct) -> Result<TokenStream> {
-    let hattrs = HelperAttributes::from(&input.attrs)?;
+    let hattrs = HelperAttributes::from(&input.attrs, true)?;
     let p = ParserBuilder::from_struct(&hattrs, data)?;
     let crate_path = &hattrs.crate_path;
     let trait_path = parse_quote!(::core::str::FromStr);
@@ -189,7 +189,7 @@ fn derive_from_str_for_struct(input: &DeriveInput, data: &DataStruct) -> Result<
     )
 }
 fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<TokenStream> {
-    let hattrs_enum = HelperAttributes::from(&input.attrs)?;
+    let hattrs_enum = HelperAttributes::from(&input.attrs, true)?;
     if let Some(span) = hattrs_enum.default_self {
         bail!(span, "`#[from_str(default)]` cannot be specified for enum.");
     }
@@ -200,7 +200,7 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Toke
     let mut bodys = Vec::new();
     let mut arms = Vec::new();
     for variant in &data.variants {
-        let hattrs_variant = HelperAttributes::from(&variant.attrs)?;
+        let hattrs_variant = HelperAttributes::from(&variant.attrs, true)?;
         if hattrs_variant.ignore.value() {
             continue;
         }
@@ -632,7 +632,7 @@ impl<'a> ParserBuilder<'a> {
 }
 impl<'a> FieldEntry<'a> {
     fn new(source: &'a Field, crate_path: &'a Path) -> Result<Self> {
-        let hattrs = HelperAttributes::from(&source.attrs)?;
+        let hattrs = HelperAttributes::from(&source.attrs, true)?;
         let use_default = hattrs.default_self.is_some();
         Ok(Self {
             hattrs,
@@ -800,7 +800,7 @@ struct HelperAttributes {
     crate_path: Path,
 }
 impl HelperAttributes {
-    fn from(attrs: &[Attribute]) -> Result<Self> {
+    fn from(attrs: &[Attribute], use_from_str: bool) -> Result<Self> {
         let mut hattrs = Self {
             format: None,
             with: None,
@@ -820,7 +820,7 @@ impl HelperAttributes {
             if a.path().is_ident("display") {
                 hattrs.set_display_args(a.parse_args()?)?;
             }
-            if a.path().is_ident("from_str") {
+            if use_from_str && a.path().is_ident("from_str") {
                 hattrs.set_from_str_args(a.parse_args()?);
             }
         }
@@ -1250,7 +1250,7 @@ impl<'a> DisplayContext<'a> {
         bounds: &mut Bounds,
         generics: &GenericParamSet,
     ) -> Result<TokenStream> {
-        let hattrs = HelperAttributes::from(&field.attrs)?;
+        let hattrs = HelperAttributes::from(&field.attrs, false)?;
         let mut bounds = bounds.child(hattrs.bound_display);
         Ok(if let Some(format) = hattrs.format {
             let args = format.format_args(
