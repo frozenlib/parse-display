@@ -1108,6 +1108,20 @@ fn enum_field_pointer_deep() {
     assert_display(X::A(Y(p)), &format!("{p:p}"));
 }
 
+#[test]
+fn with_through_formatting_parameters() {
+    struct F;
+    impl parse_display::DisplayFormat<i32> for F {
+        fn write(&self, f: &mut core::fmt::Formatter, value: &i32) -> core::fmt::Result {
+            core::fmt::Display::fmt(value, f)
+        }
+    }
+    #[derive(Display, Debug, PartialEq)]
+    #[display("{0:5}")]
+    struct X(#[display(with = F)] i32);
+    assert_display(X(10), &format!("{:5}", 10));
+}
+
 #[track_caller]
 fn assert_display<T: core::fmt::Display>(value: T, display: &str) {
     let value_display = format!("{value}");
