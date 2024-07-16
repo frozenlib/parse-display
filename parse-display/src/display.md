@@ -35,7 +35,7 @@ However, unlike `std::format!()`, `{}` has the following meaning.
 | `{a.b.c}`           | ✔      | ✔    | ✔       | ✔     | Use a nested field.                                                                 |
 | `{:x}`, `{:?}`      | ✔      | ✔    |         |       | Use format traits other than [`Display`] for `self`. (e.g. [`LowerHex`], [`Debug`]) |
 | `{}`                |        | ✔    | ✔       |       | Use a variant name of enum.                                                         |
-| `{}`                |        |      |         | ✔     | Use the field itself.                                                               |
+| `{}`,`{:x}`, `{:?}` |        |      |         | ✔     | Use the field itself.                                                               |
 
 [`LowerHex`]: std::fmt::LowerHex
 
@@ -319,11 +319,34 @@ assert_eq!(StyleExample::VarM.to_string(), "VAR M");
 
 You can customize [`Display`] and [`FromStr`] processing for a field by specifying the values that implements [`DisplayFormat`] and [`FromStrFormat`].
 
-If [`Display`] of the field is used when this attribute is not specified, the value specified for the attribute must implement [`DisplayFormat`].
+```rust
+use parse_display::{Display, DisplayFormat, FromStr, FromStrFormat};
 
-If [`FromStr`] of the field is used when this attribute is not specified, the value specified for the attribute must implement [`FromStrFormat`].
+#[derive(Display, FromStr, PartialEq, Debug)]
+pub struct X {
+    #[display(with = Plus1)]
+    a: i32,
+}
 
-See [`DisplayFormat`] and [`FromStrFormat`] for details.
+struct Plus1;
+
+impl DisplayFormat<i32> for Plus1 {
+    fn write(&self, f: &mut std::fmt::Formatter, value: &i32) -> std::fmt::Result {
+        write!(f, "{}", value + 1)
+    }
+}
+impl FromStrFormat<i32> for Plus1 {
+    type Err = <i32 as std::str::FromStr>::Err;
+    fn parse(&self, s: &str) -> std::result::Result<i32, Self::Err> {
+        Ok(s.parse::<i32>()? - 1)
+    }
+}
+
+assert_eq!(X { a: 1 }.to_string(), "2");
+assert_eq!("2".parse(), Ok(X { a: 1 }));
+```
+
+The expression specified for `with = ...` must be lightweight because it is called each time when formatting and parsing.
 
 ## `#[display(bound(...))]`, `#[from_str(bound(...))]`
 
