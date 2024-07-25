@@ -598,8 +598,9 @@ impl<'a> ParserBuilder<'a> {
                 }
                 quote! {
                     #[allow(clippy::trivial_regex)]
-                    static RE: ::std::sync::OnceLock<#crate_path::helpers::regex::Regex> = ::std::sync::OnceLock::new();
-                    if let ::core::option::Option::Some(c) = RE.get_or_init(|| #helpers::build_regex(#regex, &[#(#with,)*])).captures(&s) {
+                    static RE: ::std::sync::LazyLock<#crate_path::helpers::regex::Regex> =
+                        ::std::sync::LazyLock::new(|| #helpers::build_regex(#regex, &[#(#with,)*]));
+                    if let ::core::option::Option::Some(c) = RE.captures(&s) {
                          #code
                     }
                 }
