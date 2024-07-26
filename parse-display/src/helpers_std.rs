@@ -4,12 +4,12 @@ use std::collections::HashMap;
 use regex::Regex;
 use regex_syntax::ast::{Ast, Flags, GroupKind};
 
-use crate::FromStrFormatBase;
+use crate::FromStrFormat;
 
 pub use regex;
 
 #[track_caller]
-pub fn to_ast(format: &dyn FromStrFormatBase) -> Option<Ast> {
+pub fn to_ast<T, E>(format: &dyn FromStrFormat<T, Err = E>) -> Option<Ast> {
     let s = format.regex()?;
     let Ok(mut ast) = regex_syntax::ast::parse::Parser::new().parse(&s) else {
         panic!("invalid regex: {s}")

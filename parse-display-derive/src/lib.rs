@@ -245,7 +245,7 @@ struct ParserBuilder<'a> {
     capture_next: usize,
     parse_format: ParseFormat,
     fields: BTreeMap<FieldKey, FieldEntry<'a>>,
-    with: BTreeMap<String, Expr>,
+    with: BTreeMap<String, (Expr, Type)>,
     source: &'a Fields,
     use_default: bool,
     span: Span,
@@ -445,9 +445,9 @@ impl<'a> ParserBuilder<'a> {
                     let f = format!("(?<{c}>(?s:.*?))");
                     self.parse_format.push_hir(to_hir(&f));
                     if keys.is_empty() {
-                        if let DisplayContext::Field { .. } = context {
+                        if let DisplayContext::Field { field, .. } = context {
                             if let Some(with) = with {
-                                self.with.insert(c, with.clone());
+                                self.with.insert(c, (with.clone(), field.ty.clone()));
                             }
                         }
                     }
@@ -591,16 +591,15 @@ impl<'a> ParserBuilder<'a> {
                 let regex = to_regex_string(hirs);
                 let mut with = Vec::new();
                 let helpers = quote!( #crate_path::helpers );
-                for (name, expr) in &self.with {
+                for (name, (expr, ty)) in &self.with {
                     with.push(quote! {
-                        (#name, #helpers::to_ast(&#expr))
+                        (#name, #helpers::to_ast::<#ty,_>(&#expr))
                     });
                 }
                 quote! {
                     #[allow(clippy::trivial_regex)]
-                    static RE: ::std::sync::LazyLock<#crate_path::helpers::regex::Regex> =
-                        ::std::sync::LazyLock::new(|| #helpers::build_regex(#regex, &[#(#with,)*]));
-                    if let ::core::option::Option::Some(c) = RE.captures(&s) {
+                    static RE: ::std::sync::OnceLock<#crate_path::helpers::regex::Regex> = ::std::sync::OnceLock::new();
+                    if let ::core::option::Option::Some(c) = RE.get_or_init(|| #helpers::build_regex(#regex, &[#(#with,)*])).captures(&s) {
                          #code
                     }
                 }

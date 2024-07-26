@@ -1118,7 +1118,6 @@ fn regex_capture_prefix_escape() {
 #[test]
 fn with() {
     struct Plus1;
-    impl FromStrFormatBase for Plus1 {}
     impl FromStrFormat<i32> for Plus1 {
         type Err = std::num::ParseIntError;
         fn parse(&self, s: &str) -> core::result::Result<i32, Self::Err> {
@@ -1137,7 +1136,6 @@ fn with() {
 #[test]
 fn from_with_display_no_apply_display() {
     struct Plus1;
-    impl FromStrFormatBase for Plus1 {}
     impl FromStrFormat<i32> for Plus1 {
         type Err = std::num::ParseIntError;
         fn parse(&self, s: &str) -> core::result::Result<i32, Self::Err> {
@@ -1151,6 +1149,31 @@ fn from_with_display_no_apply_display() {
         a: i32,
     }
     assert_from_str("12", X { a: 13 });
+}
+
+#[test]
+fn use_type_parameter_in_with() {
+    struct Fmt<T> {
+        _marker: core::marker::PhantomData<T>,
+    }
+    impl<T> Fmt<T> {
+        fn new() -> Self {
+            Self {
+                _marker: core::marker::PhantomData,
+            }
+        }
+    }
+    impl<T: core::str::FromStr> parse_display::FromStrFormat<T> for Fmt<T> {
+        type Err = T::Err;
+        fn parse(&self, s: &str) -> core::result::Result<T, Self::Err> {
+            s.parse::<T>()
+        }
+    }
+
+    #[derive(FromStr, Debug, PartialEq)]
+    #[display("{0}")]
+    struct X<T: core::str::FromStr>(#[from_str(with = Fmt::new())] T);
+    assert_from_str("10", X(10));
 }
 
 fn assert_from_str<T: FromStr + Debug + PartialEq>(s: &str, value: T)

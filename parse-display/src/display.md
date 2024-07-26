@@ -320,7 +320,7 @@ assert_eq!(StyleExample::VarM.to_string(), "VAR M");
 You can customize [`Display`] and [`FromStr`] processing for a field by specifying the values that implements [`DisplayFormat`] and [`FromStrFormat`].
 
 ```rust
-use parse_display::{Display, DisplayFormat, FromStr, FromStrFormat, FromStrFormatBase};
+use parse_display::{Display, DisplayFormat, FromStr, FromStrFormat};
 
 #[derive(Display, FromStr, PartialEq, Debug)]
 pub struct X {
@@ -335,7 +335,6 @@ impl DisplayFormat<i32> for Plus1 {
         write!(f, "{}", value + 1)
     }
 }
-impl FromStrFormatBase for Plus1 {}
 impl FromStrFormat<i32> for Plus1 {
     type Err = <i32 as std::str::FromStr>::Err;
     fn parse(&self, s: &str) -> std::result::Result<i32, Self::Err> {

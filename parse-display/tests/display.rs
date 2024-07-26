@@ -1122,6 +1122,30 @@ fn with_through_formatting_parameters() {
     assert_display(X(10), &format!("{:5}", 10));
 }
 
+#[test]
+fn use_type_parameter_in_with() {
+    struct Fmt<T> {
+        _marker: core::marker::PhantomData<T>,
+    }
+    impl<T> Fmt<T> {
+        fn new() -> Self {
+            Self {
+                _marker: core::marker::PhantomData,
+            }
+        }
+    }
+    impl<T: core::fmt::Display> parse_display::DisplayFormat<T> for Fmt<T> {
+        fn write(&self, f: &mut core::fmt::Formatter, value: &T) -> core::fmt::Result {
+            write!(f, "--{value}--")
+        }
+    }
+
+    #[derive(Display, Debug, PartialEq)]
+    #[display("{0}")]
+    struct X<T: core::fmt::Display>(#[display(with = Fmt::new())] T);
+    assert_display(X(10), "--10--");
+}
+
 #[track_caller]
 fn assert_display<T: core::fmt::Display>(value: T, display: &str) {
     let value_display = format!("{value}");
