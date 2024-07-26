@@ -863,6 +863,29 @@ pub trait FromStrFormat<T> {
     /// If the field type includes type parameters, the regex must be the same regardless of the type parameters.
     ///
     /// If the regex differs, it will panic in debug mode and result in an incorrect parse in release mode.
+    ///
+    /// ```no_run
+    /// use parse_display::{FromStr, FromStrFormat ,ParseError};
+    /// use std::any::{type_name, Any};
+    /// use std::str::FromStr;
+    ///
+    /// struct TypeNameFormat;
+    /// impl<T: Default + Any> FromStrFormat<T> for TypeNameFormat {
+    ///     type Err = ParseError;
+    ///     fn parse(&self, _s: &str) -> core::result::Result<T, Self::Err> {
+    ///         Ok(Default::default())
+    ///     }
+    ///     fn regex(&self) -> Option<String> {
+    ///         Some(type_name::<T>().to_string())
+    ///     }
+    /// }
+    ///
+    /// #[derive(FromStr)]
+    /// struct X<T: Default + std::any::Any>(#[from_str(with = TypeNameFormat)] T);
+    /// let _ = X::<u32>::from_str("u32");
+    /// let _ = X::<u16>::from_str("u16"); // panic on debug mode
+    /// ```
+
     #[cfg(feature = "std")]
     fn regex(&self) -> Option<String> {
         None

@@ -1171,7 +1171,6 @@ fn use_type_parameter_in_with() {
     }
 
     #[derive(FromStr, Debug, PartialEq)]
-    #[display("{0}")]
     struct X<T: core::str::FromStr>(#[from_str(with = Fmt::new())] T);
     assert_from_str("10", X(10));
 }
@@ -1179,24 +1178,21 @@ fn use_type_parameter_in_with() {
 #[should_panic]
 #[test]
 fn regex_depending_on_the_parameter() {
-    struct TypeNameFormat;
-    impl<T: Default + std::any::Any> parse_display::FromStrFormat<T> for TypeNameFormat {
-        type Err = ParseError;
+    use parse_display::FromStrFormat;
+    use std::any::{type_name, Any};
 
-        fn parse(&self, s: &str) -> core::result::Result<T, Self::Err> {
-            if s == std::any::type_name::<T>() {
-                Ok(Default::default())
-            } else {
-                Err(ParseError::new())
-            }
+    struct TypeNameFormat;
+    impl<T: Default + Any> FromStrFormat<T> for TypeNameFormat {
+        type Err = ParseError;
+        fn parse(&self, _s: &str) -> core::result::Result<T, Self::Err> {
+            Ok(Default::default())
         }
         fn regex(&self) -> Option<String> {
-            Some(std::any::type_name::<T>().to_string())
+            Some(type_name::<T>().to_string())
         }
     }
 
     #[derive(FromStr)]
-    #[display("{0}")]
     struct X<T: Default + std::any::Any>(#[from_str(with = TypeNameFormat)] T);
     let _ = X::<u32>::from_str("u32");
     let _ = X::<u16>::from_str("u16"); // panic on debug mode
