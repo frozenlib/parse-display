@@ -7,9 +7,7 @@
 ### Changed
 
 - Set `rust-version` to 1.80.0.
-- Split `FromStrFormat` into `FromStrFormat` and `FromStrFormatBase`. ([f975628])
-
-[f975628]: https://github.com/frozenlib/parse-display/commit/f975628bcf220f8630f4496f9c4ae44958b12f9d
+- In debug mode, it will panic if the result of `FromStrFormat::regex` varies for the same field depending on the type parameters.
 
 ### Deprecated
 
@@ -18,7 +16,6 @@
 ### Fixed
 
 - Fix `#[from_str]` to not affect `Display`.
-- Fix incorrect caching of regex when the result of `FromStrFormat::regex` differs due to type parameters. ([f975628])
 
 ### Performance
 

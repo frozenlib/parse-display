@@ -859,6 +859,10 @@ pub trait FromStrFormat<T> {
     /// assert_eq!("123abc".parse(), Ok(X("".into(), "123abc".into())));
     /// assert_eq!("123abc".parse(), Ok(Y("123".into(), "abc".into())));
     /// ```
+    ///
+    /// If the field type includes type parameters, the regex must be the same regardless of the type parameters.
+    ///
+    /// If the regex differs, it will panic in debug mode and result in an incorrect parse in release mode.
     #[cfg(feature = "std")]
     fn regex(&self) -> Option<String> {
         None

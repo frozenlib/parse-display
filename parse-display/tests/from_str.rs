@@ -1176,6 +1176,34 @@ fn use_type_parameter_in_with() {
     assert_from_str("10", X(10));
 }
 
+#[should_panic]
+#[test]
+fn regex_depending_on_the_parameter() {
+    struct TypeNameFormat;
+    impl<T: Default + std::any::Any> parse_display::FromStrFormat<T> for TypeNameFormat {
+        type Err = ParseError;
+
+        fn parse(&self, s: &str) -> core::result::Result<T, Self::Err> {
+            if s == std::any::type_name::<T>() {
+                Ok(Default::default())
+            } else {
+                Err(ParseError::new())
+            }
+        }
+        fn regex(&self) -> Option<String> {
+            Some(std::any::type_name::<T>().to_string())
+        }
+    }
+
+    #[derive(FromStr)]
+    #[display("{0}")]
+    struct X<T: Default + std::any::Any>(#[from_str(with = TypeNameFormat)] T);
+    let _ = X::<u32>::from_str("u32");
+    let _ = X::<u16>::from_str("u16"); // panic on debug mode
+
+    panic_on_release_mode();
+}
+
 fn assert_from_str<T: FromStr + Debug + PartialEq>(s: &str, value: T)
 where
     <T as FromStr>::Err: Display,
@@ -1189,4 +1217,13 @@ fn assert_from_str_err<T: FromStr + Debug>(s: &str) {
     if let Ok(a) = s.parse::<T>() {
         panic!("from_str(\"{s}\") should return Err. but return `{a:?}`.");
     }
+}
+
+fn panic_on_release_mode() {
+    let mut is_debug = false;
+    debug_assert!({
+        is_debug = true;
+        false
+    });
+    assert!(is_debug);
 }

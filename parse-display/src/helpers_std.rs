@@ -1,3 +1,4 @@
+use core::mem;
 use std::borrow::Cow;
 use std::collections::HashMap;
 
@@ -9,7 +10,12 @@ use crate::FromStrFormat;
 pub use regex;
 
 #[track_caller]
-pub fn to_ast<T, E>(format: &dyn FromStrFormat<T, Err = E>) -> Option<Ast> {
+pub fn to_regex<T, E>(format: &dyn FromStrFormat<T, Err = E>) -> Option<String> {
+    format.regex()
+}
+
+#[track_caller]
+pub fn to_ast<T, E>(format: &dyn FromStrFormat<T, Err = E>) -> Option<(String, Ast)> {
     let s = format.regex()?;
     let Ok(mut ast) = regex_syntax::ast::parse::Parser::new().parse(&s) else {
         panic!("invalid regex: {s}")
@@ -37,7 +43,51 @@ pub fn to_ast<T, E>(format: &dyn FromStrFormat<T, Err = E>) -> Option<Ast> {
     if let Err(e) = e {
         panic!("{e}");
     }
-    Some(ast)
+    Some((s, ast))
+}
+
+pub struct Parser {
+    pub re: Regex,
+    pub ss: Vec<Option<String>>,
+}
+impl Parser {
+    #[track_caller]
+    pub fn new(s: &str, with: &mut [(&str, Option<(String, Ast)>)]) -> Self {
+        let mut asts: HashMap<&str, &Ast> = HashMap::new();
+        let mut ss = Vec::new();
+        for (key, item) in with {
+            if let Some((item_s, item_ast)) = item {
+                asts.insert(key, item_ast);
+                ss.push(Some(mem::take(item_s)));
+            } else {
+                ss.push(None);
+            }
+        }
+        let re = if asts.is_empty() {
+            Cow::Borrowed(s)
+        } else {
+            let mut ast = regex_syntax::ast::parse::Parser::new().parse(s).unwrap();
+            let e = replace_ast(&mut ast, &mut |ast| {
+                if let Ast::Group(g) = ast {
+                    if let GroupKind::CaptureName { name, .. } = &g.kind {
+                        if let Some(ast) = asts.get(name.name.as_str()) {
+                            g.ast = Box::new((*ast).clone());
+                            return Ok(false);
+                        }
+                    }
+                }
+                Ok(true)
+            });
+            if let Err(e) = e {
+                panic!("{e}");
+            }
+            Cow::Owned(ast.to_string())
+        };
+        Self {
+            re: Regex::new(&re).unwrap(),
+            ss,
+        }
+    }
 }
 
 #[track_caller]
