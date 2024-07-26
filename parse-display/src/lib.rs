@@ -822,6 +822,7 @@ pub trait DisplayFormat<T: ?Sized> {
     fn write(&self, f: &mut Formatter, value: &T) -> Result;
 }
 
+/// Type-parameter-independent portion of [`FromStrFormat`].
 pub trait FromStrFormatBase {
     /// Return a regular expression that the input string needs to match.
     ///
