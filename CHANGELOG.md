@@ -6,11 +6,17 @@
 
 ### Changed
 
+- Updated MSVR to 1.80
+- Split `FromStrFormat` into `FromStrFormat` and `FromStrFormatBase`. ([f975628bcf220f8630f4496f9c4ae44958b12f9d])
+
 ### Deprecated
 
 ### Removed
 
 ### Fixed
+
+- Fix `#[from_str]` to not affect `Display`. ([286810ce3436877dc7f9aafe8a60d7578981aaf9])
+- Fixed incorrect caching of regex when the result of `FromStrFormat::regex` differs due to type parameters. ([f975628bcf220f8630f4496f9c4ae44958b12f9d])
 
 ### Performance
 
