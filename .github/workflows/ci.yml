@@ -11,6 +11,10 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+      - name: Rustup update stable
+        run: rustup update stable
+      - name: Show cargo version
+        run: cargo --version
       - name: Build
         run: cargo build --verbose
       - name: Build tests
