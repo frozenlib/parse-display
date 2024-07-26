@@ -1118,6 +1118,7 @@ fn regex_capture_prefix_escape() {
 #[test]
 fn with() {
     struct Plus1;
+    impl FromStrFormatBase for Plus1 {}
     impl FromStrFormat<i32> for Plus1 {
         type Err = std::num::ParseIntError;
         fn parse(&self, s: &str) -> core::result::Result<i32, Self::Err> {
@@ -1136,6 +1137,7 @@ fn with() {
 #[test]
 fn from_with_display_no_apply_display() {
     struct Plus1;
+    impl FromStrFormatBase for Plus1 {}
     impl FromStrFormat<i32> for Plus1 {
         type Err = std::num::ParseIntError;
         fn parse(&self, s: &str) -> core::result::Result<i32, Self::Err> {

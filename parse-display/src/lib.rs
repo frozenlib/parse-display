@@ -365,7 +365,7 @@ mod helpers_std;
 /// You can customize [`Display`] and [`FromStr`] processing for a field by specifying the values that implements [`DisplayFormat`] and [`FromStrFormat`].
 ///
 /// ```rust
-/// use parse_display::{Display, DisplayFormat, FromStr, FromStrFormat};
+/// use parse_display::{Display, DisplayFormat, FromStr, FromStrFormat, FromStrFormatBase};
 ///
 /// #[derive(Display, FromStr, PartialEq, Debug)]
 /// pub struct X {
@@ -380,6 +380,7 @@ mod helpers_std;
 ///         write!(f, "{}", value + 1)
 ///     }
 /// }
+/// impl FromStrFormatBase for Plus1 {}
 /// impl FromStrFormat<i32> for Plus1 {
 ///     type Err = <i32 as std::str::FromStr>::Err;
 ///     fn parse(&self, s: &str) -> std::result::Result<i32, Self::Err> {
@@ -821,13 +822,7 @@ pub trait DisplayFormat<T: ?Sized> {
     fn write(&self, f: &mut Formatter, value: &T) -> Result;
 }
 
-/// Parsing method used in [`#[display(with = ...)]` and `#[from_str(with = ...)]`](macro@Display#displaywith---from_strwith--).
-pub trait FromStrFormat<T> {
-    type Err;
-
-    /// Parsing function used in place of [`FromStr::from_str`](core::str::FromStr::from_str).
-    fn parse(&self, s: &str) -> core::result::Result<T, Self::Err>;
-
+pub trait FromStrFormatBase {
     /// Return a regular expression that the input string needs to match.
     ///
     /// If None is returned, the input will be a string that matches `.*?`.
@@ -835,16 +830,18 @@ pub trait FromStrFormat<T> {
     /// # Examples
     ///
     /// ```
-    /// use parse_display::{FromStr, FromStrFormat};
+    /// use parse_display::{FromStr, FromStrFormat, FromStrFormatBase};
     ///
     /// struct Number;
+    /// impl FromStrFormatBase for Number {
+    ///     fn regex(&self) -> Option<String> {
+    ///         Some(r"[0-9]+".into())
+    ///     }
+    /// }
     /// impl FromStrFormat<String> for Number {
     ///     type Err = <String as std::str::FromStr>::Err;
     ///     fn parse(&self, s: &str) -> std::result::Result<String, Self::Err> {
     ///         s.parse()
-    ///     }
-    ///     fn regex(&self) -> Option<String> {
-    ///         Some(r"[0-9]+".into())
     ///     }
     /// }
     ///
@@ -863,4 +860,12 @@ pub trait FromStrFormat<T> {
     fn regex(&self) -> Option<String> {
         None
     }
+}
+
+/// Parsing method used in [`#[display(with = ...)]` and `#[from_str(with = ...)]`](macro@Display#displaywith---from_strwith--).
+pub trait FromStrFormat<T>: FromStrFormatBase {
+    type Err;
+
+    /// Parsing function used in place of [`FromStr::from_str`](core::str::FromStr::from_str).
+    fn parse(&self, s: &str) -> core::result::Result<T, Self::Err>;
 }

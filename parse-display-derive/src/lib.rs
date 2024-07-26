@@ -245,7 +245,7 @@ struct ParserBuilder<'a> {
     capture_next: usize,
     parse_format: ParseFormat,
     fields: BTreeMap<FieldKey, FieldEntry<'a>>,
-    with: BTreeMap<String, (Expr, Type)>,
+    with: BTreeMap<String, Expr>,
     source: &'a Fields,
     use_default: bool,
     span: Span,
@@ -445,9 +445,9 @@ impl<'a> ParserBuilder<'a> {
                     let f = format!("(?<{c}>(?s:.*?))");
                     self.parse_format.push_hir(to_hir(&f));
                     if keys.is_empty() {
-                        if let DisplayContext::Field { field, .. } = context {
+                        if let DisplayContext::Field { .. } = context {
                             if let Some(with) = with {
-                                self.with.insert(c, (with.clone(), field.ty.clone()));
+                                self.with.insert(c, with.clone());
                             }
                         }
                     }
@@ -591,9 +591,9 @@ impl<'a> ParserBuilder<'a> {
                 let regex = to_regex_string(hirs);
                 let mut with = Vec::new();
                 let helpers = quote!( #crate_path::helpers );
-                for (name, (expr, ty)) in &self.with {
+                for (name, expr) in &self.with {
                     with.push(quote! {
-                        (#name, #helpers::to_ast::<#ty,_>(&#expr))
+                        (#name, #helpers::to_ast(&#expr))
                     });
                 }
                 quote! {

@@ -1,11 +1,10 @@
 use core::{
     fmt::{self, Display, Formatter},
-    marker::PhantomData,
     result::Result,
     str::FromStr,
 };
 
-use parse_display::{DisplayFormat, FromStrFormat};
+use parse_display::{DisplayFormat, FromStrFormat, FromStrFormatBase};
 
 pub struct Fmt;
 
@@ -14,6 +13,7 @@ impl<T: ?Sized + Display> DisplayFormat<T> for Fmt {
         write!(f, "{value}")
     }
 }
+impl FromStrFormatBase for Fmt {}
 impl<T: FromStr> FromStrFormat<T> for Fmt {
     type Err = T::Err;
     fn parse(&self, s: &str) -> Result<T, Self::Err> {
@@ -43,6 +43,7 @@ pub fn fmt_display<T: ?Sized>(
 
 pub fn fmt_from_str<T, E>(f: impl Fn(&str) -> Result<T, E>) -> impl FromStrFormat<T, Err = E> {
     struct FnFmtFromStr<F>(F);
+    impl<T, E, F> FromStrFormatBase for FnFmtFromStr<F> where F: Fn(&str) -> Result<T, E> {}
     impl<T, E, F> FromStrFormat<T> for FnFmtFromStr<F>
     where
         F: Fn(&str) -> Result<T, E>,
@@ -55,13 +56,12 @@ pub fn fmt_from_str<T, E>(f: impl Fn(&str) -> Result<T, E>) -> impl FromStrForma
     FnFmtFromStr(f)
 }
 
-pub struct Join<'a, I: ?Sized, F = Fmt> {
+pub struct Join<'a, F = Fmt> {
     item_format: F,
     delimiter: &'a str,
-    _phantom: PhantomData<I>,
 }
 
-impl<T, I, F> DisplayFormat<T> for Join<'_, I, F>
+impl<T, I, F> DisplayFormat<T> for Join<'_, F>
 where
     T: ?Sized,
     for<'a> &'a T: IntoIterator<Item = &'a I>,
@@ -79,10 +79,12 @@ where
         Ok(())
     }
 }
-impl<T, I, F> FromStrFormat<T> for Join<'_, I, F>
+impl<F> FromStrFormatBase for Join<'_, F> {}
+impl<I, T, F> FromStrFormat<T> for Join<'_, F>
 where
     F: FromStrFormat<I>,
     T: FromIterator<I>,
+    T: IntoIterator<Item = I>,
 {
     type Err = F::Err;
     fn parse(&self, s: &str) -> Result<T, Self::Err> {
@@ -92,14 +94,13 @@ where
     }
 }
 
-pub fn join<I: ?Sized, F>(item_format: F, delimiter: &str) -> Join<I, F> {
+pub fn join<F>(item_format: F, delimiter: &str) -> Join<F> {
     Join {
         item_format,
         delimiter,
-        _phantom: PhantomData,
     }
 }
 
-pub fn delimiter<I: ?Sized>(delimiter: &str) -> Join<I> {
+pub fn delimiter(delimiter: &str) -> Join {
     join(fmt(), delimiter)
 }
