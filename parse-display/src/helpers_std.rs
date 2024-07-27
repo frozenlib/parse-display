@@ -17,7 +17,13 @@ pub fn to_regex<T, E>(format: &dyn FromStrFormat<T, Err = E>) -> Option<String> 
 #[track_caller]
 pub fn to_ast<T, E>(format: &dyn FromStrFormat<T, Err = E>) -> Option<(String, Ast)> {
     let s = format.regex()?;
-    let Ok(mut ast) = regex_syntax::ast::parse::Parser::new().parse(&s) else {
+    let ast = ast_from_str(&s);
+    Some((s, ast))
+}
+
+#[track_caller]
+fn ast_from_str(s: &str) -> Ast {
+    let Ok(mut ast) = regex_syntax::ast::parse::Parser::new().parse(s) else {
         panic!("invalid regex: {s}")
     };
     let e = replace_ast(&mut ast, &mut |ast| {
@@ -43,7 +49,7 @@ pub fn to_ast<T, E>(format: &dyn FromStrFormat<T, Err = E>) -> Option<(String, A
     if let Err(e) = e {
         panic!("{e}");
     }
-    Some((s, ast))
+    ast
 }
 
 pub struct Parser {
