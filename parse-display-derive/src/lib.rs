@@ -629,9 +629,9 @@ impl<'a> ParserBuilder<'a> {
                     });
                 }
                 quote! {
-                    static RE: ::std::sync::OnceLock<#helpers::Parser> = ::std::sync::OnceLock::new();
+                    static PARSER: ::std::sync::OnceLock<#helpers::Parser> = ::std::sync::OnceLock::new();
                     #[allow(clippy::trivial_regex)]
-                    let p = RE.get_or_init(|| #helpers::Parser::new(#regex, &mut [#(#with,)*]));
+                    let p = PARSER.get_or_init(|| #helpers::Parser::new(#regex, &mut [#(#with,)*]));
                     #(#debug_asserts)*
                     if let ::core::option::Option::Some(c) = p.re.captures(&s) {
                          #code
