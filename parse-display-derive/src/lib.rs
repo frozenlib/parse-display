@@ -618,7 +618,7 @@ impl<'a> ParserBuilder<'a> {
                     },
                 ) in self.with.iter().enumerate()
                 {
-                    with.push(quote! {
+                    with.push(quote_spanned! {expr.span()=>
                         (#capture, #helpers::to_ast::<#ty, _>(&#expr))
                     });
                     let msg = format!(
@@ -1699,13 +1699,22 @@ fn build_parse_capture_expr(
         if let Some(with) = &field.hattrs.with {
             let ty = &field.source.ty;
             expr1 = quote! {
-                #crate_path::helpers::parse_with::<#ty, _ >(#with, #expr0)
+                #crate_path::helpers::parse_with::<#ty, _>(#with, #expr0)
             };
+            expr1 = set_span(expr1, with.span());
         }
     }
     quote! {
         #expr1.map_err(|e| #crate_path::ParseError::with_message(#msg))?
     }
+}
+fn set_span(ts: TokenStream, span: Span) -> TokenStream {
+    ts.into_iter()
+        .map(|mut ts| {
+            ts.set_span(span);
+            ts
+        })
+        .collect()
 }
 
 fn unref_ty(ty: &Type) -> Type {
