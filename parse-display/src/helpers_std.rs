@@ -61,9 +61,9 @@ impl Parser {
     pub fn new(s: &str, with: &mut [(&str, Option<(String, Ast)>)]) -> Self {
         let mut asts: HashMap<&str, &Ast> = HashMap::new();
         let mut ss = Vec::new();
-        for (key, item) in with {
+        for (capture_name, item) in with {
             if let Some((item_s, item_ast)) = item {
-                asts.insert(key, item_ast);
+                asts.insert(capture_name, item_ast);
                 ss.push(Some(mem::take(item_s)));
             } else {
                 ss.push(None);

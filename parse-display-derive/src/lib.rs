@@ -241,13 +241,15 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Toke
     )
 }
 struct With {
+    capture: String,
     key: FieldKey,
     expr: Expr,
     ty: Type,
 }
 impl With {
-    fn new(key: &FieldKey, expr: &Expr, ty: &Type) -> Self {
+    fn new(capture: String, key: &FieldKey, expr: &Expr, ty: &Type) -> Self {
         Self {
+            capture,
             key: key.clone(),
             expr: expr.clone(),
             ty: ty.clone(),
@@ -259,7 +261,7 @@ struct ParserBuilder<'a> {
     capture_next: usize,
     parse_format: ParseFormat,
     fields: BTreeMap<FieldKey, FieldEntry<'a>>,
-    with: BTreeMap<String, With>,
+    with: Vec<With>,
     source: &'a Fields,
     use_default: bool,
     span: Span,
@@ -285,7 +287,7 @@ impl<'a> ParserBuilder<'a> {
             capture_next: 1,
             parse_format: ParseFormat::new(),
             fields,
-            with: BTreeMap::new(),
+            with: Vec::new(),
             use_default: false,
             span: Span::call_site(),
             new_expr: None,
@@ -461,7 +463,7 @@ impl<'a> ParserBuilder<'a> {
                     if keys.is_empty() {
                         if let DisplayContext::Field { field, key, .. } = context {
                             if let Some(with_expr) = with {
-                                self.with.insert(c, With::new(key, with_expr, &field.ty));
+                                self.with.push(With::new(c, key, with_expr, &field.ty));
                             }
                         }
                     }
@@ -606,9 +608,18 @@ impl<'a> ParserBuilder<'a> {
                 let mut with = Vec::new();
                 let helpers = quote!( #crate_path::helpers );
                 let mut debug_asserts = Vec::new();
-                for (index, (name, With { key, ty, expr })) in self.with.iter().enumerate() {
+                for (
+                    index,
+                    With {
+                        capture,
+                        key,
+                        ty,
+                        expr,
+                    },
+                ) in self.with.iter().enumerate()
+                {
                     with.push(quote! {
-                        (#name, #helpers::to_ast::<#ty, _>(&#expr))
+                        (#capture, #helpers::to_ast::<#ty, _>(&#expr))
                     });
                     let msg = format!(
                         "The regex for the field `{key}` varies depending on the type parameter."
