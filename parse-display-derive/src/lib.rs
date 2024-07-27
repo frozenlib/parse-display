@@ -15,7 +15,7 @@ mod format_syntax;
 
 use crate::{format_syntax::*, regex_utils::*, syn_utils::*};
 use proc_macro2::{Span, TokenStream};
-use quote::{format_ident, quote, ToTokens};
+use quote::{format_ident, quote, quote_spanned, ToTokens};
 use regex::{Captures, Regex};
 use regex_syntax::hir::Hir;
 use std::{
@@ -240,12 +240,26 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Toke
         hattrs_enum.dump_from_str,
     )
 }
+struct With {
+    key: FieldKey,
+    expr: Expr,
+    ty: Type,
+}
+impl With {
+    fn new(key: &FieldKey, expr: &Expr, ty: &Type) -> Self {
+        Self {
+            key: key.clone(),
+            expr: expr.clone(),
+            ty: ty.clone(),
+        }
+    }
+}
 
 struct ParserBuilder<'a> {
     capture_next: usize,
     parse_format: ParseFormat,
     fields: BTreeMap<FieldKey, FieldEntry<'a>>,
-    with: BTreeMap<String, (FieldKey, Expr, Type)>,
+    with: BTreeMap<String, With>,
     source: &'a Fields,
     use_default: bool,
     span: Span,
@@ -446,9 +460,8 @@ impl<'a> ParserBuilder<'a> {
                     self.parse_format.push_hir(to_hir(&f));
                     if keys.is_empty() {
                         if let DisplayContext::Field { field, key, .. } = context {
-                            if let Some(with) = with {
-                                self.with
-                                    .insert(c, ((*key).clone(), with.clone(), field.ty.clone()));
+                            if let Some(with_expr) = with {
+                                self.with.insert(c, With::new(key, with_expr, &field.ty));
                             }
                         }
                     }
@@ -593,14 +606,14 @@ impl<'a> ParserBuilder<'a> {
                 let mut with = Vec::new();
                 let helpers = quote!( #crate_path::helpers );
                 let mut debug_asserts = Vec::new();
-                for (index, (name, (key, expr, ty))) in self.with.iter().enumerate() {
+                for (index, (name, With { key, ty, expr })) in self.with.iter().enumerate() {
                     with.push(quote! {
                         (#name, #helpers::to_ast::<#ty, _>(&#expr))
                     });
                     let msg = format!(
                         "The regex for the field `{key}` varies depending on the type parameter."
                     );
-                    debug_asserts.push(quote! {
+                    debug_asserts.push(quote_spanned! {expr.span()=>
                         ::core::debug_assert_eq!(&p.ss[#index], &#helpers::to_regex::<#ty, _>(&#expr), #msg);
                     });
                 }

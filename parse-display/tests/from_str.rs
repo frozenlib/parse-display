@@ -1193,7 +1193,10 @@ fn regex_depending_on_the_parameter() {
     }
 
     #[derive(FromStr)]
-    struct X<T: Default + std::any::Any>(#[from_str(with = TypeNameFormat)] T);
+    struct X<T: Default + std::any::Any> {
+        #[from_str(with = TypeNameFormat)]
+        _x: T,
+    }
     let _ = X::<u32>::from_str("u32");
     let _ = X::<u16>::from_str("u16"); // panic on debug mode
 
