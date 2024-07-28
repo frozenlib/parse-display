@@ -8,6 +8,9 @@
 
 - Set `rust-version` to 1.80.0.
 - In debug mode, it will panic if the result of `FromStrFormat::regex` varies for the same field depending on the type parameters.
+- Change the behavior when both `#[display("...")]` and `#[from_str("...")]` are specified for a field. ([dc14a2b])
+
+[dc14a2b]: https://github.com/frozenlib/parse-display/commit/dc14a2b78a0b547f4911d2cf45d2f8b96aa723e2
 
 ### Deprecated
 

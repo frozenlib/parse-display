@@ -487,7 +487,7 @@ struct MyStruct {
   b: u8,
 }
 
-assert_eq!("10__20".parse(), Ok(MyStruct { a:10, b:20 }));
+assert_eq!("10__20".parse(), Ok(MyStruct { a: 10, b: 20 }));
 ```
 
 ### Field regex
@@ -506,7 +506,7 @@ struct MyStruct {
   #[from_str(regex = "[0-9]+")]
   b: u8,
 }
-assert_eq!("10__20".parse(), Ok(MyStruct { a:10, b:20 }));
+assert_eq!("10__20".parse(), Ok(MyStruct { a: 10, b: 20 }));
 ```
 
 If `#[from_str(regex = "...")]` is not set to field ,
@@ -522,6 +522,52 @@ struct MyStruct {
   b: String,
 }
 assert_eq!("abcdef".parse(), Ok(MyStruct { a:"".into(), b:"abcdef".into() }));
+```
+
+### Field regex with capture
+
+Using a named capture group with an empty name in the field's regex will convert only the string within that group to the field's value.
+
+```rust
+use parse_display::FromStr;
+
+#[derive(FromStr, PartialEq, Debug)]
+struct MyStruct {
+  #[from_str(regex = "a = (?<>[0-9]+)")]
+  a: u8,
+}
+assert_eq!("a = 10".parse(), Ok(MyStruct { a: 10 }));
+```
+
+### Field regex with display format
+
+If both `#[display("...")]` and `#[from_str(regex = "...")]` are specified for a field and the regex does not contain named capture groups, the pattern within the `{}` part of the format specified by `#[display("...")]` will be determined by `#[from_str(regex = "...")]`.
+
+```rust
+use parse_display::FromStr;
+
+#[derive(FromStr, PartialEq, Debug)]
+struct X {
+  #[display("a = {}")]
+  #[from_str(regex = "[0-9]+")]
+  a: u8,
+}
+assert_eq!("a = 10".parse(), Ok(X { a: 10 }));
+```
+
+If the regex does not contain named capture groups, `#[display("...")]` is ignored.
+
+```rust
+use parse_display::FromStr;
+
+#[derive(FromStr, PartialEq, Debug)]
+struct Y {
+  #[display("a = {}")]
+  #[from_str(regex = "a = (?<>[0-9]+)")]
+  a: u8,
+}
+assert_eq!("a = 10".parse(), Ok(Y { a: 10 }));
+assert!("a = a = 10".parse::<Y>().is_err());
 ```
 
 ### Variant name
