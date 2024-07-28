@@ -111,6 +111,25 @@ fn from_str_struct_field_regex_all() {
 }
 
 #[test]
+fn from_str_struct_field_regex_all_with_display() {
+    #[derive(FromStr, Debug, Eq, PartialEq)]
+    #[display("{a}, {b}")]
+    struct TestStruct {
+        #[display("a = {}")]
+        #[from_str(regex = "[0-9]+")]
+        a: u32,
+        b: String,
+    }
+    assert_from_str(
+        "a = 12, abc",
+        TestStruct {
+            a: 12,
+            b: "abc".into(),
+        },
+    );
+}
+
+#[test]
 fn from_str_struct_field_regex_self() {
     #[derive(FromStr, Debug, Eq, PartialEq)]
     #[display("{a},{b}")]
@@ -123,7 +142,7 @@ fn from_str_struct_field_regex_self() {
 }
 
 #[test]
-fn from_str_struct_field_regex_self_and_display() {
+fn from_str_struct_field_regex_self_with_display() {
     #[derive(FromStr, Debug, Eq, PartialEq)]
     #[display("{a},{b}")]
     struct TestStruct {

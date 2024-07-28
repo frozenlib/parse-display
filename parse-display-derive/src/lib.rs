@@ -362,7 +362,12 @@ impl<'a> ParserBuilder<'a> {
         Ok(field.set_capture(sub_keys, &mut self.capture_next))
     }
 
-    fn push_regex(&mut self, s: &LitStr, context: &DisplayContext) -> Result<()> {
+    fn push_regex(
+        &mut self,
+        s: &LitStr,
+        context: &DisplayContext,
+        format: &Option<DisplayFormat>,
+    ) -> Result<()> {
         const IDX_ESC: usize = 1;
         const IDX_P: usize = 2;
         const IDX_KEY: usize = 3;
@@ -427,6 +432,9 @@ impl<'a> ParserBuilder<'a> {
         }
         if let DisplayContext::Field { .. } = context {
             if !has_capture {
+                if let Some(format) = format {
+                    return self.push_format(format, context, None, Some(&text));
+                }
                 let name = self.set_capture(context, &[], s.span())?;
                 text = format!("(?<{name}>{text})");
             }
@@ -438,7 +446,8 @@ impl<'a> ParserBuilder<'a> {
         &mut self,
         format: &DisplayFormat,
         context: &DisplayContext,
-        with: &Option<Expr>,
+        with: Option<&Expr>,
+        regex: Option<&str>,
     ) -> Result<()> {
         for p in &format.parts {
             match p {
@@ -458,15 +467,18 @@ impl<'a> ParserBuilder<'a> {
                         continue;
                     }
                     let c = self.set_capture(context, &keys, format.span)?;
-                    let f = format!("(?<{c}>(?s:.*?))");
-                    self.parse_format.push_hir(to_hir(&f));
+                    let mut f = format!("(?<{c}>(?s:.*?))");
                     if keys.is_empty() {
+                        if let Some(regex) = regex {
+                            f = format!("(?<{c}>(?s:{regex}))");
+                        }
                         if let DisplayContext::Field { field, key, .. } = context {
                             if let Some(with_expr) = with {
                                 self.with.push(With::new(c, key, with_expr, &field.ty));
                             }
                         }
                     }
+                    self.parse_format.push_hir(to_hir(&f));
                 }
             }
         }
@@ -484,7 +496,12 @@ impl<'a> ParserBuilder<'a> {
     }
     fn push_attrs(&mut self, hattrs: &HelperAttributes, context: &DisplayContext) -> Result<()> {
         if !self.try_push_attrs(hattrs, context)? {
-            self.push_format(&context.default_from_str_format()?, context, &hattrs.with)?;
+            self.push_format(
+                &context.default_from_str_format()?,
+                context,
+                hattrs.with.as_ref(),
+                None,
+            )?;
         }
         Ok(())
     }
@@ -494,10 +511,10 @@ impl<'a> ParserBuilder<'a> {
         context: &DisplayContext,
     ) -> Result<bool> {
         Ok(if let Some(regex) = &hattrs.regex {
-            self.push_regex(regex, context)?;
+            self.push_regex(regex, context, &hattrs.format)?;
             true
         } else if let Some(format) = &hattrs.format {
-            self.push_format(format, context, &hattrs.with)?;
+            self.push_format(format, context, hattrs.with.as_ref(), None)?;
             true
         } else {
             false
