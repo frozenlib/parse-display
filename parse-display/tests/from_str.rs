@@ -123,6 +123,19 @@ fn from_str_struct_field_regex_self() {
 }
 
 #[test]
+fn from_str_struct_field_regex_self_and_display() {
+    #[derive(FromStr, Debug, Eq, PartialEq)]
+    #[display("{a},{b}")]
+    struct TestStruct {
+        #[display("---{}---")]
+        #[from_str(regex = "---(?P<>[0-9]+)---")]
+        a: u32,
+        b: u32,
+    }
+    assert_from_str("---12---,50", TestStruct { a: 12, b: 50 });
+}
+
+#[test]
 fn from_str_struct_format_chain() {
     #[derive(FromStr, Debug, Eq, PartialEq, Default)]
     #[display("{a.x},{a.y}")]
