@@ -29,15 +29,20 @@ Specifies the format using a syntax similar to `std::format!()`.
 
 However, unlike `std::format!()`, `{}` has the following meaning.
 
-| format              | struct | enum | variant | field | description                                                                         |
-| ------------------- | ------ | ---- | ------- | ----- | ----------------------------------------------------------------------------------- |
-| `{a}`, `{b}`, `{1}` | ✔      | ✔    | ✔       | ✔     | Use a field with the specified name.                                                |
-| `{a.b.c}`           | ✔      | ✔    | ✔       | ✔     | Use a nested field.                                                                 |
-| `{:x}`, `{:?}`      | ✔      | ✔    |         |       | Use format traits other than [`Display`] for `self`. (e.g. [`LowerHex`], [`Debug`]) |
-| `{}`                |        | ✔    | ✔       |       | Use a variant name of enum.                                                         |
-| `{}`,`{:x}`, `{:?}` |        |      |         | ✔     | Use the field itself.                                                               |
+| format                | struct | enum | variant | field | description                                                                         |
+| --------------------- | ------ | ---- | ------- | ----- | ----------------------------------------------------------------------------------- |
+| [`{a}`, `{b}`, `{1}`] | ✔      | ✔    | ✔       | ✔     | Use a field with the specified name.                                                |
+| [`{}`]                |        | ✔    | ✔       |       | Use a variant name of enum.                                                         |
+| [`{}`,`{:x}`, `{:?}`] |        |      |         | ✔     | Use the field itself.                                                               |
+| [`{:x}`, `{:?}`]      | ✔      | ✔    |         |       | Use format traits other than [`Display`] for `self`. (e.g. [`LowerHex`], [`Debug`]) |
+| [`{a.b.c}`]           | ✔      | ✔    | ✔       | ✔     | Use a nested field.                                                                 |
 
 [`LowerHex`]: std::fmt::LowerHex
+[`{a}`, `{b}`, `{1}`]: #struct-format
+[`{}`]: #variant-name
+[`{}`,`{:x}`, `{:?}`]: #field-format
+[`{:x}`, `{:?}`]: #format-parameter
+[`{a.b.c}`]: #nested-field
 
 ### Struct format
 
@@ -194,6 +199,46 @@ assert_eq!(MyEnum::VarA(10).to_string(), "this is A ___10___");
 assert_eq!("this is A ___10___".parse(), Ok(MyEnum::VarA(10)));
 ```
 
+### Format parameter
+
+Like `std::format!()`, format parameter can be specified.
+
+```rust
+use parse_display::{Display, FromStr};
+
+#[derive(Display, PartialEq, Debug)]
+#[display("{a:>04}")]
+struct WithFormatParameter {
+  a: u32,
+}
+assert_eq!(WithFormatParameter { a:5 }.to_string(), "0005");
+```
+
+When `{}` is used within `#[display("...")]` set for an enum, and if a format trait is added to `{}` such as `{:?}`, the meaning changes from "variant name" to "a string using a trait other than Display for self."
+
+```rust
+use parse_display::Display;
+
+#[derive(Display, PartialEq, Debug)]
+#[display("{}")]
+enum X {
+  A,
+}
+assert_eq!(X::A.to_string(), "A");
+
+#[derive(Display, PartialEq)]
+#[display("{:?}")]
+enum Y {
+  A,
+}
+impl std::fmt::Debug for Y {
+  fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    write!(f, "Debug Y")
+  }
+}
+assert_eq!(Y::A.to_string(), "Debug Y");
+```
+
 ### Nested field
 
 You can use nested field, e.g. `{x.a}` .
@@ -218,21 +263,6 @@ assert_eq!("10".parse(), Ok(Y { x: X { a: 10, b: 0 } }));
 ```
 
 When using nested field, you need to use [`#[from_str(default)]`](#from_strdefault) to implement `FromStr`.
-
-### Format parameter
-
-Like `std::format!()`, format parameter can be specified.
-
-```rust
-use parse_display::{Display, FromStr};
-
-#[derive(Display, PartialEq, Debug)]
-#[display("{a:>04}")]
-struct WithFormatParameter {
-  a: u32,
-}
-assert_eq!(WithFormatParameter { a:5 }.to_string(), "0005");
-```
 
 ## `#[display(style = "...")]`
 
