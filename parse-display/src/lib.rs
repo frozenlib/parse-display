@@ -70,7 +70,7 @@ mod helpers_std;
 ///
 /// ## `#[display("...")]`
 ///
-/// Specifies the format using a syntax similar to `std::format!()`.
+/// Specifies the format using a syntax similar to [`std::format!()`].
 ///
 /// However, unlike `std::format!()`, `{}` has the following meaning.
 ///

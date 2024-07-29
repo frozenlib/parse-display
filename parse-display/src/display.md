@@ -25,7 +25,7 @@ Helper attributes can be written in the following positions.
 
 ## `#[display("...")]`
 
-Specifies the format using a syntax similar to `std::format!()`.
+Specifies the format using a syntax similar to [`std::format!()`].
 
 However, unlike `std::format!()`, `{}` has the following meaning.
 
