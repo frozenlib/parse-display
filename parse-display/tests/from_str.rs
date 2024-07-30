@@ -1251,10 +1251,8 @@ fn assert_from_str_err<T: FromStr + Debug>(s: &str) {
 }
 
 fn panic_on_release_mode() {
-    let mut is_debug = false;
-    debug_assert!({
-        is_debug = true;
-        false
-    });
-    assert!(is_debug);
+    #[cfg(not(debug_assertions))]
+    {
+        panic!("release mode");
+    }
 }
