@@ -1,6 +1,6 @@
 [package]
 name = "parse-display"
-version = "0.9.1"
+version = "0.10.0"
 edition = "2021"
 authors = ["frozenlib"]
 license = "MIT OR Apache-2.0"
@@ -19,12 +19,12 @@ std = ["regex", "regex-syntax"]
 docs = []
 
 [dependencies]
-parse-display-derive = { version = "=0.9.1", path = "../parse-display-derive" }
-regex = { version = "1.10.4", optional = true }
-regex-syntax = { version = "0.8.3", optional = true }
+parse-display-derive = { version = "=0.10.0", path = "../parse-display-derive" }
+regex = { version = "1.10.6", optional = true }
+regex-syntax = { version = "0.8.4", optional = true }
 
 [dev-dependencies]
-trybuild = "1.0.96"
+trybuild = "1.0.99"
 
 [package.metadata.docs.rs]
 features = ["docs"]

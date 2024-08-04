@@ -6,6 +6,22 @@
 
 ### Changed
 
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Performance
+
+### Security
+
+## [0.10.0] - 2024-08-04
+
+### Added
+
+### Changed
+
 - Set `rust-version` to 1.80.0.
 - In debug mode, it will panic if the result of `FromStrFormat::regex` varies for the same field depending on the type parameters.
 - Change the behavior when both `#[display("...")]` and `#[from_str("...")]` are specified for a field. ([dc14a2b])
@@ -95,7 +111,8 @@
 
 - Support `#[from_str(ignore)]` for variant.
 
-[unreleased]: https://github.com/frozenlib/parse-display/compare/v0.9.1...HEAD
+[unreleased]: https://github.com/frozenlib/parse-display/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/frozenlib/parse-display/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/frozenlib/parse-display/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/frozenlib/parse-display/compare/v0.8.2...v0.9.0
 [0.8.2]: https://github.com/frozenlib/parse-display/compare/v0.8.1...v0.8.2
