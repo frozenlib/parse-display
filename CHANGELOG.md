@@ -18,8 +18,6 @@
 
 ## [0.10.0] - 2024-08-04
 
-### Added
-
 ### Changed
 
 - Set `rust-version` to 1.80.0.
@@ -28,17 +26,9 @@
 
 [dc14a2b]: https://github.com/frozenlib/parse-display/commit/dc14a2b78a0b547f4911d2cf45d2f8b96aa723e2
 
-### Deprecated
-
-### Removed
-
 ### Fixed
 
 - Fix `#[from_str]` to not affect `Display`.
-
-### Performance
-
-### Security
 
 ## [0.9.1] - 2024-05-31
 
