@@ -857,8 +857,7 @@ impl Display for ParseError {
         write!(f, "{}", self.0)
     }
 }
-#[cfg(feature = "std")]
-impl std::error::Error for ParseError {
+impl core::error::Error for ParseError {
     fn description(&self) -> &str {
         self.0
     }
