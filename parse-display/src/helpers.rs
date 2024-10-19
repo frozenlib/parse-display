@@ -22,11 +22,15 @@ where
     fmt.parse(s)
 }
 
-pub struct FmtPointer<'a, T: ?Sized + fmt::Pointer>(pub &'a T);
+struct FmtPointer<'a, T: ?Sized + fmt::Pointer>(&'a T);
 
 impl<'a, T: ?Sized + fmt::Pointer> fmt::Pointer for FmtPointer<'a, T> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Pointer::fmt(self.0, f)
     }
+}
+
+pub fn fmt_pointer<T: ?Sized + fmt::Pointer>(value: &T) -> impl fmt::Pointer + '_ {
+    FmtPointer(value)
 }

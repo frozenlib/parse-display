@@ -1157,7 +1157,7 @@ impl DisplayFormat {
                     let mut expr = quote!(&#format_arg);
                     if format_spec.format_type == FormatType::Pointer {
                         let crate_path = context.crate_path();
-                        expr = quote!(#crate_path::helpers::FmtPointer(#expr));
+                        expr = quote!(#crate_path::helpers::fmt_pointer(#expr));
                     }
                     expr = set_span(expr, self.span);
                     format_args.push(expr);
