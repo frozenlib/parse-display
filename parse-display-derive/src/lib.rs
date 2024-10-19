@@ -1118,7 +1118,7 @@ impl DisplayFormat {
         };
         Some(Self {
             parts: vec![p],
-            span: data.fields.span(),
+            span: Span::call_site(),
         })
     }
     fn from_unit_variant(variant: &Variant) -> Result<Option<Self>> {
@@ -1159,6 +1159,7 @@ impl DisplayFormat {
                         let crate_path = context.crate_path();
                         expr = quote!(#crate_path::helpers::FmtPointer(#expr));
                     }
+                    expr = set_span(expr, self.span);
                     format_args.push(expr);
                 }
             }

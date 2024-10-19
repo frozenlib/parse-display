@@ -1,8 +1,10 @@
 error[E0277]: `NoDisplay` doesn't implement `std::fmt::Display`
- --> tests/compile_fail/display/struct_no_display_field_format.rs:5:10
+ --> tests/compile_fail/display/struct_no_display_field_format.rs:6:11
   |
 5 | #[derive(Display)]
-  |          ^^^^^^^ `NoDisplay` cannot be formatted with the default formatter
+  |          ------- in this derive macro expansion
+6 | #[display("{x}")]
+  |           ^^^^^ `NoDisplay` cannot be formatted with the default formatter
   |
   = help: the trait `std::fmt::Display` is not implemented for `NoDisplay`, which is required by `&NoDisplay: std::fmt::Display`
   = note: in format strings you may be able to use `{:?}` (or {:#?} for pretty-print) instead

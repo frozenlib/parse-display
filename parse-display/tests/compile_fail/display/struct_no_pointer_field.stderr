@@ -3,19 +3,40 @@ error[E0277]: the trait bound `u32: Pointer` is not satisfied
   |
 3 | #[derive(Display)]
   |          ^^^^^^^ the trait `Pointer` is not implemented for `u32`
+4 | #[display("{x:p}")]
+  |           ------- required by a bound introduced by this call
   |
 note: required by a bound in `FmtPointer`
  --> src/helpers.rs
   |
   | pub struct FmtPointer<'a, T: ?Sized + fmt::Pointer>(pub &'a T);
   |                                       ^^^^^^^^^^^^ required by this bound in `FmtPointer`
-  = note: this error originates in the derive macro `Display` (in Nightly builds, run with -Z macro-backtrace for more info)
+help: consider borrowing here
+  |
+3 | #[derive(&Display)]
+  |          +
+3 | #[derive(&mut Display)]
+  |          ++++
 
 error[E0277]: the trait bound `u32: Pointer` is not satisfied
- --> tests/compile_fail/display/struct_no_pointer_field.rs:3:10
+ --> tests/compile_fail/display/struct_no_pointer_field.rs:4:11
+  |
+4 | #[display("{x:p}")]
+  |           ^^^^^^^ the trait `Pointer` is not implemented for `u32`
+  |
+note: required by a bound in `FmtPointer`
+ --> src/helpers.rs
+  |
+  | pub struct FmtPointer<'a, T: ?Sized + fmt::Pointer>(pub &'a T);
+  |                                       ^^^^^^^^^^^^ required by this bound in `FmtPointer`
+
+error[E0277]: the trait bound `u32: Pointer` is not satisfied
+ --> tests/compile_fail/display/struct_no_pointer_field.rs:4:11
   |
 3 | #[derive(Display)]
-  |          ^^^^^^^ the trait `Pointer` is not implemented for `u32`, which is required by `FmtPointer<'_, u32>: Pointer`
+  |          ------- in this derive macro expansion
+4 | #[display("{x:p}")]
+  |           ^^^^^^^ the trait `Pointer` is not implemented for `u32`, which is required by `FmtPointer<'_, u32>: Pointer`
   |
   = help: the trait `Pointer` is implemented for `FmtPointer<'a, T>`
   = note: required for `FmtPointer<'_, u32>` to implement `Pointer`
