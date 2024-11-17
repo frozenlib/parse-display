@@ -5,7 +5,7 @@
 pub trait FromStrRegex: core::str::FromStr {
     /// Returns a regex pattern for strings that might be parseable by [`FromStr`](core::str::FromStr).
     ///
-    /// Note: Matching this pattern does not guarantee successful parsing.
+    /// Note: Matching this pattern does not guarantee that the string can be parsed successfully.
     fn from_str_regex() -> String;
 }
 impl FromStrRegex for String {
