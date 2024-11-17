@@ -1,11 +1,11 @@
 use core::mem;
-use std::borrow::Cow;
 use std::collections::HashMap;
+use std::{borrow::Cow, fmt};
 
 use regex::Regex;
 use regex_syntax::ast::{Ast, Flags, GroupKind};
 
-use crate::FromStrFormat;
+use crate::{DisplayFormat, FromStrFormat, FromStrRegex};
 
 pub use regex;
 
@@ -164,3 +164,19 @@ fn replace_ast(
 }
 
 type ReplaceAstResult<T = ()> = Result<T, String>;
+
+pub struct RegexInfer;
+impl<T: fmt::Display> DisplayFormat<T> for RegexInfer {
+    fn write(&self, f: &mut fmt::Formatter, value: &T) -> fmt::Result {
+        T::fmt(value, f)
+    }
+}
+impl<T: FromStrRegex> FromStrFormat<T> for RegexInfer {
+    type Err = T::Err;
+    fn parse(&self, s: &str) -> core::result::Result<T, Self::Err> {
+        s.parse()
+    }
+    fn regex(&self) -> Option<String> {
+        Some(T::from_str_regex())
+    }
+}

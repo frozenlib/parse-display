@@ -188,17 +188,19 @@ fn derive_from_str_for_struct(input: &DeriveInput, data: &DataStruct) -> Result<
         },
     ));
 
-    let body = p.build_from_str_regex_body(crate_path)?;
-    ts.extend(impl_trait(
-        input,
-        &parse_quote!(#crate_path::FromStrRegex),
-        &wheres,
-        quote! {
-            fn from_str_regex() -> String {
-                #body
-            }
-        },
-    ));
+    if cfg!(feature = "std") {
+        let body = p.build_from_str_regex_body(crate_path)?;
+        ts.extend(impl_trait(
+            input,
+            &parse_quote!(#crate_path::FromStrRegex),
+            &wheres,
+            quote! {
+                fn from_str_regex() -> String {
+                    #body
+                }
+            },
+        ));
+    }
     dump_if(hattrs.dump_from_str, &ts);
     Ok(ts)
 }
@@ -266,36 +268,37 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Toke
             }
         },
     ));
-    let body = if regex_args.is_empty() {
-        let fmts = regex_fmts
-            .into_iter()
-            .map(|s| escape(&s.unwrap()))
-            .collect::<Vec<_>>();
-        let s = fmts.join("|");
-        quote! { #s.into() }
-    } else {
-        let fmts = regex_fmts
-            .into_iter()
-            .map(|s| match s {
-                Some(s) => format!("({})", escape_fmt(&escape(&s))),
-                None => "{}".to_string(),
-            })
-            .collect::<Vec<_>>();
-        let fmt = fmts.join("|");
-        quote! { format!(#fmt, #(#regex_args,)*) }
-    };
+    if cfg!(feature = "std") {
+        let body = if regex_args.is_empty() {
+            let fmts = regex_fmts
+                .into_iter()
+                .map(|s| escape(&s.unwrap()))
+                .collect::<Vec<_>>();
+            let s = fmts.join("|");
+            quote! { #s.into() }
+        } else {
+            let fmts = regex_fmts
+                .into_iter()
+                .map(|s| match s {
+                    Some(s) => format!("({})", escape_fmt(&escape(&s))),
+                    None => "{}".to_string(),
+                })
+                .collect::<Vec<_>>();
+            let fmt = fmts.join("|");
+            quote! { format!(#fmt, #(#regex_args,)*) }
+        };
 
-    ts.extend(impl_trait(
-        input,
-        &parse_quote!(#crate_path::FromStrRegex),
-        &wheres,
-        quote! {
-            fn from_str_regex() -> String {
-                #body
-            }
-        },
-    ));
-
+        ts.extend(impl_trait(
+            input,
+            &parse_quote!(#crate_path::FromStrRegex),
+            &wheres,
+            quote! {
+                fn from_str_regex() -> String {
+                    #body
+                }
+            },
+        ));
+    }
     dump_if(hattrs_enum.dump_from_str, &ts);
     Ok(ts)
 }

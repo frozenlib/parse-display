@@ -14,7 +14,7 @@ rust-version = "1.81.0"
 
 [features]
 default = ["std"]
-std = ["regex", "regex-syntax"]
+std = ["regex", "regex-syntax", "parse-display-derive/std"]
 docs = []
 
 [dependencies]
