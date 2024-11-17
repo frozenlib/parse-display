@@ -69,6 +69,7 @@ pub use from_str_regex::FromStrRegex;
 /// | [`#[display(crate = ...)]`](#displaycrate--)                  | ✔            |               | ✔      | ✔    |         |       |
 /// | [`#[display(dump)]`](#displaydump-from_strdump)               | ✔            | ✔             | ✔      | ✔    |         |       |
 /// | [`#[from_str(regex = "...")]`](#from_strregex--)              |              | ✔             | ✔      | ✔    | ✔       | ✔     |
+/// | [`#[from_str(regex_infer)]`](#from_strregex_infer)            |              | ✔             | ✔      | ✔    | ✔       | ✔     |
 /// | [`#[from_str(new = ...)]`](#from_strnew--)                    |              | ✔             | ✔      |      | ✔       |       |
 /// | [`#[from_str(ignore)]`](#from_strignore)                      |              | ✔             |        |      | ✔       |       |
 /// | [`#[from_str(default)]`](#from_strdefault)                    |              | ✔             | ✔      |      |         | ✔     |
@@ -744,6 +745,40 @@ pub use from_str_regex::FromStrRegex;
 /// assert_eq!("1".parse(), Ok(MyNonZeroUSize(1)));
 /// assert_eq!("0".parse::<MyNonZeroUSize>().is_err(), true);
 /// ```
+///
+/// ## `#[from_str(regex_infer)]`
+///
+/// By default, fields are matched using the regular expression `(?s:.*?)`.
+///
+/// If you specify `#[from_str(regex_infer)]`,
+/// this behavior is changed and the pattern obtained from the field type's [`FromStrRegex::from_str_regex`] is used for matching.
+///
+/// ```rust
+/// use parse_display::FromStr;
+///
+/// #[derive(FromStr, PartialEq, Debug)]
+/// #[display("{a}{b}")]
+/// struct X {
+///     a: u32,
+///     b: String,
+/// }
+///
+/// // `a` matches "" and `b` matches "1a", so it fails to convert to `Y`.
+/// assert!("1a".parse::<X>().is_err());
+///
+/// #[derive(FromStr, PartialEq, Debug)]
+/// #[display("{a}{b}")]
+/// struct Y {
+///     #[from_str(regex_infer)]
+///     a: u32,
+///     b: String,
+/// }
+///
+/// // `a` matches "1" and `b` matches "a", so it can be converted to `Y`.
+/// assert_eq!("1a".parse(), Ok(Y { a: 1, b: "a".into() }));
+/// ```
+///
+/// If `#[from_str(regex_infer)]` is specified for a type or variant rather than a field, this attribute is applied to all fields.
 ///
 /// ## `#[from_str(ignore)]`
 ///
