@@ -890,6 +890,11 @@ impl<T, E> IntoResult<T> for core::result::Result<T, E> {
     }
 }
 
+#[cfg(feature = "std")]
+pub trait RegexForFromStr: core::str::FromStr {
+    fn regex_for_from_str(&self) -> Option<String>;
+}
+
 /// Formatting method used in [`#[display(with = ...)]`](macro@Display#displaywith---from_strwith--).
 pub trait DisplayFormat<T: ?Sized> {
     /// Formatting function used in place of [`Display::fmt`].
