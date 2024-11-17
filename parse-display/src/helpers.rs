@@ -3,7 +3,7 @@ use core::fmt;
 #[cfg(feature = "std")]
 pub use super::helpers_std::*;
 
-use crate::{DisplayFormat, FromStrFormat};
+use crate::{DisplayFormat, FromStrFormat, RegexForFromStr};
 
 pub struct Formatted<'a, T: ?Sized, F: DisplayFormat<T>> {
     pub value: &'a T,
@@ -33,4 +33,20 @@ impl<'a, T: ?Sized + fmt::Pointer> fmt::Pointer for FmtPointer<'a, T> {
 
 pub fn fmt_pointer<T: ?Sized + fmt::Pointer>(value: &T) -> impl fmt::Pointer + '_ {
     FmtPointer(value)
+}
+
+pub struct RegexInfer;
+impl<T: fmt::Display> DisplayFormat<T> for RegexInfer {
+    fn write(&self, f: &mut fmt::Formatter, value: &T) -> fmt::Result {
+        T::fmt(value, f)
+    }
+}
+impl<T: RegexForFromStr> FromStrFormat<T> for RegexInfer {
+    type Err = T::Err;
+    fn parse(&self, s: &str) -> core::result::Result<T, Self::Err> {
+        s.parse()
+    }
+    fn regex(&self) -> Option<String> {
+        T::regex_for_from_str()
+    }
 }

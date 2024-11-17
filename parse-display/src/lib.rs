@@ -42,6 +42,12 @@ pub mod helpers;
 #[cfg(feature = "std")]
 mod helpers_std;
 
+#[cfg(feature = "std")]
+mod regex_for_from_str;
+
+#[cfg(feature = "std")]
+pub use regex_for_from_str::RegexForFromStr;
+
 // #[include_doc("display.md", start)]
 /// Derive [`Display`].
 ///
@@ -888,11 +894,6 @@ impl<T, E> IntoResult<T> for core::result::Result<T, E> {
     fn into_result(self) -> core::result::Result<T, E> {
         self
     }
-}
-
-#[cfg(feature = "std")]
-pub trait RegexForFromStr: core::str::FromStr {
-    fn regex_for_from_str(&self) -> Option<String>;
 }
 
 /// Formatting method used in [`#[display(with = ...)]`](macro@Display#displaywith---from_strwith--).

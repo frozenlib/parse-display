@@ -1235,6 +1235,50 @@ fn regex_depending_on_the_parameter() {
     panic_on_release_mode();
 }
 
+#[test]
+fn regex_infer() {
+    #[derive(FromStr, Debug, Eq, PartialEq)]
+    #[display("{a}{b}")]
+    struct X {
+        a: String,
+        #[from_str(regex_infer)]
+        b: u32,
+    }
+    #[derive(FromStr, Debug, Eq, PartialEq)]
+    #[display("{a}{b}")]
+    struct Y {
+        a: String,
+        b: u32,
+    }
+
+    assert_from_str(
+        "abc10",
+        X {
+            a: "abc".into(),
+            b: 10,
+        },
+    );
+    assert_from_str_err::<Y>("abc10");
+}
+
+#[test]
+fn regex_infer_all() {
+    #[derive(FromStr, Debug, Eq, PartialEq)]
+    #[display("{a}{b}")]
+    #[from_str(regex_infer)]
+    struct X {
+        a: String,
+        b: u32,
+    }
+    assert_from_str(
+        "abc10",
+        X {
+            a: "abc".into(),
+            b: 10,
+        },
+    );
+}
+
 fn assert_from_str<T: FromStr + Debug + PartialEq>(s: &str, value: T)
 where
     <T as FromStr>::Err: Display,

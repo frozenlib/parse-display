@@ -277,10 +277,10 @@ struct FieldEntry<'a> {
 }
 
 impl<'a> ParserBuilder<'a> {
-    fn new(source: &'a Fields, crate_path: &'a Path) -> Result<Self> {
+    fn new(source: &'a Fields, regex_infer: bool, crate_path: &'a Path) -> Result<Self> {
         let mut fields = BTreeMap::new();
         for (key, field) in field_map(source) {
-            fields.insert(key, FieldEntry::new(field, crate_path)?);
+            fields.insert(key, FieldEntry::new(field, regex_infer, crate_path)?);
         }
         Ok(Self {
             source,
@@ -294,7 +294,7 @@ impl<'a> ParserBuilder<'a> {
         })
     }
     fn from_struct(hattrs: &'a HelperAttributes, data: &'a DataStruct) -> Result<Self> {
-        let mut s = Self::new(&data.fields, &hattrs.crate_path)?;
+        let mut s = Self::new(&data.fields, hattrs.regex_infer, &hattrs.crate_path)?;
         let context = DisplayContext::Struct {
             data,
             crate_path: &hattrs.crate_path,
@@ -309,7 +309,11 @@ impl<'a> ParserBuilder<'a> {
         hattrs_enum: &'a HelperAttributes,
         variant: &'a Variant,
     ) -> Result<Self> {
-        let mut s = Self::new(&variant.fields, &hattrs_enum.crate_path)?;
+        let mut s = Self::new(
+            &variant.fields,
+            hattrs_enum.regex_infer || hattrs_variant.regex_infer,
+            &hattrs_enum.crate_path,
+        )?;
         let context = DisplayContext::Variant {
             variant,
             style: DisplayStyle::from_helper_attributes(hattrs_enum, hattrs_variant),
@@ -682,8 +686,11 @@ impl<'a> ParserBuilder<'a> {
     }
 }
 impl<'a> FieldEntry<'a> {
-    fn new(source: &'a Field, crate_path: &'a Path) -> Result<Self> {
-        let hattrs = HelperAttributes::from(&source.attrs, true)?;
+    fn new(source: &'a Field, regex_infer: bool, crate_path: &'a Path) -> Result<Self> {
+        let mut hattrs = HelperAttributes::from(&source.attrs, true)?;
+        if (regex_infer || hattrs.regex_infer) && hattrs.with.is_none() {
+            hattrs.with = Some(parse_quote!(#crate_path::helpers::RegexInfer));
+        };
         let use_default = hattrs.default_self.is_some();
         Ok(Self {
             hattrs,
@@ -825,6 +832,7 @@ impl Parse for DefaultField {
 #[derive(StructMeta)]
 struct FromStrArgs {
     regex: Option<LitStr>,
+    regex_infer: Flag,
     with: Option<Expr>,
     new: Option<Expr>,
     bound: Option<Vec<Quotable<Bound>>>,
@@ -842,6 +850,7 @@ struct HelperAttributes {
     bound_display: Option<Vec<Bound>>,
     bound_from_str: Option<Vec<Bound>>,
     regex: Option<LitStr>,
+    regex_infer: bool,
     default_self: Option<Span>,
     default_fields: Vec<DefaultField>,
     new_expr: Option<Expr>,
@@ -859,6 +868,7 @@ impl HelperAttributes {
             bound_display: None,
             bound_from_str: None,
             regex: None,
+            regex_infer: false,
             new_expr: None,
             default_self: None,
             default_fields: Vec::new(),
@@ -906,6 +916,7 @@ impl HelperAttributes {
         if let Some(regex) = args.regex {
             self.regex = Some(regex);
         }
+        self.regex_infer |= args.regex_infer.value();
         if let Some(with) = args.with {
             self.with = Some(with);
         }
