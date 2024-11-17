@@ -77,3 +77,17 @@ impl FromStrRegex for i128 {
         regex_sint()
     }
 }
+
+fn regex_f() -> String {
+    r"[+-]?([0-9]+\.?|[0-9]*\.[0-9]+)([eE][+-]?[0-9]+)?".into()
+}
+impl FromStrRegex for f32 {
+    fn from_str_regex() -> String {
+        regex_f()
+    }
+}
+impl FromStrRegex for f64 {
+    fn from_str_regex() -> String {
+        regex_f()
+    }
+}
