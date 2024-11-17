@@ -287,10 +287,7 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Toke
             }
             fmt.push(')')
         }
-        quote! {
-            static S : std::sync::OnceLock<String> = std::sync::OnceLock::new(|| format!(#fmt, #(#args,)*));
-            S.get_or_init().clone()
-        }
+        quote! { format!(#fmt, #(#args,)*) }
     };
 
     ts.extend(impl_trait(
@@ -602,10 +599,7 @@ impl<'a> ParserBuilder<'a> {
     fn build_regex_for_from_str_body(&self, crate_path: &Path) -> Result<TokenStream> {
         Ok(match self.build_parser_source(crate_path, false)? {
             ParserSource::Parser { init, .. } => {
-                quote! {
-                    static REGEX_FOR_FROM_STR: ::std::sync::OnceLock<String> = ::std::sync::OnceLock::new();
-                    REGEX_FOR_FROM_STR.get_or_init(|| (#init).re_str).clone()
-                }
+                quote! { (#init).re_str }
             }
             ParserSource::String(s) => {
                 let s = regex_syntax::escape(&s);
