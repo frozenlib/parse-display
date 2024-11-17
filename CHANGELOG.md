@@ -4,6 +4,9 @@
 
 ### Added
 
+- Add `FromStrRegex` trait.
+- Support `#[from_str(regex_infer)]`.
+
 ### Changed
 
 ### Deprecated
