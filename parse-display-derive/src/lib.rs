@@ -16,7 +16,7 @@ mod format_syntax;
 use crate::{format_syntax::*, regex_utils::*, syn_utils::*};
 use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote, quote_spanned, ToTokens};
-use regex::{Captures, Regex};
+use regex::{escape, Captures, Regex};
 use regex_syntax::hir::Hir;
 use std::{
     collections::{BTreeMap, HashMap},
@@ -176,7 +176,7 @@ fn derive_from_str_for_struct(input: &DeriveInput, data: &DataStruct) -> Result<
     p.build_bounds(&generics, &mut bounds);
     let wheres = bounds.build_wheres(&trait_path);
     let mut ts = TokenStream::new();
-    ts.extend(impl_trait_result(
+    ts.extend(impl_trait(
         input,
         &trait_path,
         &wheres,
@@ -186,11 +186,10 @@ fn derive_from_str_for_struct(input: &DeriveInput, data: &DataStruct) -> Result<
                 #body
             }
         },
-        false,
-    )?);
+    ));
 
     let body = p.build_regex_for_from_str_body(crate_path)?;
-    ts.extend(impl_trait_result(
+    ts.extend(impl_trait(
         input,
         &parse_quote!(#crate_path::RegexForFromStr),
         &wheres,
@@ -199,8 +198,7 @@ fn derive_from_str_for_struct(input: &DeriveInput, data: &DataStruct) -> Result<
                 #body
             }
         },
-        false,
-    )?);
+    ));
     dump_if(hattrs.dump_from_str, &ts);
     Ok(ts)
 }
@@ -215,6 +213,8 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Toke
     let generics = GenericParamSet::new(&input.generics);
     let mut bodys = Vec::new();
     let mut arms = Vec::new();
+    let mut parser_sources = Vec::new();
+    let mut variant_patterns = Some(Vec::new());
     for variant in &data.variants {
         let hattrs_variant = HelperAttributes::from(&variant.attrs, true)?;
         if hattrs_variant.ignore.value() {
@@ -229,6 +229,15 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Toke
             ParseVariantCode::MatchArm(arm) => arms.push(arm),
             ParseVariantCode::Statement(body) => bodys.push(body),
         }
+        let parser_source = p.build_parser_source(crate_path, false)?;
+        if let Some(variant_strs) = &mut variant_patterns {
+            if let ParserSource::String(s) = &parser_source {
+                variant_strs.push(format!("({})", escape(s)));
+            } else {
+                variant_strs.clear();
+            }
+        }
+        parser_sources.push(parser_source);
     }
     let match_body = if arms.is_empty() {
         quote! {}
@@ -241,7 +250,9 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Toke
         }
     };
     let wheres = bounds.build_wheres(&trait_path);
-    impl_trait_result(
+
+    let mut ts = TokenStream::new();
+    ts.extend(impl_trait(
         input,
         &trait_path,
         &wheres,
@@ -253,8 +264,48 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Toke
                 ::core::result::Result::Err(#crate_path::ParseError::new())
             }
         },
-        hattrs_enum.dump_from_str,
-    )
+    ));
+    let body = if let Some(variant_patterns) = variant_patterns {
+        let s = variant_patterns.join("|");
+        quote! { #s.into() }
+    } else {
+        let mut fmt = String::new();
+        let mut args = Vec::new();
+        for s in parser_sources {
+            if fmt.is_empty() {
+                fmt.push('|');
+            }
+            fmt.push('(');
+            match s {
+                ParserSource::Parser { init, .. } => {
+                    fmt.push_str("{}");
+                    args.push(quote!(#init.re_str));
+                }
+                ParserSource::String(s) => {
+                    fmt.push_str(&escape(&s));
+                }
+            }
+            fmt.push(')')
+        }
+        quote! {
+            static S : std::sync::OnceLock<String> = std::sync::OnceLock::new(|| format!(#fmt, #(#args,)*));
+            S.get_or_init().clone()
+        }
+    };
+
+    ts.extend(impl_trait(
+        input,
+        &parse_quote!(#crate_path::RegexForFromStr),
+        &wheres,
+        quote! {
+            fn regex_for_from_str() -> String {
+                #body
+            }
+        },
+    ));
+
+    dump_if(hattrs_enum.dump_from_str, &ts);
+    Ok(ts)
 }
 struct With {
     capture: String,

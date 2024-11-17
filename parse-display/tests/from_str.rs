@@ -1280,7 +1280,7 @@ fn regex_infer_all() {
 }
 
 #[test]
-fn struct_regex_for_from_str() {
+fn regex_for_from_str_struct() {
     #[derive(FromStr, Debug, Eq, PartialEq)]
     #[display("{a},{b}")]
     struct X {
@@ -1295,8 +1295,6 @@ fn struct_regex_for_from_str() {
         x: X,
         y: u32,
     }
-    dbg!(X::regex_for_from_str());
-    dbg!(Y::regex_for_from_str());
 
     assert_from_str(
         "10,20,30",
@@ -1305,6 +1303,25 @@ fn struct_regex_for_from_str() {
             y: 30,
         },
     );
+}
+
+#[test]
+fn regex_for_from_str_enum() {
+    #[derive(FromStr, Debug, Eq, PartialEq)]
+    enum X {
+        A,
+        B,
+    }
+
+    #[derive(FromStr, Debug, Eq, PartialEq)]
+    #[display("{x}{y}")]
+    struct Y {
+        #[from_str(regex_infer)]
+        x: X,
+        y: u32,
+    }
+
+    assert_from_str("A30", Y { x: X::A, y: 30 });
 }
 
 fn assert_from_str<T: FromStr + Debug + PartialEq>(s: &str, value: T)
