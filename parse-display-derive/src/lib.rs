@@ -16,8 +16,8 @@ mod format_syntax;
 use crate::{format_syntax::*, regex_utils::*, syn_utils::*};
 use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote, quote_spanned, ToTokens};
-use regex::{escape, Captures, Regex};
-use regex_syntax::hir::Hir;
+use regex::{Captures, Regex};
+use regex_syntax::{escape, hir::Hir};
 use std::{
     collections::{BTreeMap, HashMap},
     fmt::{Display, Formatter},
@@ -213,8 +213,8 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Toke
     let generics = GenericParamSet::new(&input.generics);
     let mut bodys = Vec::new();
     let mut arms = Vec::new();
-    let mut parser_sources = Vec::new();
-    let mut variant_patterns = Some(Vec::new());
+    let mut regex_fmts = Vec::new();
+    let mut regex_args = Vec::new();
     for variant in &data.variants {
         let hattrs_variant = HelperAttributes::from(&variant.attrs, true)?;
         if hattrs_variant.ignore.value() {
@@ -229,15 +229,16 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Toke
             ParseVariantCode::MatchArm(arm) => arms.push(arm),
             ParseVariantCode::Statement(body) => bodys.push(body),
         }
-        let parser_source = p.build_parser_source(crate_path, false)?;
-        if let Some(variant_strs) = &mut variant_patterns {
-            if let ParserSource::String(s) = &parser_source {
-                variant_strs.push(format!("({})", escape(s)));
-            } else {
-                variant_strs.clear();
+        match &p.parse_format {
+            ParseFormat::Hirs(hirs) => {
+                regex_fmts.push(None);
+                let expr = p.build_parser_init(hirs, crate_path)?.expr;
+                regex_args.push(quote!((#expr).re_str));
+            }
+            ParseFormat::String(s) => {
+                regex_fmts.push(Some(s.clone()));
             }
         }
-        parser_sources.push(parser_source);
     }
     let match_body = if arms.is_empty() {
         quote! {}
@@ -265,29 +266,23 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Toke
             }
         },
     ));
-    let body = if let Some(variant_patterns) = variant_patterns {
-        let s = variant_patterns.join("|");
+    let body = if regex_args.is_empty() {
+        let fmts = regex_fmts
+            .into_iter()
+            .map(|s| escape(&s.unwrap()))
+            .collect::<Vec<_>>();
+        let s = fmts.join("|");
         quote! { #s.into() }
     } else {
-        let mut fmt = String::new();
-        let mut args = Vec::new();
-        for s in parser_sources {
-            if fmt.is_empty() {
-                fmt.push('|');
-            }
-            fmt.push('(');
-            match s {
-                ParserSource::Parser { init, .. } => {
-                    fmt.push_str("{}");
-                    args.push(quote!(#init.re_str));
-                }
-                ParserSource::String(s) => {
-                    fmt.push_str(&escape(&s));
-                }
-            }
-            fmt.push(')')
-        }
-        quote! { format!(#fmt, #(#args,)*) }
+        let fmts = regex_fmts
+            .into_iter()
+            .map(|s| match s {
+                Some(s) => format!("({})", escape_fmt(&escape(&s))),
+                None => "{}".to_string(),
+            })
+            .collect::<Vec<_>>();
+        let fmt = fmts.join("|");
+        quote! { format!(#fmt, #(#regex_args,)*) }
     };
 
     ts.extend(impl_trait(
@@ -597,15 +592,16 @@ impl<'a> ParserBuilder<'a> {
         })
     }
     fn build_from_str_regex_body(&self, crate_path: &Path) -> Result<TokenStream> {
-        Ok(match self.build_parser_source(crate_path, false)? {
-            ParserSource::Parser { init, .. } => {
-                quote! { (#init).re_str }
+        match &self.parse_format {
+            ParseFormat::Hirs(hirs) => {
+                let expr = self.build_parser_init(hirs, crate_path)?.expr;
+                Ok(quote! { (#expr).re_str })
             }
-            ParserSource::String(s) => {
-                let s = regex_syntax::escape(&s);
-                quote! { #s.into() }
+            ParseFormat::String(s) => {
+                let s = escape(s);
+                Ok(quote! { #s.into() })
             }
-        })
+        }
     }
 
     fn build_parse_variant_code(
@@ -640,7 +636,7 @@ impl<'a> ParserBuilder<'a> {
         let re;
         match &self.parse_format {
             ParseFormat::Hirs(hirs) => {
-                re = Regex::new(&to_regex_string(hirs, true)).unwrap();
+                re = Regex::new(&to_regex_string(hirs)).unwrap();
                 for (index, name) in re.capture_names().enumerate() {
                     if let Some(name) = name {
                         names.insert(name, index);
@@ -697,66 +693,60 @@ impl<'a> ParserBuilder<'a> {
         };
         Ok(code)
     }
-    fn build_parser_source(&self, crate_path: &Path, start_end: bool) -> Result<ParserSource> {
-        match &self.parse_format {
-            ParseFormat::Hirs(hirs) => {
-                let regex = to_regex_string(hirs, start_end);
-                let mut with = Vec::new();
-                let helpers = quote!( #crate_path::helpers );
-                let mut debug_asserts = Vec::new();
-                for (
-                    index,
-                    With {
-                        capture,
-                        key,
-                        ty,
-                        expr,
-                    },
-                ) in self.with.iter().enumerate()
-                {
-                    with.push(quote_spanned! {expr.span()=>
-                        (#capture, #helpers::to_ast::<#ty, _>(&#expr))
-                    });
-                    let msg = format!(
-                        "The regex for the field `{key}` varies depending on the type parameter."
-                    );
-                    debug_asserts.push(quote_spanned! {expr.span()=>
-                        ::core::debug_assert_eq!(&p.ss[#index], &#helpers::to_regex::<#ty, _>(&#expr), #msg);
-                    });
-                }
-                Ok(ParserSource::Parser {
-                    init: quote!(#helpers::Parser::new(#regex, &mut [#(#with,)*])),
-                    debug_asserts,
-                })
-            }
-            ParseFormat::String(s) => Ok(ParserSource::String(s.clone())),
+    fn build_parser_init(&self, hirs: &[Hir], crate_path: &Path) -> Result<ParserInit> {
+        let regex = to_regex_string(hirs);
+        let mut with = Vec::new();
+        let helpers = quote!( #crate_path::helpers );
+        let mut debug_asserts = Vec::new();
+        for (
+            index,
+            With {
+                capture,
+                key,
+                ty,
+                expr,
+            },
+        ) in self.with.iter().enumerate()
+        {
+            with.push(quote_spanned! {expr.span()=>
+                (#capture, #helpers::to_ast::<#ty, _>(&#expr))
+            });
+            let msg =
+                format!("The regex for the field `{key}` varies depending on the type parameter.");
+            debug_asserts.push(quote_spanned! {expr.span()=>
+                ::core::debug_assert_eq!(&p.ss[#index], &#helpers::to_regex::<#ty, _>(&#expr), #msg);
+            });
         }
+        Ok(ParserInit {
+            expr: quote!(#helpers::Parser::new(#regex, &mut [#(#with,)*])),
+            debug_asserts,
+        })
     }
     fn build_parse_code(&self, crate_path: &Path, constructor: Path) -> Result<TokenStream> {
         let code = self.build_construct_code(crate_path, constructor)?;
-        let code = match self.build_parser_source(crate_path, true)? {
-            ParserSource::Parser {
-                init,
-                debug_asserts,
-            } => {
+        Ok(match &self.parse_format {
+            ParseFormat::Hirs(hirs) => {
+                let ParserInit {
+                    expr,
+                    debug_asserts,
+                } = self.build_parser_init(&hirs_with_start_end(hirs), crate_path)?;
                 let helpers = quote!( #crate_path::helpers );
                 quote! {
                     static PARSER: ::std::sync::OnceLock<#helpers::Parser> = ::std::sync::OnceLock::new();
                     #[allow(clippy::trivial_regex)]
-                    let p = PARSER.get_or_init(|| #init);
+                    let p = PARSER.get_or_init(|| #expr);
                     #(#debug_asserts)*
                     if let ::core::option::Option::Some(c) = p.re.captures(&s) {
                          #code
                     }
                 }
             }
-            ParserSource::String(s) => quote! {
+            ParseFormat::String(s) => quote! {
                 if s == #s {
                     #code
                 }
             },
-        };
-        Ok(code)
+        })
     }
 
     fn build_bounds(&self, generics: &GenericParamSet, bounds: &mut Bounds) {
@@ -880,12 +870,9 @@ impl<'a> FieldEntry<'a> {
     }
 }
 
-enum ParserSource {
-    Parser {
-        init: TokenStream,
-        debug_asserts: Vec<TokenStream>,
-    },
-    String(String),
+struct ParserInit {
+    expr: TokenStream,
+    debug_asserts: Vec<TokenStream>,
 }
 
 fn get_newtype_field(data: &DataStruct) -> Option<String> {
@@ -1849,4 +1836,16 @@ fn unref_ty(ty: &Type) -> Type {
     } else {
         ty.clone()
     }
+}
+
+fn escape_fmt(s: &str) -> String {
+    let mut out = String::new();
+    for c in s.chars() {
+        match c {
+            '{' => out.push_str("{{"),
+            '}' => out.push_str("}}"),
+            c => out.push(c),
+        }
+    }
+    out
 }

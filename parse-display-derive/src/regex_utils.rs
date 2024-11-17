@@ -28,16 +28,14 @@ fn to_ast(s: &str) -> Ast {
 pub fn push_str(hirs: &mut Vec<Hir>, s: &str) {
     hirs.push(Hir::literal(s.as_bytes()));
 }
-pub fn to_regex_string(hirs: &[Hir], start_end: bool) -> String {
-    let mut hs = Vec::new();
-    if start_end {
-        hs.push(Hir::look(regex_syntax::hir::Look::Start));
-    }
+pub fn hirs_with_start_end(hirs: &[Hir]) -> Vec<Hir> {
+    let mut hs = vec![Hir::look(regex_syntax::hir::Look::Start)];
     hs.extend(hirs.iter().cloned());
-    if start_end {
-        hs.push(Hir::look(regex_syntax::hir::Look::End));
-    }
-    Hir::concat(hs).to_string()
+    hs.push(Hir::look(regex_syntax::hir::Look::End));
+    hs
+}
+pub fn to_regex_string(hirs: &[Hir]) -> String {
+    Hir::concat(hirs.to_vec()).to_string()
 }
 
 fn replace_asts(asts: &mut Vec<Ast>, f: &mut impl FnMut(&mut Ast) -> bool) {
