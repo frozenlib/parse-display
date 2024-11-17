@@ -1320,8 +1320,45 @@ fn from_str_regex_enum() {
         x: X,
         y: u32,
     }
-
     assert_from_str("A30", Y { x: X::A, y: 30 });
+}
+
+#[test]
+fn from_str_regex_meta() {
+    #[derive(FromStr, Debug, Eq, PartialEq)]
+    enum X {
+        #[display("*")]
+        A,
+        B,
+    }
+
+    #[derive(FromStr, Debug, Eq, PartialEq)]
+    #[display("{x}{y}")]
+    struct Y {
+        #[from_str(regex_infer)]
+        x: X,
+        y: u32,
+    }
+    assert_from_str("*30", Y { x: X::A, y: 30 });
+}
+
+#[test]
+fn from_str_regex_brace() {
+    #[derive(FromStr, Debug, Eq, PartialEq)]
+    enum X {
+        #[display("{{")]
+        A,
+        B,
+    }
+
+    #[derive(FromStr, Debug, Eq, PartialEq)]
+    #[display("{x}{y}")]
+    struct Y {
+        #[from_str(regex_infer)]
+        x: X,
+        y: u32,
+    }
+    assert_from_str("{30", Y { x: X::A, y: 30 });
 }
 
 fn assert_from_str<T: FromStr + Debug + PartialEq>(s: &str, value: T)
