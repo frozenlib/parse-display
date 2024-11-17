@@ -47,6 +47,6 @@ impl<T: RegexForFromStr> FromStrFormat<T> for RegexInfer {
         s.parse()
     }
     fn regex(&self) -> Option<String> {
-        T::regex_for_from_str()
+        Some(T::regex_for_from_str())
     }
 }
