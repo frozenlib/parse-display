@@ -54,6 +54,7 @@ fn ast_from_str(s: &str) -> Ast {
 
 pub struct Parser {
     pub re: Regex,
+    pub re_str: String,
     pub ss: Vec<Option<String>>,
 }
 impl Parser {
@@ -69,30 +70,34 @@ impl Parser {
                 ss.push(None);
             }
         }
-        let re = if asts.is_empty() {
-            Cow::Borrowed(s)
-        } else {
-            let mut ast = regex_syntax::ast::parse::Parser::new().parse(s).unwrap();
-            let e = replace_ast(&mut ast, &mut |ast| {
-                if let Ast::Group(g) = ast {
-                    if let GroupKind::CaptureName { name, .. } = &g.kind {
-                        if let Some(ast) = asts.get(name.name.as_str()) {
-                            g.ast = Box::new((*ast).clone());
-                            return Ok(false);
-                        }
+        let mut ast = regex_syntax::ast::parse::Parser::new().parse(s).unwrap();
+        replace_ast(&mut ast, &mut |ast| {
+            if let Ast::Group(g) = ast {
+                if let GroupKind::CaptureName { name, .. } = &g.kind {
+                    if let Some(ast) = asts.get(name.name.as_str()) {
+                        g.ast = Box::new((*ast).clone());
+                        return Ok(false);
                     }
                 }
-                Ok(true)
-            });
-            if let Err(e) = e {
-                panic!("{e}");
             }
-            Cow::Owned(ast.to_string())
-        };
-        Self {
-            re: Regex::new(&re).unwrap(),
-            ss,
-        }
+            Ok(true)
+        })
+        .unwrap();
+        let re = Regex::new(&ast.to_string()).unwrap();
+        replace_ast(&mut ast, &mut |ast| {
+            if let Ast::Group(g) = ast {
+                if let GroupKind::CaptureName { .. } = &g.kind {
+                    g.kind = GroupKind::NonCapturing(Flags {
+                        span: g.span,
+                        items: vec![],
+                    });
+                }
+            }
+            Ok(true)
+        })
+        .unwrap();
+        let re_str = ast.to_string();
+        Self { re, re_str, ss }
     }
 }
 

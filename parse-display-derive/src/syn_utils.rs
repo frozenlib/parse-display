@@ -170,8 +170,11 @@ pub fn impl_trait_result(
     dump: bool,
 ) -> Result<TokenStream> {
     let ts = impl_trait(input, trait_path, wheres, contents);
+    dump_if(dump, &ts);
+    Ok(ts)
+}
+pub fn dump_if(dump: bool, ts: &TokenStream) {
     if dump {
         panic!("macro output:\n{ts}");
     }
-    Ok(ts)
 }
