@@ -170,7 +170,7 @@ fn derive_from_str_for_struct(input: &DeriveInput, data: &DataStruct) -> Result<
     let p = ParserBuilder::from_struct(&hattrs, data)?;
     let crate_path = &hattrs.crate_path;
     let trait_path = parse_quote!(::core::str::FromStr);
-    let body = p.build_from_str_body(crate_path, parse_quote!(Self))?;
+    let body = p.build_from_str_body(parse_quote!(Self))?;
     let generics = GenericParamSet::new(&input.generics);
     let mut bounds = Bounds::from_data(hattrs.bound_from_str_resolved());
     p.build_bounds(&generics, &mut bounds);
@@ -189,7 +189,7 @@ fn derive_from_str_for_struct(input: &DeriveInput, data: &DataStruct) -> Result<
     ));
 
     if cfg!(feature = "std") {
-        let body = p.build_from_str_regex_body(crate_path)?;
+        let body = p.build_from_str_regex_body()?;
         ts.extend(impl_trait(
             input,
             &parse_quote!(#crate_path::FromStrRegex),
@@ -227,14 +227,14 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Toke
         let p = ParserBuilder::from_variant(&hattrs_variant, &hattrs_enum, variant)?;
         let mut bounds = bounds.child(hattrs_variant.bound_from_str_resolved());
         p.build_bounds(&generics, &mut bounds);
-        match p.build_parse_variant_code(crate_path, constructor)? {
+        match p.build_parse_variant_code(constructor)? {
             ParseVariantCode::MatchArm(arm) => arms.push(arm),
             ParseVariantCode::Statement(body) => bodys.push(body),
         }
         match &p.parse_format {
             ParseFormat::Hirs(hirs) => {
                 regex_fmts.push(None);
-                let expr = p.build_parser_init(hirs, crate_path)?.expr;
+                let expr = p.build_parser_init(hirs)?.expr;
                 regex_args.push(quote!((#expr).re_str));
             }
             ParseFormat::String(s) => {
@@ -328,6 +328,7 @@ struct ParserBuilder<'a> {
     use_default: bool,
     span: Span,
     new_expr: Option<Expr>,
+    crate_path: &'a Path,
 }
 struct FieldEntry<'a> {
     hattrs: HelperAttributes,
@@ -353,6 +354,7 @@ impl<'a> ParserBuilder<'a> {
             use_default: false,
             span: Span::call_site(),
             new_expr: None,
+            crate_path,
         })
     }
     fn from_struct(hattrs: &'a HelperAttributes, data: &'a DataStruct) -> Result<Self> {
@@ -587,17 +589,18 @@ impl<'a> ParserBuilder<'a> {
         })
     }
 
-    fn build_from_str_body(&self, crate_path: &Path, constructor: Path) -> Result<TokenStream> {
-        let code = self.build_parse_code(crate_path, constructor)?;
+    fn build_from_str_body(&self, constructor: Path) -> Result<TokenStream> {
+        let code = self.build_parse_code(constructor)?;
+        let crate_path = self.crate_path;
         Ok(quote! {
             #code
             ::core::result::Result::Err(#crate_path::ParseError::new())
         })
     }
-    fn build_from_str_regex_body(&self, crate_path: &Path) -> Result<TokenStream> {
+    fn build_from_str_regex_body(&self) -> Result<TokenStream> {
         match &self.parse_format {
             ParseFormat::Hirs(hirs) => {
-                let expr = self.build_parser_init(hirs, crate_path)?.expr;
+                let expr = self.build_parser_init(hirs)?.expr;
                 Ok(quote! { (#expr).re_str })
             }
             ParseFormat::String(s) => {
@@ -607,15 +610,12 @@ impl<'a> ParserBuilder<'a> {
         }
     }
 
-    fn build_parse_variant_code(
-        &self,
-        crate_path: &Path,
-        constructor: Path,
-    ) -> Result<ParseVariantCode> {
+    fn build_parse_variant_code(&self, constructor: Path) -> Result<ParseVariantCode> {
         match &self.parse_format {
             ParseFormat::Hirs(_) => {
                 let fn_ident: Ident = format_ident!("parse_variant");
-                let code = self.build_from_str_body(crate_path, constructor)?;
+                let crate_path = self.crate_path;
+                let code = self.build_from_str_body(constructor)?;
                 let code = quote! {
                     let #fn_ident = |s: &str| -> ::core::result::Result<Self, #crate_path::ParseError> {
                         #code
@@ -627,14 +627,14 @@ impl<'a> ParserBuilder<'a> {
                 Ok(ParseVariantCode::Statement(code))
             }
             ParseFormat::String(s) => {
-                let code = self.build_construct_code(crate_path, constructor)?;
+                let code = self.build_construct_code(constructor)?;
                 let code = quote! { #s  => { #code }};
                 Ok(ParseVariantCode::MatchArm(code))
             }
         }
     }
 
-    fn build_construct_code(&self, crate_path: &Path, constructor: Path) -> Result<TokenStream> {
+    fn build_construct_code(&self, constructor: Path) -> Result<TokenStream> {
         let mut names = HashMap::new();
         let re;
         match &self.parse_format {
@@ -656,6 +656,7 @@ impl<'a> ParserBuilder<'a> {
                 let var = key.new_arg_var();
                 code.extend(quote! { let #var = #expr; });
             }
+            let crate_path = self.crate_path;
             code.extend(quote! {
                 if let ::core::result::Result::Ok(value) = #crate_path::IntoResult::into_result(#new_expr) {
                     return ::core::result::Result::Ok(value);
@@ -696,8 +697,9 @@ impl<'a> ParserBuilder<'a> {
         };
         Ok(code)
     }
-    fn build_parser_init(&self, hirs: &[Hir], crate_path: &Path) -> Result<ParserInit> {
+    fn build_parser_init(&self, hirs: &[Hir]) -> Result<ParserInit> {
         let regex = to_regex_string(hirs);
+        let crate_path = self.crate_path;
         let mut with = Vec::new();
         let helpers = quote!( #crate_path::helpers );
         let mut debug_asserts = Vec::new();
@@ -725,17 +727,17 @@ impl<'a> ParserBuilder<'a> {
             debug_asserts,
         })
     }
-    fn build_parse_code(&self, crate_path: &Path, constructor: Path) -> Result<TokenStream> {
-        let code = self.build_construct_code(crate_path, constructor)?;
+    fn build_parse_code(&self, constructor: Path) -> Result<TokenStream> {
+        let code = self.build_construct_code(constructor)?;
         Ok(match &self.parse_format {
             ParseFormat::Hirs(hirs) => {
                 let ParserInit {
                     expr,
                     debug_asserts,
-                } = self.build_parser_init(&hirs_with_start_end(hirs), crate_path)?;
-                let helpers = quote!( #crate_path::helpers );
+                } = self.build_parser_init(&hirs_with_start_end(hirs))?;
+                let crate_path = self.crate_path;
                 quote! {
-                    static PARSER: ::std::sync::OnceLock<#helpers::Parser> = ::std::sync::OnceLock::new();
+                    static PARSER: ::std::sync::OnceLock<#crate_path::helpers::Parser> = ::std::sync::OnceLock::new();
                     #[allow(clippy::trivial_regex)]
                     let p = PARSER.get_or_init(|| #expr);
                     #(#debug_asserts)*
