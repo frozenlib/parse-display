@@ -43,10 +43,10 @@ pub mod helpers;
 mod helpers_std;
 
 #[cfg(feature = "std")]
-mod regex_for_from_str;
+mod from_str_regex;
 
 #[cfg(feature = "std")]
-pub use regex_for_from_str::RegexForFromStr;
+pub use from_str_regex::FromStrRegex;
 
 // #[include_doc("display.md", start)]
 /// Derive [`Display`].

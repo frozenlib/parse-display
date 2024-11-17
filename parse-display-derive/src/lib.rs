@@ -188,13 +188,13 @@ fn derive_from_str_for_struct(input: &DeriveInput, data: &DataStruct) -> Result<
         },
     ));
 
-    let body = p.build_regex_for_from_str_body(crate_path)?;
+    let body = p.build_from_str_regex_body(crate_path)?;
     ts.extend(impl_trait(
         input,
-        &parse_quote!(#crate_path::RegexForFromStr),
+        &parse_quote!(#crate_path::FromStrRegex),
         &wheres,
         quote! {
-            fn regex_for_from_str() -> String {
+            fn from_str_regex() -> String {
                 #body
             }
         },
@@ -292,10 +292,10 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Toke
 
     ts.extend(impl_trait(
         input,
-        &parse_quote!(#crate_path::RegexForFromStr),
+        &parse_quote!(#crate_path::FromStrRegex),
         &wheres,
         quote! {
-            fn regex_for_from_str() -> String {
+            fn from_str_regex() -> String {
                 #body
             }
         },
@@ -596,7 +596,7 @@ impl<'a> ParserBuilder<'a> {
             ::core::result::Result::Err(#crate_path::ParseError::new())
         })
     }
-    fn build_regex_for_from_str_body(&self, crate_path: &Path) -> Result<TokenStream> {
+    fn build_from_str_regex_body(&self, crate_path: &Path) -> Result<TokenStream> {
         Ok(match self.build_parser_source(crate_path, false)? {
             ParserSource::Parser { init, .. } => {
                 quote! { (#init).re_str }

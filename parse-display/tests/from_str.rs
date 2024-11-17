@@ -1280,7 +1280,7 @@ fn regex_infer_all() {
 }
 
 #[test]
-fn regex_for_from_str_struct() {
+fn from_str_regex_struct() {
     #[derive(FromStr, Debug, Eq, PartialEq)]
     #[display("{a},{b}")]
     struct X {
@@ -1306,7 +1306,7 @@ fn regex_for_from_str_struct() {
 }
 
 #[test]
-fn regex_for_from_str_enum() {
+fn from_str_regex_enum() {
     #[derive(FromStr, Debug, Eq, PartialEq)]
     enum X {
         A,
