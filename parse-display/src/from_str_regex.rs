@@ -79,7 +79,7 @@ impl FromStrRegex for i128 {
 }
 
 fn regex_f() -> String {
-    r"[+-]?([0-9]+\.?|[0-9]*\.[0-9]+)([eE][+-]?[0-9]+)?".into()
+    r"(?i:[+-]?([0-9]+\.?|[0-9]*\.[0-9]+)(e[+-]?[0-9]+)?|[+-]?inf|nan)".into()
 }
 impl FromStrRegex for f32 {
     fn from_str_regex() -> String {
