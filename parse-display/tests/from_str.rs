@@ -1324,6 +1324,25 @@ fn from_str_regex_enum() {
 }
 
 #[test]
+fn from_str_regex_with_display_attr() {
+    #[derive(FromStr, Debug, Eq, PartialEq)]
+    enum X {
+        A,
+        B,
+    }
+
+    #[derive(FromStr, Debug, Eq, PartialEq)]
+    #[display("{x}{y}")]
+    struct Y {
+        #[display("**{}")]
+        #[from_str(regex_infer)]
+        x: X,
+        y: u32,
+    }
+    assert_from_str("**A30", Y { x: X::A, y: 30 });
+}
+
+#[test]
 fn from_str_regex_meta() {
     #[derive(FromStr, Debug, Eq, PartialEq)]
     enum X {
