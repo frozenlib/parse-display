@@ -14,7 +14,7 @@ Helper attributes can be written in the following positions.
 | [`#[display("...")]`](#display)                               | ✔            |               | ✔      | ✔    | ✔       | ✔     |
 | [`#[display(style = "...")]`](#displaystyle--)                | ✔            |               |        | ✔    | ✔       |       |
 | [`#[display(with = ...)]`](#displaywith---from_strwith--)     | ✔            | ✔             |        |      |         | ✔     |
-| [`#[display(bound(...))]`](displaybound-from_strbound)        | ✔            | ✔             | ✔      | ✔    | ✔       | ✔     |
+| [`#[display(bound(...))]`](#displaybound-from_strbound)       | ✔            | ✔             | ✔      | ✔    | ✔       | ✔     |
 | [`#[display(crate = ...)]`](#displaycrate--)                  | ✔            |               | ✔      | ✔    |         |       |
 | [`#[display(dump)]`](#displaydump-from_strdump)               | ✔            | ✔             | ✔      | ✔    |         |       |
 | [`#[from_str(regex = "...")]`](#from_strregex--)              |              | ✔             | ✔      | ✔    | ✔       | ✔     |
