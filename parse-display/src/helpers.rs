@@ -24,7 +24,7 @@ where
 
 struct FmtPointer<'a, T: ?Sized + fmt::Pointer>(&'a T);
 
-impl<'a, T: ?Sized + fmt::Pointer> fmt::Pointer for FmtPointer<'a, T> {
+impl<T: ?Sized + fmt::Pointer> fmt::Pointer for FmtPointer<'_, T> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Pointer::fmt(self.0, f)

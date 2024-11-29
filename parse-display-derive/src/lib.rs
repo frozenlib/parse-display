@@ -1338,7 +1338,7 @@ enum DisplayContext<'a> {
     },
 }
 
-impl<'a> DisplayContext<'a> {
+impl DisplayContext<'_> {
     fn format_arg(
         &self,
         arg: &str,
@@ -1647,19 +1647,19 @@ struct BoundsChild<'a> {
     owner: &'a mut Bounds,
     bounds: Bounds,
 }
-impl<'a> Deref for BoundsChild<'a> {
+impl Deref for BoundsChild<'_> {
     type Target = Bounds;
 
     fn deref(&self) -> &Self::Target {
         &self.bounds
     }
 }
-impl<'a> DerefMut for BoundsChild<'a> {
+impl DerefMut for BoundsChild<'_> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.bounds
     }
 }
-impl<'a> Drop for BoundsChild<'a> {
+impl Drop for BoundsChild<'_> {
     fn drop(&mut self) {
         if self.owner.can_extend {
             self.owner.ty.append(&mut self.bounds.ty);

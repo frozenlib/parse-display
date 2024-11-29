@@ -1011,7 +1011,6 @@ pub trait FromStrFormat<T> {
     /// let _ = X::<u32>::from_str("u32");
     /// let _ = X::<u16>::from_str("u16"); // panic on debug mode
     /// ```
-
     #[cfg(feature = "std")]
     fn regex(&self) -> Option<String> {
         None

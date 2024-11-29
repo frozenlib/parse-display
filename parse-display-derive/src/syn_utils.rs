@@ -61,7 +61,7 @@ impl GenericParamSet {
             generics: &'a GenericParamSet,
             result: bool,
         }
-        impl<'a, 'ast> Visit<'ast> for Visitor<'a> {
+        impl<'ast> Visit<'ast> for Visitor<'_> {
             fn visit_path(&mut self, i: &'ast syn::Path) {
                 if i.leading_colon.is_none() {
                     if let Some(s) = i.segments.iter().next() {
