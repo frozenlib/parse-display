@@ -3,7 +3,7 @@ use std::{ffi::OsString, path::PathBuf};
 
 /// A trait for getting regex patterns that match strings parseable by [`FromStr`](core::str::FromStr).
 ///
-/// When using [`#[derive(FromStr)]`](derive@crate::Display) with the [`#[from_str(regex_infer)]`](derive@crate::Display#from_strregex_infer) attribute,
+/// When using [`#[derive(FromStr)]`](derive@crate::FromStr) with the [`#[from_str(regex_infer)]`](derive@crate::Display#from_strregex_infer) attribute,
 /// the regex pattern is obtained from the `FromStrRegex` implementation of the field's type.
 pub trait FromStrRegex: core::str::FromStr {
     /// Returns a regex pattern for strings that might be parseable by [`FromStr`](core::str::FromStr).

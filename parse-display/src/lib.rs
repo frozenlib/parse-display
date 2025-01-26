@@ -879,7 +879,7 @@ pub use from_str_regex::FromStrRegex;
 // #[include_doc("display.md", end)]
 pub use parse_display_derive::Display;
 
-/// Derive [`FromStr`](std::str::FromStr).
+/// Derive [`FromStr`](std::str::FromStr) and [`FromStrRegex`].
 ///
 /// `#[derive(Display)]` and `#[derive(FromStr)]` use common helper attributes.
 ///
