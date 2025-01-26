@@ -44,10 +44,10 @@ impl<'a> ParserBuilder<'a> {
     }
     pub fn from_struct(hattrs: &'a HelperAttributes, data: &'a DataStruct) -> Result<Self> {
         let mut s = Self::new(&data.fields, hattrs.regex_infer, &hattrs.crate_path)?;
-        let b = VarBase::Struct { data };
+        let vb = VarBase::Struct { data };
         s.new_expr.clone_from(&hattrs.new_expr);
         s.apply_attrs(hattrs)?;
-        s.push_attrs(hattrs, &b)?;
+        s.push_attrs(hattrs, &vb)?;
         Ok(s)
     }
     pub fn from_variant(
@@ -60,15 +60,15 @@ impl<'a> ParserBuilder<'a> {
             hattrs_enum.regex_infer || hattrs_variant.regex_infer,
             &hattrs_enum.crate_path,
         )?;
-        let b = VarBase::Variant {
+        let vb = VarBase::Variant {
             variant,
             style: DisplayStyle::from_helper_attributes(hattrs_enum, hattrs_variant),
         };
         s.new_expr.clone_from(&hattrs_variant.new_expr);
         s.apply_attrs(hattrs_enum)?;
         s.apply_attrs(hattrs_variant)?;
-        if !s.try_push_attrs(hattrs_variant, &b)? {
-            s.push_attrs(hattrs_enum, &b)?;
+        if !s.try_push_attrs(hattrs_variant, &vb)? {
+            s.push_attrs(hattrs_enum, &vb)?;
         }
         Ok(s)
     }
@@ -109,7 +109,7 @@ impl<'a> ParserBuilder<'a> {
     fn push_regex(
         &mut self,
         s: &LitStr,
-        b: &VarBase,
+        vb: &VarBase,
         format: &Option<DisplayFormat>,
     ) -> Result<()> {
         const IDX_ESC: usize = 1;
@@ -152,7 +152,7 @@ impl<'a> ParserBuilder<'a> {
             has_capture = true;
             let cp = &c[IDX_P];
             let keys = FieldKey::from_str_deep(&c[IDX_KEY]);
-            let name = self.set_capture(b, &keys, s.span())?;
+            let name = self.set_capture(vb, &keys, s.span())?;
             if name == CAPTURE_NAME_EMPTY {
                 if !cp.is_empty() {
                     p = "P";
@@ -163,7 +163,7 @@ impl<'a> ParserBuilder<'a> {
         })?;
 
         if has_capture_empty {
-            if let VarBase::Variant { variant, style, .. } = b {
+            if let VarBase::Variant { variant, style, .. } = vb {
                 let value = style.apply(&variant.ident);
                 self.parse_format
                     .push_hir(to_hir_with_expand(&text, CAPTURE_NAME_EMPTY, &value));
@@ -174,12 +174,12 @@ impl<'a> ParserBuilder<'a> {
                 "`(?{p}<>)` (empty capture name) is not allowed in struct's regex."
             );
         }
-        if let VarBase::Field { .. } = b {
+        if let VarBase::Field { .. } = vb {
             if !has_capture {
                 if let Some(format) = format {
-                    return self.push_format(format, b, None, Some(&text));
+                    return self.push_format(format, vb, None, Some(&text));
                 }
-                let name = self.set_capture(b, &[], s.span())?;
+                let name = self.set_capture(vb, &[], s.span())?;
                 text = format!("(?<{name}>{text})");
             }
         }
@@ -189,7 +189,7 @@ impl<'a> ParserBuilder<'a> {
     fn push_format(
         &mut self,
         format: &DisplayFormat,
-        b: &VarBase,
+        vb: &VarBase,
         with: Option<&Expr>,
         regex: Option<&str>,
     ) -> Result<()> {
@@ -200,23 +200,23 @@ impl<'a> ParserBuilder<'a> {
                 DisplayFormatPart::EscapedEndBracket => self.push_str("}"),
                 DisplayFormatPart::Var { arg, .. } => {
                     let keys = FieldKey::from_str_deep(arg);
-                    if let VarBase::Variant { variant, style, .. } = b {
+                    if let VarBase::Variant { variant, style, .. } = vb {
                         if keys.is_empty() {
                             self.push_str(&style.apply(&variant.ident));
                             continue;
                         }
                     }
                     if keys.len() == 1 {
-                        self.push_field(b, &keys[0], format.span)?;
+                        self.push_field(vb, &keys[0], format.span)?;
                         continue;
                     }
-                    let c = self.set_capture(b, &keys, format.span)?;
+                    let c = self.set_capture(vb, &keys, format.span)?;
                     let mut f = format!("(?<{c}>(?s:.*?))");
                     if keys.is_empty() {
                         if let Some(regex) = regex {
                             f = format!("(?<{c}>(?s:{regex}))");
                         }
-                        if let VarBase::Field { field, key, .. } = b {
+                        if let VarBase::Field { field, key, .. } = vb {
                             if let Some(with_expr) = with {
                                 self.with.push(With::new(c, key, with_expr, &field.ty));
                             }
@@ -231,25 +231,30 @@ impl<'a> ParserBuilder<'a> {
     fn push_str(&mut self, string: &str) {
         self.parse_format.push_str(string);
     }
-    fn push_field(&mut self, b: &VarBase, key: &FieldKey, span: Span) -> Result<()> {
+    fn push_field(&mut self, vb: &VarBase, key: &FieldKey, span: Span) -> Result<()> {
         let e = self.field(key, span)?;
         let hattrs = e.hattrs.clone();
-        let parent = b;
+        let parent = vb;
         let field = e.source;
         self.push_attrs(&hattrs, &VarBase::Field { parent, key, field })
     }
-    fn push_attrs(&mut self, hattrs: &HelperAttributes, b: &VarBase) -> Result<()> {
-        if !self.try_push_attrs(hattrs, b)? {
-            self.push_format(&b.default_from_str_format()?, b, hattrs.with.as_ref(), None)?;
+    fn push_attrs(&mut self, hattrs: &HelperAttributes, vb: &VarBase) -> Result<()> {
+        if !self.try_push_attrs(hattrs, vb)? {
+            self.push_format(
+                &vb.default_from_str_format()?,
+                vb,
+                hattrs.with.as_ref(),
+                None,
+            )?;
         }
         Ok(())
     }
-    fn try_push_attrs(&mut self, hattrs: &HelperAttributes, b: &VarBase) -> Result<bool> {
+    fn try_push_attrs(&mut self, hattrs: &HelperAttributes, vb: &VarBase) -> Result<bool> {
         Ok(if let Some(regex) = &hattrs.regex {
-            self.push_regex(regex, b, &hattrs.format)?;
+            self.push_regex(regex, vb, &hattrs.format)?;
             true
         } else if let Some(format) = &hattrs.format {
-            self.push_format(format, b, hattrs.with.as_ref(), None)?;
+            self.push_format(format, vb, hattrs.with.as_ref(), None)?;
             true
         } else {
             false
