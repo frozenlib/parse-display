@@ -367,7 +367,7 @@ impl<'a> ParserBuilder<'a> {
             let mut setters = Vec::new();
             for (key, field) in &self.fields {
                 let left_expr = quote! { value . #key };
-                setters.push(field.build_setters(&names, key, left_expr, true));
+                setters.push(field.build_setters(&names, key, left_expr, true)?);
             }
             quote! {
                 let mut value = <Self as ::core::default::Default>::default();
@@ -537,18 +537,22 @@ impl<'a> FieldEntry<'a> {
     fn capture_index(&self, names: &HashMap<&str, usize>) -> Option<usize> {
         Some(capture_index(self.capture?, names))
     }
-    fn build_expr(&self, names: &HashMap<&str, usize>, key: &FieldKey) -> Option<TokenStream> {
+    fn build_expr(
+        &self,
+        names: &HashMap<&str, usize>,
+        key: &FieldKey,
+    ) -> Result<Option<TokenStream>> {
         if let Some(capture_index) = self.capture_index(names) {
-            Some(build_parse_capture_expr(
+            Ok(Some(build_parse_capture_expr(
                 &key.to_string(),
                 capture_index,
                 Some(self),
                 self.crate_path,
-            ))
+            )?))
         } else if self.use_default {
-            Some(quote! { ::core::default::Default::default() })
+            Ok(Some(quote! { ::core::default::Default::default() }))
         } else {
-            None
+            Ok(None)
         }
     }
     fn build_setters(
@@ -557,10 +561,10 @@ impl<'a> FieldEntry<'a> {
         key: &FieldKey,
         left_expr: TokenStream,
         include_self: bool,
-    ) -> TokenStream {
+    ) -> Result<TokenStream> {
         let mut setters = Vec::new();
         if include_self {
-            if let Some(expr) = self.build_expr(names, key) {
+            if let Some(expr) = self.build_expr(names, key)? {
                 setters.push(quote! { #left_expr = #expr; });
             }
         }
@@ -571,10 +575,10 @@ impl<'a> FieldEntry<'a> {
                 capture_index(*idx, names),
                 None,
                 self.crate_path,
-            );
+            )?;
             setters.push(quote! { #left_expr #(.#keys)* = #expr; });
         }
-        quote! { #(#setters)* }
+        Ok(quote! { #(#setters)* })
     }
 
     fn build_field_init_expr(
@@ -583,9 +587,9 @@ impl<'a> FieldEntry<'a> {
         key: &FieldKey,
         span: Span,
     ) -> Result<TokenStream> {
-        if let Some(mut expr) = self.build_expr(names, key) {
+        if let Some(mut expr) = self.build_expr(names, key)? {
             if !self.deep_captures.is_empty() {
-                let setters = self.build_setters(names, key, quote!(field_value), false);
+                let setters = self.build_setters(names, key, quote!(field_value), false)?;
                 let ty = &self.source.ty;
                 expr = quote! {
                     {
@@ -663,10 +667,23 @@ fn build_parse_capture_expr(
     capture_index: usize,
     field: Option<&FieldEntry>,
     crate_path: &Path,
-) -> TokenStream {
+) -> Result<TokenStream> {
     let msg = format!("field `{field_name}` parse failed.");
     let e = if let Some(field) = field {
         if field.hattrs.opt.value() {
+            if !field.hattrs.regex_infer
+                && field.hattrs.regex.is_none()
+                && field.hattrs.with.is_none()
+                && field.hattrs.format.is_none()
+            {
+                let span = field.source.span();
+                bail!(
+                    span,
+                    "Field `{field_name}` has `opt` attribute but empty string matches `Some`, so empty string will not be parsed as `None`.
+To prevent `Some` from matching empty strings, specify a pattern that excludes empty strings using `regex`, `regex_infer`, `with`, or a format string."
+                );
+            }
+
             let e = str_expr_to_parse_capture_expr(quote!(s), field, crate_path);
             quote! {
                 c.get(#capture_index).map(|m| m.as_str()).map(|s| #e).transpose()
@@ -681,9 +698,9 @@ fn build_parse_capture_expr(
     } else {
         quote!(c.get(#capture_index).map_or("", |m| m.as_str()).parse())
     };
-    quote! {
+    Ok(quote! {
         #e.map_err(|e| #crate_path::ParseError::with_message(#msg))?
-    }
+    })
 }
 fn str_expr_to_parse_capture_expr(
     str_expr: TokenStream,

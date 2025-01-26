@@ -1,0 +1,7 @@
+error: Field `value` has `opt` attribute but empty string matches `Some`, so empty string will not be parsed as `None`.
+
+       To prevent `Some` from matching empty strings,specify a pattern that excludes empty strings using `regex`, `regex_infer`, `with`, or a format string.
+ --> tests/compile_fail/from_str/empty_to_some.rs:5:5
+  |
+5 |     #[display(opt)]
+  |     ^
