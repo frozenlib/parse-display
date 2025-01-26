@@ -177,7 +177,7 @@ fn derive_from_str_for_struct(input: &DeriveInput, data: &DataStruct) -> Result<
     let body = p.build_from_str_body(parse_quote!(Self))?;
     let generics = GenericParamSet::new(&input.generics);
     let mut bounds = Bounds::from_data(hattrs.bound_from_str_resolved());
-    p.build_bounds(&generics, &mut bounds);
+    p.build_bounds(&generics, &mut bounds)?;
     let wheres = bounds.build_wheres(&trait_path);
     let mut ts = TokenStream::new();
     ts.extend(impl_trait(
@@ -230,7 +230,7 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Toke
         let constructor = parse_quote!(Self::#variant_ident);
         let p = ParserBuilder::from_variant(&hattrs_variant, &hattrs_enum, variant)?;
         let mut bounds = bounds.child(hattrs_variant.bound_from_str_resolved());
-        p.build_bounds(&generics, &mut bounds);
+        p.build_bounds(&generics, &mut bounds)?;
         match p.build_parse_variant_code(constructor)? {
             ParseVariantCode::MatchArm(arm) => arms.push(arm),
             ParseVariantCode::Statement(body) => bodys.push(body),
@@ -780,8 +780,8 @@ enum VarBase<'a> {
         field: &'a Field,
         key: &'a FieldKey,
     },
-    Some {
-        ident: &'a Ident,
+    FieldSome {
+        key: &'a FieldKey,
         ty: &'a Type,
     },
 }
@@ -816,7 +816,8 @@ impl VarBase<'_> {
                     bounds,
                     cx,
                 )?,
-                VarBase::Some { ident, ty, .. } => {
+                VarBase::FieldSome { key, ty, .. } => {
+                    let ident = key.binding_var();
                     format_arg(quote!(*#ident), ty, format_spec, span, with, bounds, cx)?
                 }
                 VarBase::Variant { variant, style, .. } => {
@@ -865,17 +866,10 @@ impl VarBase<'_> {
                     "`#[display(opt)]` is only allowed for `Option<T>`."
                 );
             };
-            let ident = field
-                .ident
-                .clone()
-                .unwrap_or(Ident::new("value", field.span()));
             let crate_path = cx.crate_path;
             let in_expr = self.field_expr(key);
             let formatter_ident = Ident::new("_formatter", Span::call_site());
-            let vb = VarBase::Some {
-                ident: &ident,
-                ty: inner_ty,
-            };
+            let vb = VarBase::FieldSome { key, ty: inner_ty };
             let out_expr = vb.format_arg_from_some_format(
                 hattrs.format,
                 format_spec,
@@ -884,6 +878,7 @@ impl VarBase<'_> {
                 &mut bounds,
                 cx,
             )?;
+            let ident = key.binding_var();
             Ok(quote! {
                 (
                     #crate_path::helpers::OptionFormatHelper::<#inner_ty, _> {
@@ -938,7 +933,8 @@ impl VarBase<'_> {
                 let expr = parent.field_expr(parent_key);
                 quote! { #expr.#key }
             }
-            VarBase::Some { ident, .. } => {
+            VarBase::FieldSome { key: key_base, .. } => {
+                let ident = key_base.binding_var();
                 quote! { #ident.#key }
             }
         }
@@ -955,7 +951,7 @@ impl VarBase<'_> {
                 DisplayFormat::from_unit_variant(variant)?.expect(ERROR_MESSAGE_FOR_VARIANT)
             }
             VarBase::Field { field, .. } => DisplayFormat::parse("{}", field.span())?,
-            VarBase::Some { ty, .. } => DisplayFormat::parse("{}", ty.span())?,
+            VarBase::FieldSome { ty, .. } => DisplayFormat::parse("{}", ty.span())?,
         })
     }
     fn fields(&self) -> Option<&Fields> {
@@ -963,7 +959,7 @@ impl VarBase<'_> {
             VarBase::Struct { data, .. } => Some(&data.fields),
             VarBase::Variant { variant, .. } => Some(&variant.fields),
             VarBase::Field { .. } => None,
-            VarBase::Some { .. } => None,
+            VarBase::FieldSome { .. } => None,
         }
     }
 }
@@ -1065,6 +1061,13 @@ impl FieldKey {
         match member {
             Member::Named(ident) => Self::from_ident(ident),
             Member::Unnamed(index) => Self::Unnamed(index.index as usize),
+        }
+    }
+    fn from_field(field: &Field) -> Self {
+        if let Some(ident) = &field.ident {
+            Self::from_ident(ident)
+        } else {
+            Self::Unnamed(0)
         }
     }
 

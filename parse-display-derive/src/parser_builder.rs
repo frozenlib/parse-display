@@ -1,12 +1,18 @@
 use crate::{
-    field_map, join, regex_utils::*, set_span, syn_utils::*, Bounds, DisplayFormat,
-    DisplayFormatPart, DisplayStyle, FieldKey, HelperAttributes, VarBase, With,
+    field_map, get_option_element, join, regex_utils::*, set_span, syn_utils::*, Bounds,
+    DisplayFormat, DisplayFormatPart, DisplayStyle, FieldKey, HelperAttributes, VarBase, With,
 };
 use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote, quote_spanned};
 use regex::{Captures, Regex};
-use regex_syntax::{escape, hir::Hir};
-use std::collections::{BTreeMap, HashMap};
+use regex_syntax::{
+    escape,
+    hir::{Hir, Repetition},
+};
+use std::{
+    collections::{BTreeMap, HashMap},
+    mem,
+};
 use syn::{
     parse_quote, spanned::Spanned, DataStruct, Expr, Field, Fields, Ident, LitStr, Path, Result,
     Variant,
@@ -216,9 +222,16 @@ impl<'a> ParserBuilder<'a> {
                         if let Some(regex) = regex {
                             f = format!("(?<{c}>(?s:{regex}))");
                         }
-                        if let VarBase::Field { field, key, .. } = vb {
-                            if let Some(with_expr) = with {
-                                self.with.push(With::new(c, key, with_expr, &field.ty));
+                        if let Some(with_expr) = with {
+                            match vb {
+                                VarBase::Struct { .. } => {}
+                                VarBase::Variant { .. } => {}
+                                VarBase::Field { field, key, .. } => {
+                                    self.with.push(With::new(c, key, with_expr, &field.ty));
+                                }
+                                VarBase::FieldSome { key, ty } => {
+                                    self.with.push(With::new(c, key, with_expr, ty));
+                                }
                             }
                         }
                     }
@@ -236,7 +249,22 @@ impl<'a> ParserBuilder<'a> {
         let hattrs = e.hattrs.clone();
         let parent = vb;
         let field = e.source;
-        self.push_attrs(&hattrs, &VarBase::Field { parent, key, field })
+        if e.hattrs.opt.value() {
+            let mut hirs = mem::take(&mut self.parse_format).into_hirs();
+            self.push_attrs(&hattrs, &VarBase::Field { parent, key, field })?;
+            let hirs_child = mem::take(&mut self.parse_format).into_hirs();
+            let hir = Hir::repetition(Repetition {
+                min: 0,
+                max: Some(1),
+                greedy: true,
+                sub: Box::new(Hir::concat(hirs_child)),
+            });
+            hirs.push(hir);
+            self.parse_format = ParseFormat::Hirs(hirs);
+            Ok(())
+        } else {
+            self.push_attrs(&hattrs, &VarBase::Field { parent, key, field })
+        }
     }
     fn push_attrs(&mut self, hattrs: &HelperAttributes, vb: &VarBase) -> Result<()> {
         if !self.try_push_attrs(hattrs, vb)? {
@@ -443,19 +471,28 @@ impl<'a> ParserBuilder<'a> {
         Ok(())
     }
 
-    pub fn build_bounds(&self, generics: &GenericParamSet, bounds: &mut Bounds) {
+    pub fn build_bounds(&self, generics: &GenericParamSet, bounds: &mut Bounds) -> Result<()> {
         if !bounds.can_extend {
-            return;
+            return Ok(());
         }
         for field in self.fields.values() {
             let mut bounds = bounds.child(field.hattrs.bound_from_str_resolved());
             if bounds.can_extend && field.capture.is_some() && field.hattrs.with.is_none() {
-                let ty = &field.source.ty;
+                let mut ty = &field.source.ty;
+                if field.hattrs.opt.value() {
+                    if let Some(opt_ty) = get_option_element(ty) {
+                        ty = opt_ty;
+                    } else {
+                        let key = FieldKey::from_field(field.source);
+                        bail!(ty.span(), "field `{key}` is not a option type.");
+                    }
+                }
                 if generics.contains_in_type(ty) {
                     bounds.ty.push(ty.clone());
                 }
             }
         }
+        Ok(())
     }
 }
 impl<'a> FieldEntry<'a> {
@@ -592,6 +629,14 @@ impl ParseFormat {
             unreachable!()
         }
     }
+    fn into_hirs(mut self) -> Vec<Hir> {
+        self.as_hirs();
+        match self {
+            Self::Hirs(hirs) => hirs,
+            Self::String(_) => unreachable!(),
+        }
+    }
+
     fn push_str(&mut self, string: &str) {
         match self {
             Self::Hirs(hirs) => push_str(hirs, string),
@@ -600,6 +645,11 @@ impl ParseFormat {
     }
     fn push_hir(&mut self, hir: Hir) {
         self.as_hirs().push(hir);
+    }
+}
+impl Default for ParseFormat {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -615,19 +665,39 @@ fn build_parse_capture_expr(
     crate_path: &Path,
 ) -> TokenStream {
     let msg = format!("field `{field_name}` parse failed.");
-    let expr0 = quote!(c.get(#capture_index).map_or("", |m| m.as_str()));
-    let mut expr1 = quote!(#expr0.parse());
-    if let Some(field) = field {
-        if let Some(with) = &field.hattrs.with {
-            let ty = &field.source.ty;
-            expr1 = quote! {
-                #crate_path::helpers::parse_with::<#ty, _>(#with, #expr0)
-            };
-            expr1 = set_span(expr1, with.span());
+    let e = if let Some(field) = field {
+        if field.hattrs.opt.value() {
+            let e = str_expr_to_parse_capture_expr(quote!(s), field, crate_path);
+            quote! {
+                c.get(#capture_index).map(|m| m.as_str()).map(|s| #e).transpose()
+            }
+        } else {
+            str_expr_to_parse_capture_expr(
+                quote!(c.get(#capture_index).map_or("", |m| m.as_str())),
+                field,
+                crate_path,
+            )
         }
-    }
+    } else {
+        quote!(c.get(#capture_index).map_or("", |m| m.as_str()).parse())
+    };
     quote! {
-        #expr1.map_err(|e| #crate_path::ParseError::with_message(#msg))?
+        #e.map_err(|e| #crate_path::ParseError::with_message(#msg))?
+    }
+}
+fn str_expr_to_parse_capture_expr(
+    str_expr: TokenStream,
+    field: &FieldEntry,
+    crate_path: &Path,
+) -> TokenStream {
+    if let Some(with) = &field.hattrs.with {
+        let ty = &field.source.ty;
+        let expr = quote! {
+            #crate_path::helpers::parse_with::<#ty, _>(#with, #str_expr)
+        };
+        set_span(expr, with.span())
+    } else {
+        quote!(#str_expr.parse())
     }
 }
 

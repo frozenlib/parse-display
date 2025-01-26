@@ -1380,6 +1380,28 @@ fn from_str_regex_brace() {
     assert_from_str("{30", Y { x: X::A, y: 30 });
 }
 
+#[test]
+fn from_str_opt() {
+    #[derive(FromStr, Debug, Eq, PartialEq)]
+    struct X {
+        #[display("a={}", opt)]
+        a: Option<u32>,
+    }
+    assert_from_str("a=10", X { a: Some(10) });
+    assert_from_str("", X { a: None });
+}
+
+#[test]
+fn from_str_opt_generic() {
+    #[derive(FromStr, Debug, Eq, PartialEq)]
+    struct X<T> {
+        #[display("a={}", opt)]
+        a: Option<T>,
+    }
+    assert_from_str("a=10", X { a: Some(10) });
+    assert_from_str("", X { a: None::<u32> });
+}
+
 fn assert_from_str<T: FromStr + Debug + PartialEq>(s: &str, value: T)
 where
     <T as FromStr>::Err: Display,
