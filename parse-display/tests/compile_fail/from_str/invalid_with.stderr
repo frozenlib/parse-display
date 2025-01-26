@@ -4,4 +4,5 @@ error[E0277]: the trait bound `&'static str: FromStrFormat<u8>` is not satisfied
 5 |     #[from_str(with = "not impl FromStrFormat")]
   |                       ^^^^^^^^^^^^^^^^^^^^^^^^ the trait `FromStrFormat<u8>` is not implemented for `&'static str`
   |
+  = help: the trait `FromStrFormat<T>` is implemented for `RegexInfer`
   = note: required for the cast from `&&'static str` to `&dyn FromStrFormat<u8, Err = _>`

@@ -1,0 +1,5 @@
+error: field `a` is not a option type.
+ --> tests/compile_fail/from_str/opt_with_not_option.rs:6:8
+  |
+6 |     a: u32,
+  |        ^^^
