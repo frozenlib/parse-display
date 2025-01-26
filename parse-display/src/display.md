@@ -14,6 +14,7 @@ Helper attributes can be written in the following positions.
 | [`#[display("...")]`](#display)                               | ✔            |               | ✔      | ✔    | ✔       | ✔     |
 | [`#[display(style = "...")]`](#displaystyle--)                | ✔            |               |        | ✔    | ✔       |       |
 | [`#[display(with = ...)]`](#displaywith---from_strwith--)     | ✔            | ✔             |        |      |         | ✔     |
+| [`#[display(opt)]`](#displayopt)                              |              |               |        |      |         | ✔     |
 | [`#[display(bound(...))]`](#displaybound-from_strbound)       | ✔            | ✔             | ✔      | ✔    | ✔       | ✔     |
 | [`#[display(crate = ...)]`](#displaycrate--)                  | ✔            |               | ✔      | ✔    |         |       |
 | [`#[display(dump)]`](#displaydump-from_strdump)               | ✔            | ✔             | ✔      | ✔    |         |       |
@@ -345,6 +346,24 @@ assert_eq!(StyleExample::VarK.to_string(), "Var k");
 assert_eq!(StyleExample::VarL.to_string(), "var l");
 assert_eq!(StyleExample::VarM.to_string(), "VAR M");
 ```
+
+## `#[display(opt)]`
+
+When applied to an `Option<T>` field, this attribute makes the field display an empty string for `None` and use `T`'s trait implementations directly (not `Option<T>`'s, but `T`'s `Display`, `FromStr`, etc.) for `Some(T)`.
+
+```rust
+use parse_display::{Display, FromStr};
+
+#[derive(Display, FromStr, PartialEq, Debug)]
+struct X {
+    #[display("a={}", opt)]
+    a: Option<u32>,
+}
+assert_eq!(X { a: Some(10) }.to_string(), "a=10");
+assert_eq!(X { a: None::<u32> }.to_string(), "");
+```
+
+When the field is `None`, not just the placeholder but the entire format string for that field is omitted from the output. In the example above, when `a` is `None`, the output is `""` rather than `"a="`.
 
 ## `#[display(with = "...")]`, `#[from_str(with = "...")]`
 
