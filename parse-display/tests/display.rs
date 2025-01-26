@@ -1146,6 +1146,31 @@ fn use_type_parameter_in_with() {
     assert_display(X(10), "--10--");
 }
 
+#[test]
+fn opt() {
+    #[derive(Display)]
+    #[display("{a}")]
+    struct X {
+        #[display(opt)]
+        a: Option<u8>,
+    }
+    assert_display(X { a: Some(10) }, "10");
+    assert_display(X { a: None }, "");
+}
+
+#[test]
+fn opt_with_format() {
+    #[derive(Display)]
+    #[display("{a}")]
+    struct X {
+        #[display("a={}", opt)]
+        a: Option<u8>,
+    }
+
+    assert_display(X { a: Some(10) }, "a=10");
+    assert_display(X { a: None }, "");
+}
+
 #[track_caller]
 fn assert_display<T: core::fmt::Display>(value: T, display: &str) {
     let value_display = format!("{value}");

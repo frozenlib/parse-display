@@ -1,4 +1,7 @@
-use core::fmt;
+use ::core::{
+    fmt::{self, Display, Formatter},
+    ops::Fn,
+};
 
 #[cfg(feature = "std")]
 pub use super::helpers_std::*;
@@ -33,4 +36,22 @@ impl<T: ?Sized + fmt::Pointer> fmt::Pointer for FmtPointer<'_, T> {
 
 pub fn fmt_pointer<T: ?Sized + fmt::Pointer>(value: &T) -> impl fmt::Pointer + '_ {
     FmtPointer(value)
+}
+
+pub struct OptionFormatHelper<'a, T, F> {
+    pub value: &'a Option<T>,
+    pub f: F,
+    pub none_value: &'a str,
+}
+impl<'a, T, F> Display for OptionFormatHelper<'a, T, F>
+where
+    F: Fn(&'a T, &mut Formatter) -> fmt::Result,
+{
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        if let Some(value) = self.value {
+            (self.f)(value, f)
+        } else {
+            Formatter::write_str(f, self.none_value)
+        }
+    }
 }

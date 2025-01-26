@@ -32,7 +32,8 @@ use syn::{
     parse_macro_input, parse_quote, parse_str,
     spanned::Spanned,
     Attribute, Data, DataEnum, DataStruct, DeriveInput, Expr, Field, Fields, FieldsNamed,
-    FieldsUnnamed, Ident, LitStr, Member, Path, Result, Type, Variant,
+    FieldsUnnamed, GenericArgument, Ident, LitStr, Member, Path, PathArguments, Result, Type,
+    Variant,
 };
 
 #[proc_macro_derive(Display, attributes(display))]
@@ -66,7 +67,7 @@ fn derive_display_for_struct(input: &DeriveInput, data: &DataStruct) -> Result<T
         crate_path: &hattrs.crate_path,
     };
     let write = format
-        .format_args(vb, &None, &mut bounds, &cx)?
+        .format_args(&vb, &None, &mut bounds, &cx)?
         .build_write(quote!(f))?;
     let trait_path = parse_quote!(::core::fmt::Display);
     let wheres = bounds.build_wheres(&trait_path);
@@ -124,7 +125,7 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Token
         let variant_ident = &variant.ident;
         let write = format
             .format_args(
-                VarBase::Variant { variant, style },
+                &VarBase::Variant { variant, style },
                 &None,
                 &mut bounds.child(hattrs_variant.bound_display),
                 cx,
@@ -332,6 +333,7 @@ struct DisplayArgs {
     #[struct_meta(unnamed)]
     format: Option<LitStr>,
     with: Option<Expr>,
+    opt: Flag,
     style: Option<LitStr>,
     bound: Option<Vec<Quotable<Bound>>>,
     #[struct_meta(name = "crate")]
@@ -369,6 +371,7 @@ struct FromStrArgs {
 struct HelperAttributes {
     format: Option<DisplayFormat>,
     with: Option<Expr>,
+    opt: Flag,
     style: Option<DisplayStyle>,
     bound_display: Option<Vec<Bound>>,
     bound_from_str: Option<Vec<Bound>>,
@@ -387,6 +390,7 @@ impl HelperAttributes {
         let mut hattrs = Self {
             format: None,
             with: None,
+            opt: Flag::NONE,
             style: None,
             bound_display: None,
             bound_from_str: None,
@@ -416,6 +420,9 @@ impl HelperAttributes {
         }
         if let Some(with) = args.with {
             self.with = Some(with);
+        }
+        if args.opt.value() {
+            self.opt = args.opt;
         }
         if let Some(style) = &args.style {
             self.style = Some(DisplayStyle::parse_lit_str(style)?);
@@ -665,7 +672,7 @@ impl DisplayFormat {
 
     fn format_args(
         &self,
-        vb: VarBase,
+        vb: &VarBase,
         with: &Option<Expr>,
         bounds: &mut Bounds,
         cx: &CodeContext,
@@ -773,6 +780,10 @@ enum VarBase<'a> {
         field: &'a Field,
         key: &'a FieldKey,
     },
+    Some {
+        ident: &'a Ident,
+        ty: &'a Type,
+    },
 }
 
 impl VarBase<'_> {
@@ -805,6 +816,9 @@ impl VarBase<'_> {
                     bounds,
                     cx,
                 )?,
+                VarBase::Some { ident, ty, .. } => {
+                    format_arg(quote!(*#ident), ty, format_spec, span, with, bounds, cx)?
+                }
                 VarBase::Variant { variant, style, .. } => {
                     let s = style.apply(&variant.ident);
                     quote! { #s }
@@ -839,29 +853,74 @@ impl VarBase<'_> {
     ) -> Result<TokenStream> {
         let hattrs = HelperAttributes::from(&field.attrs, false)?;
         let mut bounds = bounds.child(hattrs.bound_display);
-        Ok(if let Some(format) = hattrs.format {
-            let args = format.format_args(
-                VarBase::Field {
-                    parent: self,
-                    field,
-                    key,
-                },
-                &hattrs.with,
-                &mut bounds,
-                cx,
-            )?;
-            quote! { format_args!(#args) }
-        } else {
-            format_arg(
-                self.field_expr(key),
-                &field.ty,
+        let vb = VarBase::Field {
+            parent: self,
+            field,
+            key,
+        };
+        if let Some(opt_span) = hattrs.opt.span {
+            let Some(inner_ty) = get_option_element(&field.ty) else {
+                bail!(
+                    opt_span,
+                    "`#[display(opt)]` is only allowed for `Option<T>`."
+                );
+            };
+            let ident = field
+                .ident
+                .clone()
+                .unwrap_or(Ident::new("value", field.span()));
+            let crate_path = cx.crate_path;
+            let in_expr = self.field_expr(key);
+            let formatter_ident = Ident::new("_formatter", Span::call_site());
+            let vb = VarBase::Some {
+                ident: &ident,
+                ty: inner_ty,
+            };
+            let out_expr = vb.format_arg_from_some_format(
+                hattrs.format,
                 format_spec,
                 span,
                 &hattrs.with,
                 &mut bounds,
                 cx,
-            )?
-        })
+            )?;
+            Ok(quote! {
+                (
+                    #crate_path::helpers::OptionFormatHelper::<#inner_ty, _> {
+                        value: &#in_expr,
+                        f: |#ident : &#inner_ty, #formatter_ident : &mut ::core::fmt::Formatter| {
+                             ::core::write!(#formatter_ident, "{}", #out_expr)
+                        },
+                        none_value: "",
+                    }
+                )
+            })
+        } else {
+            vb.format_arg_from_some_format(
+                hattrs.format,
+                format_spec,
+                span,
+                &hattrs.with,
+                &mut bounds,
+                cx,
+            )
+        }
+    }
+    fn format_arg_from_some_format(
+        &self,
+        format: Option<DisplayFormat>,
+        format_spec: &FormatSpec,
+        span: Span,
+        with: &Option<Expr>,
+        bounds: &mut Bounds,
+        cx: &CodeContext,
+    ) -> Result<TokenStream> {
+        if let Some(format) = format {
+            let args = format.format_args(self, with, bounds, cx)?;
+            Ok(quote! { format_args!(#args) })
+        } else {
+            self.format_arg("", format_spec, span, with, bounds, cx)
+        }
     }
 
     fn field_expr(&self, key: &FieldKey) -> TokenStream {
@@ -879,6 +938,9 @@ impl VarBase<'_> {
                 let expr = parent.field_expr(parent_key);
                 quote! { #expr.#key }
             }
+            VarBase::Some { ident, .. } => {
+                quote! { #ident.#key }
+            }
         }
     }
 
@@ -893,6 +955,7 @@ impl VarBase<'_> {
                 DisplayFormat::from_unit_variant(variant)?.expect(ERROR_MESSAGE_FOR_VARIANT)
             }
             VarBase::Field { field, .. } => DisplayFormat::parse("{}", field.span())?,
+            VarBase::Some { ty, .. } => DisplayFormat::parse("{}", ty.span())?,
         })
     }
     fn fields(&self) -> Option<&Fields> {
@@ -900,6 +963,7 @@ impl VarBase<'_> {
             VarBase::Struct { data, .. } => Some(&data.fields),
             VarBase::Variant { variant, .. } => Some(&variant.fields),
             VarBase::Field { .. } => None,
+            VarBase::Some { .. } => None,
         }
     }
 }
@@ -1114,4 +1178,18 @@ fn escape_fmt(s: &str) -> String {
         }
     }
     out
+}
+
+fn get_option_element(ty: &Type) -> Option<&Type> {
+    get_element(ty, &[&["std", "option"], &["core", "option"]], "Option")
+}
+fn get_element<'a>(ty: &'a Type, ns: &[&[&str]], name: &str) -> Option<&'a Type> {
+    if let PathArguments::AngleBracketed(args) = get_arguments_of(ty, ns, name)? {
+        if args.args.len() == 1 {
+            if let GenericArgument::Type(ty) = &args.args[0] {
+                return Some(ty);
+            }
+        }
+    }
+    None
 }
