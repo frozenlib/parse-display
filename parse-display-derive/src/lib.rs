@@ -47,11 +47,7 @@ pub fn derive_display(input: proc_macro::TokenStream) -> proc_macro::TokenStream
 
 fn derive_display_for_struct(input: &DeriveInput, data: &DataStruct) -> Result<TokenStream> {
     let hattrs = HelperAttributes::from(&input.attrs, false)?;
-    let context = DisplayContext::Struct {
-        data,
-        crate_path: &hattrs.crate_path,
-    };
-    let generics = GenericParamSet::new(&input.generics);
+    let vb = VarBase::Struct { data };
 
     let mut format = hattrs.format;
     if format.is_none() {
@@ -64,8 +60,13 @@ fn derive_display_for_struct(input: &DeriveInput, data: &DataStruct) -> Result<T
         )
     };
     let mut bounds = Bounds::from_data(hattrs.bound_display);
+    let generics = &GenericParamSet::new(&input.generics);
+    let cx = CodeContext {
+        generics,
+        crate_path: &hattrs.crate_path,
+    };
     let write = format
-        .format_args(context, &None, &mut bounds, &generics)?
+        .format_args(vb, &None, &mut bounds, &cx)?
         .build_write(quote!(f))?;
     let trait_path = parse_quote!(::core::fmt::Display);
     let wheres = bounds.build_wheres(&trait_path);
@@ -86,7 +87,7 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Token
         hattrs_enum: &HelperAttributes,
         variant: &Variant,
         bounds: &mut Bounds,
-        generics: &GenericParamSet,
+        cx: &CodeContext,
     ) -> Result<TokenStream> {
         let fields = match &variant.fields {
             Fields::Named(fields) => {
@@ -123,14 +124,10 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Token
         let variant_ident = &variant.ident;
         let write = format
             .format_args(
-                DisplayContext::Variant {
-                    variant,
-                    style,
-                    crate_path: &hattrs_enum.crate_path,
-                },
+                VarBase::Variant { variant, style },
                 &None,
                 &mut bounds.child(hattrs_variant.bound_display),
-                generics,
+                cx,
             )?
             .build_write(quote!(f))?;
         Ok(quote! {
@@ -141,10 +138,14 @@ fn derive_display_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Token
     }
     let hattrs = HelperAttributes::from(&input.attrs, false)?;
     let mut bounds = Bounds::from_data(hattrs.bound_display.clone());
-    let generics = GenericParamSet::new(&input.generics);
     let mut arms = Vec::new();
+    let generics = &GenericParamSet::new(&input.generics);
+    let cx = CodeContext {
+        generics,
+        crate_path: &hattrs.crate_path,
+    };
     for variant in &data.variants {
-        arms.push(make_arm(&hattrs, variant, &mut bounds, &generics)?);
+        arms.push(make_arm(&hattrs, variant, &mut bounds, &cx)?);
     }
     let trait_path = parse_quote!(::core::fmt::Display);
     let contents = quote! {
@@ -664,10 +665,10 @@ impl DisplayFormat {
 
     fn format_args(
         &self,
-        context: DisplayContext,
+        vb: VarBase,
         with: &Option<Expr>,
         bounds: &mut Bounds,
-        generics: &GenericParamSet,
+        cx: &CodeContext,
     ) -> Result<FormatArgs> {
         let mut format_str = String::new();
         let mut format_args = Vec::new();
@@ -686,10 +687,10 @@ impl DisplayFormat {
                     format_str.push('}');
                     let format_spec = FormatSpec::parse_with_span(format_spec, self.span)?;
                     let format_arg =
-                        context.format_arg(arg, &format_spec, self.span, with, bounds, generics)?;
+                        vb.format_arg(arg, &format_spec, self.span, with, bounds, cx)?;
                     let mut expr = quote!(&#format_arg);
                     if format_spec.format_type == FormatType::Pointer {
-                        let crate_path = context.crate_path();
+                        let crate_path = &cx.crate_path;
                         expr = quote!(#crate_path::helpers::fmt_pointer(#expr));
                     }
                     expr = set_span(expr, self.span);
@@ -754,24 +755,27 @@ impl DisplayFormatPart {
     }
 }
 
-enum DisplayContext<'a> {
+struct CodeContext<'a> {
+    generics: &'a GenericParamSet,
+    crate_path: &'a Path,
+}
+
+enum VarBase<'a> {
     Struct {
         data: &'a DataStruct,
-        crate_path: &'a Path,
     },
     Variant {
         variant: &'a Variant,
         style: DisplayStyle,
-        crate_path: &'a Path,
     },
     Field {
-        parent: &'a DisplayContext<'a>,
+        parent: &'a VarBase<'a>,
         field: &'a Field,
         key: &'a FieldKey,
     },
 }
 
-impl DisplayContext<'_> {
+impl VarBase<'_> {
     fn format_arg(
         &self,
         arg: &str,
@@ -779,31 +783,29 @@ impl DisplayContext<'_> {
         span: Span,
         with: &Option<Expr>,
         bounds: &mut Bounds,
-        generics: &GenericParamSet,
+        cx: &CodeContext,
     ) -> Result<TokenStream> {
         let keys = FieldKey::from_str_deep(arg);
         if keys.is_empty() {
-            if matches!(
-                self,
-                DisplayContext::Struct { .. } | DisplayContext::Variant { .. }
-            ) && format_spec.format_type != FormatType::Display
+            if matches!(self, VarBase::Struct { .. } | VarBase::Variant { .. })
+                && format_spec.format_type != FormatType::Display
             {
                 return Ok(quote!(self));
             }
             return Ok(match self {
-                DisplayContext::Struct { .. } => {
+                VarBase::Struct { .. } => {
                     bail!(span, "{{}} is not allowed in struct format.")
                 }
-                DisplayContext::Field { parent, field, key } => parent.format_arg_by_field_expr(
-                    key,
-                    field,
+                VarBase::Field { parent, field, key } => format_arg(
+                    parent.field_expr(key),
+                    &field.ty,
                     format_spec,
                     span,
                     with,
                     bounds,
-                    generics,
+                    cx,
                 )?,
-                DisplayContext::Variant { variant, style, .. } => {
+                VarBase::Variant { variant, style, .. } => {
                     let s = style.apply(&variant.ident);
                     quote! { #s }
                 }
@@ -817,7 +819,7 @@ impl DisplayContext<'_> {
                 let Some(field) = m.get(key) else {
                     bail!(span, "unknown field '{key}'.");
                 };
-                return self.format_arg_of_field(key, field, format_spec, span, bounds, generics);
+                return self.format_arg_of_field(key, field, format_spec, span, bounds, cx);
             }
         }
         let mut expr = self.field_expr(&keys[0]);
@@ -833,82 +835,43 @@ impl DisplayContext<'_> {
         format_spec: &FormatSpec,
         span: Span,
         bounds: &mut Bounds,
-        generics: &GenericParamSet,
+        cx: &CodeContext,
     ) -> Result<TokenStream> {
         let hattrs = HelperAttributes::from(&field.attrs, false)?;
         let mut bounds = bounds.child(hattrs.bound_display);
         Ok(if let Some(format) = hattrs.format {
             let args = format.format_args(
-                DisplayContext::Field {
+                VarBase::Field {
                     parent: self,
                     field,
                     key,
                 },
                 &hattrs.with,
                 &mut bounds,
-                generics,
+                cx,
             )?;
             quote! { format_args!(#args) }
         } else {
-            self.format_arg_by_field_expr(
-                key,
-                field,
+            format_arg(
+                self.field_expr(key),
+                &field.ty,
                 format_spec,
                 span,
                 &hattrs.with,
                 &mut bounds,
-                generics,
+                cx,
             )?
         })
-    }
-    #[allow(clippy::too_many_arguments)]
-    fn format_arg_by_field_expr(
-        &self,
-        key: &FieldKey,
-        field: &Field,
-        format_spec: &FormatSpec,
-        span: Span,
-        with: &Option<Expr>,
-        bounds: &mut Bounds,
-        generics: &GenericParamSet,
-    ) -> Result<TokenStream> {
-        let ty = &field.ty;
-        if with.is_none() && generics.contains_in_type(ty) {
-            let tr = format_spec.format_type.trait_name();
-            let tr: Ident = parse_str(tr).unwrap();
-            if bounds.can_extend {
-                bounds.pred.push(parse_quote!(#ty : ::core::fmt::#tr));
-            }
-        }
-        let mut expr = self.field_expr(key);
-        if let Some(with) = with {
-            if format_spec.format_type != FormatType::Display {
-                bail!(
-                    span,
-                    "Since `with = ...` is specified, the `{}` format cannot be used.",
-                    format_spec.format_type
-                );
-            }
-            let crate_path = self.crate_path();
-            let unref_ty = unref_ty(ty);
-            expr = quote! {
-                #crate_path::helpers::Formatted::<'_, #unref_ty, _> {
-                    value : &#expr,
-                    format : #with,
-                }
-            };
-        }
-        Ok(expr)
     }
 
     fn field_expr(&self, key: &FieldKey) -> TokenStream {
         match self {
-            DisplayContext::Struct { .. } => quote! { self.#key },
-            DisplayContext::Variant { .. } => {
+            VarBase::Struct { .. } => quote! { self.#key },
+            VarBase::Variant { .. } => {
                 let var = key.binding_var();
                 quote! { (*#var) }
             }
-            DisplayContext::Field {
+            VarBase::Field {
                 parent,
                 key: parent_key,
                 ..
@@ -923,29 +886,58 @@ impl DisplayContext<'_> {
         const ERROR_MESSAGE_FOR_STRUCT:&str="`#[display(\"format\")]` or `#[from_str(regex = \"regex\")]` is required except newtype pattern.";
         const ERROR_MESSAGE_FOR_VARIANT:&str="`#[display(\"format\")]` or `#[from_str(regex = \"regex\")]` is required except unit variant.";
         Ok(match self {
-            DisplayContext::Struct { data, .. } => {
+            VarBase::Struct { data, .. } => {
                 DisplayFormat::from_newtype_struct(data).expect(ERROR_MESSAGE_FOR_STRUCT)
             }
-            DisplayContext::Variant { variant, .. } => {
+            VarBase::Variant { variant, .. } => {
                 DisplayFormat::from_unit_variant(variant)?.expect(ERROR_MESSAGE_FOR_VARIANT)
             }
-            DisplayContext::Field { field, .. } => DisplayFormat::parse("{}", field.span())?,
+            VarBase::Field { field, .. } => DisplayFormat::parse("{}", field.span())?,
         })
     }
     fn fields(&self) -> Option<&Fields> {
         match self {
-            DisplayContext::Struct { data, .. } => Some(&data.fields),
-            DisplayContext::Variant { variant, .. } => Some(&variant.fields),
-            DisplayContext::Field { .. } => None,
+            VarBase::Struct { data, .. } => Some(&data.fields),
+            VarBase::Variant { variant, .. } => Some(&variant.fields),
+            VarBase::Field { .. } => None,
         }
     }
-    fn crate_path(&self) -> &Path {
-        match self {
-            DisplayContext::Struct { crate_path, .. } => crate_path,
-            DisplayContext::Variant { crate_path, .. } => crate_path,
-            DisplayContext::Field { parent, .. } => parent.crate_path(),
+}
+#[allow(clippy::too_many_arguments)]
+fn format_arg(
+    mut expr: TokenStream,
+    ty: &Type,
+    format_spec: &FormatSpec,
+    span: Span,
+    with: &Option<Expr>,
+    bounds: &mut Bounds,
+    cx: &CodeContext,
+) -> Result<TokenStream> {
+    if with.is_none() && cx.generics.contains_in_type(ty) {
+        let tr = format_spec.format_type.trait_name();
+        let tr: Ident = parse_str(tr).unwrap();
+        if bounds.can_extend {
+            bounds.pred.push(parse_quote!(#ty : ::core::fmt::#tr));
         }
     }
+    if let Some(with) = with {
+        if format_spec.format_type != FormatType::Display {
+            bail!(
+                span,
+                "Since `with = ...` is specified, the `{}` format cannot be used.",
+                format_spec.format_type
+            );
+        }
+        let crate_path = cx.crate_path;
+        let unref_ty = unref_ty(ty);
+        expr = quote! {
+            #crate_path::helpers::Formatted::<'_, #unref_ty, _> {
+                value : &#expr,
+                format : #with,
+            }
+        };
+    }
+    Ok(expr)
 }
 
 #[derive(Debug)]
