@@ -1,6 +1,6 @@
 use crate::{
-    field_map, field_of, join, regex_utils::*, set_span, syn_utils::*, Bounds, DisplayFormat,
-    DisplayFormatPart, DisplayStyle, FieldEntry, FieldKey, HelperAttributes, VarBase, With,
+    field_map, join, regex_utils::*, set_span, syn_utils::*, Bounds, DisplayFormat,
+    DisplayFormatPart, DisplayStyle, FieldKey, HelperAttributes, VarBase, With,
 };
 use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote, quote_spanned};
@@ -89,10 +89,10 @@ impl<'a> ParserBuilder<'a> {
     fn field(&mut self, key: &FieldKey, span: Span) -> Result<&mut FieldEntry<'a>> {
         field_of(&mut self.fields, key, span)
     }
-    fn set_capture(&mut self, context: &VarBase, keys: &[FieldKey], span: Span) -> Result<String> {
+    fn set_capture(&mut self, vb: &VarBase, keys: &[FieldKey], span: Span) -> Result<String> {
         let field_key;
         let sub_keys;
-        if let VarBase::Field { key, .. } = context {
+        if let VarBase::Field { key, .. } = vb {
             field_key = *key;
             sub_keys = keys;
         } else {
@@ -637,4 +637,25 @@ fn capture_name(idx: usize) -> String {
 }
 fn capture_index(idx: usize, names: &HashMap<&str, usize>) -> usize {
     names[capture_name(idx).as_str()]
+}
+
+struct FieldEntry<'a> {
+    hattrs: HelperAttributes,
+    deep_captures: BTreeMap<Vec<FieldKey>, usize>,
+    source: &'a Field,
+    capture: Option<usize>,
+    use_default: bool,
+    crate_path: &'a Path,
+}
+
+fn field_of<'a, 'b>(
+    fields: &'a mut BTreeMap<FieldKey, FieldEntry<'b>>,
+    key: &FieldKey,
+    span: Span,
+) -> Result<&'a mut FieldEntry<'b>> {
+    if let Some(f) = fields.get_mut(key) {
+        Ok(f)
+    } else {
+        bail!(span, "field `{key}` not found.");
+    }
 }

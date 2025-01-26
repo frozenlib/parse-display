@@ -1130,27 +1130,6 @@ fn trim_raw(s: &str) -> &str {
     }
 }
 
-struct FieldEntry<'a> {
-    hattrs: HelperAttributes,
-    deep_captures: BTreeMap<Vec<FieldKey>, usize>,
-    source: &'a Field,
-    capture: Option<usize>,
-    use_default: bool,
-    crate_path: &'a Path,
-}
-
-fn field_of<'a, 'b>(
-    fields: &'a mut BTreeMap<FieldKey, FieldEntry<'b>>,
-    key: &FieldKey,
-    span: Span,
-) -> Result<&'a mut FieldEntry<'b>> {
-    if let Some(f) = fields.get_mut(key) {
-        Ok(f)
-    } else {
-        bail!(span, "field `{key}` not found.");
-    }
-}
-
 fn set_span(ts: TokenStream, span: Span) -> TokenStream {
     ts.into_iter()
         .map(|mut ts| {
