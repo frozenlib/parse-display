@@ -1171,6 +1171,39 @@ fn opt_with_format() {
     assert_display(X { a: None }, "");
 }
 
+#[test]
+fn opt_member() {
+    struct A {
+        u: u8,
+    }
+
+    #[derive(Display)]
+    #[display("{a}")]
+    struct X {
+        #[display("a={u}", opt)]
+        a: Option<A>,
+    }
+    assert_display(
+        X {
+            a: Some(A { u: 10 }),
+        },
+        "a=10",
+    );
+    assert_display(X { a: None }, "");
+}
+
+#[test]
+fn opt_generics() {
+    #[derive(Display)]
+    #[display("{a}")]
+    struct X<T> {
+        #[display(opt)]
+        a: Option<T>,
+    }
+    assert_display(X { a: Some(10) }, "10");
+    assert_display(X { a: None::<u8> }, "");
+}
+
 #[track_caller]
 fn assert_display<T: core::fmt::Display>(value: T, display: &str) {
     let value_display = format!("{value}");
