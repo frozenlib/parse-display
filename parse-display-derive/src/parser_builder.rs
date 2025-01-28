@@ -671,19 +671,6 @@ fn build_parse_capture_expr(
     let msg = format!("field `{field_name}` parse failed.");
     let e = if let Some(field) = field {
         if field.hattrs.opt.value() {
-            if !field.hattrs.regex_infer
-                && field.hattrs.regex.is_none()
-                && field.hattrs.with.is_none()
-                && field.hattrs.format.is_none()
-            {
-                let span = field.source.span();
-                bail!(
-                    span,
-                    "Field `{field_name}` has `opt` attribute but empty string matches `Some`, so empty string will not be parsed as `None`.
-To prevent `Some` from matching empty strings, specify a pattern that excludes empty strings using `regex`, `regex_infer`, `with`, or a format string."
-                );
-            }
-
             let e = str_expr_to_parse_capture_expr(quote!(s), field, crate_path);
             quote! {
                 c.get(#capture_index).map(|m| m.as_str()).map(|s| #e).transpose()

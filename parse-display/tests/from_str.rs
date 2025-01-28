@@ -1396,10 +1396,10 @@ fn from_str_opt_2() {
     #[derive(FromStr, Debug, Eq, PartialEq)]
     #[display("{a},{b}")]
     struct X {
-        #[display("{}", opt)]
+        #[display(opt)]
         a: Option<u32>,
 
-        #[display("{}", opt)]
+        #[display(opt)]
         b: Option<u32>,
     }
     assert_from_str(
