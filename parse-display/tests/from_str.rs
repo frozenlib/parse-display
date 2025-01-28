@@ -1392,6 +1392,41 @@ fn from_str_opt() {
 }
 
 #[test]
+fn from_str_opt_2() {
+    #[derive(FromStr, Debug, Eq, PartialEq)]
+    #[display("{a},{b}")]
+    struct X {
+        #[display("{}", opt)]
+        a: Option<u32>,
+
+        #[display("{}", opt)]
+        b: Option<u32>,
+    }
+    assert_from_str(
+        "10,20",
+        X {
+            a: Some(10),
+            b: Some(20),
+        },
+    );
+    assert_from_str(
+        "10,",
+        X {
+            a: Some(10),
+            b: None,
+        },
+    );
+    assert_from_str(
+        ",20",
+        X {
+            a: None,
+            b: Some(20),
+        },
+    );
+    assert_from_str(",", X { a: None, b: None });
+}
+
+#[test]
 fn from_str_opt_generic() {
     #[derive(FromStr, Debug, Eq, PartialEq)]
     struct X<T> {
@@ -1402,6 +1437,7 @@ fn from_str_opt_generic() {
     assert_from_str("", X { a: None::<u32> });
 }
 
+#[track_caller]
 fn assert_from_str<T: FromStr + Debug + PartialEq>(s: &str, value: T)
 where
     <T as FromStr>::Err: Display,
@@ -1411,6 +1447,8 @@ where
         Err(e) => panic!("\"{s}\" parse failed. ({e})"),
     }
 }
+
+#[track_caller]
 fn assert_from_str_err<T: FromStr + Debug>(s: &str) {
     if let Ok(a) = s.parse::<T>() {
         panic!("from_str(\"{s}\") should return Err. but return `{a:?}`.");

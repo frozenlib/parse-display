@@ -256,7 +256,7 @@ impl<'a> ParserBuilder<'a> {
             let hir = Hir::repetition(Repetition {
                 min: 0,
                 max: Some(1),
-                greedy: true,
+                greedy: false,
                 sub: Box::new(Hir::concat(hirs_child)),
             });
             hirs.push(hir);
