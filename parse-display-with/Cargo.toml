@@ -1,7 +1,7 @@
 [package]
 name = "parse-display-with"
 version = "0.0.2"
-edition = "2021"
+edition = "2024"
 authors = ["frozenlib"]
 license = "MIT OR Apache-2.0"
 readme = "README.md"
@@ -10,7 +10,7 @@ documentation = "https://docs.rs/parse-display-with/"
 keywords = ["parse-display"]
 categories = ["parsing"]
 description = "Custom formatting/parsing utilities for parse-display."
-rust-version = "1.81.0"
+rust-version = "1.85.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
