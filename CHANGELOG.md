@@ -6,6 +6,7 @@
 
 - Add `FromStrRegex` trait.
 - Support `#[from_str(regex_infer)]`.
+- Support `#[display(opt)]`.
 
 ### Changed
 
