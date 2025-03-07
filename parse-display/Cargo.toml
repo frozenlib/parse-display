@@ -19,8 +19,8 @@ docs = []
 
 [dependencies]
 parse-display-derive = { version = "=0.10.0", path = "../parse-display-derive" }
-regex = { version = "1.10.6", optional = true }
-regex-syntax = { version = "0.8.4", optional = true }
+regex = { workspace = true, optional = true }
+regex-syntax = { workspace = true, optional = true }
 
 [dev-dependencies]
 trybuild = "1.0.99"
