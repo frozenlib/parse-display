@@ -3,5 +3,5 @@ resolver = "3"
 members = ["parse-display", "parse-display-derive", "parse-display-with"]
 
 [workspace.dependencies]
-regex = "1.10.6"
-regex-syntax = "0.8.4"
+regex = "1.11.1"
+regex-syntax = "0.8.5"
