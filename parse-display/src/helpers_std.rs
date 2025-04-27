@@ -5,20 +5,25 @@ use std::{borrow::Cow, fmt};
 use regex::Regex;
 use regex_syntax::ast::{Ast, Flags, GroupKind};
 
-use crate::{DisplayFormat, FromStrFormat, FromStrRegex};
+use crate::{ANY_REGEX, DisplayFormat, FromStrFormat, FromStrRegex};
 
 pub use regex;
 
 #[track_caller]
 pub fn to_regex<T, E>(format: &dyn FromStrFormat<T, Err = E>) -> Option<String> {
-    format.regex()
+    let s = format.regex_pattern();
+    if s == ANY_REGEX { None } else { Some(s) }
 }
 
 #[track_caller]
 pub fn to_ast<T, E>(format: &dyn FromStrFormat<T, Err = E>) -> Option<(String, Ast)> {
-    let s = format.regex()?;
-    let ast = ast_from_str(&s);
-    Some((s, ast))
+    let s = format.regex_pattern();
+    if s == ANY_REGEX {
+        None
+    } else {
+        let ast = ast_from_str(&s);
+        Some((s, ast))
+    }
 }
 
 #[track_caller]

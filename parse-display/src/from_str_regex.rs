@@ -1,6 +1,8 @@
 use core::num::NonZero;
 use std::{ffi::OsString, path::PathBuf};
 
+use crate::ANY_REGEX;
+
 /// A trait for getting regex patterns that match strings parseable by [`FromStr`](core::str::FromStr).
 ///
 /// When using [`#[derive(FromStr)]`](derive@crate::FromStr) with the [`#[from_str(regex_infer)]`](derive@crate::Display#from_strregex_infer) attribute,
@@ -19,7 +21,7 @@ impl FromStrRegex for char {
 }
 
 fn regex_any() -> String {
-    r"(?s:.*?)".into()
+    ANY_REGEX.into()
 }
 
 impl FromStrRegex for String {

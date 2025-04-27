@@ -966,6 +966,9 @@ pub trait DisplayFormat<T: ?Sized> {
     fn write(&self, f: &mut Formatter, value: &T) -> Result;
 }
 
+/// Regular expression that matches any string. Equivalent to `"(?s:.*?)"`.
+pub const ANY_REGEX: &str = "(?s:.*?)";
+
 /// Parsing method used in [`#[display(with = ...)]` and `#[from_str(with = ...)]`](macro@Display#displaywith---from_strwith--).
 pub trait FromStrFormat<T> {
     type Err;
@@ -975,7 +978,7 @@ pub trait FromStrFormat<T> {
 
     /// Return a regular expression that the input string needs to match.
     ///
-    /// If None is returned, the input will be a string that matches `(?s:.*?)`.
+    /// By default, [`ANY_REGEX`] is returned, which matches any string.
     ///
     /// # Examples
     ///
@@ -988,8 +991,8 @@ pub trait FromStrFormat<T> {
     ///     fn parse(&self, s: &str) -> std::result::Result<String, Self::Err> {
     ///         s.parse()
     ///     }
-    ///     fn regex(&self) -> Option<String> {
-    ///         Some(r"[0-9]+".into())
+    ///     fn regex_pattern(&self) -> String {
+    ///         r"[0-9]+".into()
     ///     }
     /// }
     ///
@@ -1020,8 +1023,8 @@ pub trait FromStrFormat<T> {
     ///     fn parse(&self, _s: &str) -> core::result::Result<T, Self::Err> {
     ///         Ok(Default::default())
     ///     }
-    ///     fn regex(&self) -> Option<String> {
-    ///         Some(type_name::<T>().to_string())
+    ///     fn regex_pattern(&self) -> String {
+    ///         type_name::<T>().to_string()
     ///     }
     /// }
     ///
@@ -1031,6 +1034,14 @@ pub trait FromStrFormat<T> {
     /// let _ = X::<u16>::from_str("u16"); // panic on debug mode
     /// ```
     #[cfg(feature = "std")]
+    #[allow(deprecated)]
+    fn regex_pattern(&self) -> String {
+        self.regex().unwrap_or(ANY_REGEX.into())
+    }
+
+    #[cfg(feature = "std")]
+    #[deprecated(note = r"use `regex_pattern` instead. 
+In `regex_pattern`, use `ANY_REGEX` instead of `None` for patterns that matches any string.")]
     fn regex(&self) -> Option<String> {
         None
     }
