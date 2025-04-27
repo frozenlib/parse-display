@@ -10,6 +10,10 @@
 
 ### Changed
 
+- Use edition 2024.
+- Set `rust-version` to 1.85.0.
+- Deprecate `FromStrFormat::regex` and add `FromStrFormat::regex_pattern` instead.
+
 ### Deprecated
 
 ### Removed
