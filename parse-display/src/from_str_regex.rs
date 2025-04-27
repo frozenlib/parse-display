@@ -167,6 +167,11 @@ impl FromStrRegex for i128 {
         regex_sint()
     }
 }
+impl FromStrRegex for NonZero<i128> {
+    fn from_str_regex() -> String {
+        regex_sint()
+    }
+}
 
 impl FromStrRegex for isize {
     fn from_str_regex() -> String {
