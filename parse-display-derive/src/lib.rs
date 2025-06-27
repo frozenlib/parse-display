@@ -19,7 +19,7 @@ use crate::{format_syntax::*, syn_utils::*};
 use bound::{Bound, Bounds};
 use parser_builder::{ParseVariantCode, ParserBuilder};
 use proc_macro2::{Span, TokenStream};
-use quote::{format_ident, quote, ToTokens};
+use quote::{ToTokens, format_ident, quote};
 use regex_syntax::escape;
 use std::{
     collections::BTreeMap,
@@ -27,13 +27,13 @@ use std::{
 };
 use structmeta::{Flag, StructMeta, ToTokens};
 use syn::{
+    Attribute, Data, DataEnum, DataStruct, DeriveInput, Expr, Field, Fields, FieldsNamed,
+    FieldsUnnamed, GenericArgument, Ident, LitStr, Member, Path, PathArguments, Result, Type,
+    Variant,
     ext::IdentExt,
     parse::{Parse, ParseStream},
     parse_macro_input, parse_quote, parse_str,
     spanned::Spanned,
-    Attribute, Data, DataEnum, DataStruct, DeriveInput, Expr, Field, Fields, FieldsNamed,
-    FieldsUnnamed, GenericArgument, Ident, LitStr, Member, Path, PathArguments, Result, Type,
-    Variant,
 };
 
 #[proc_macro_derive(Display, attributes(display))]
@@ -941,8 +941,8 @@ impl VarBase<'_> {
     }
 
     fn default_from_str_format(&self) -> Result<DisplayFormat> {
-        const ERROR_MESSAGE_FOR_STRUCT:&str="`#[display(\"format\")]` or `#[from_str(regex = \"regex\")]` is required except newtype pattern.";
-        const ERROR_MESSAGE_FOR_VARIANT:&str="`#[display(\"format\")]` or `#[from_str(regex = \"regex\")]` is required except unit variant.";
+        const ERROR_MESSAGE_FOR_STRUCT: &str = "`#[display(\"format\")]` or `#[from_str(regex = \"regex\")]` is required except newtype pattern.";
+        const ERROR_MESSAGE_FOR_VARIANT: &str = "`#[display(\"format\")]` or `#[from_str(regex = \"regex\")]` is required except unit variant.";
         Ok(match self {
             VarBase::Struct { data, .. } => {
                 DisplayFormat::from_newtype_struct(data).expect(ERROR_MESSAGE_FOR_STRUCT)

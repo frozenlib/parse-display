@@ -936,11 +936,7 @@ fn new_return_option() {
 
     impl Non1USize {
         fn new(value: usize) -> Option<Self> {
-            if value == 1 {
-                None
-            } else {
-                Some(Self(value))
-            }
+            if value == 1 { None } else { Some(Self(value)) }
         }
     }
 
@@ -991,11 +987,7 @@ fn new_tuple() {
 
     impl MyNonZeroUSize {
         fn new(value: usize) -> Option<Self> {
-            if value == 0 {
-                None
-            } else {
-                Some(Self(value))
-            }
+            if value == 0 { None } else { Some(Self(value)) }
         }
     }
 
@@ -1211,7 +1203,7 @@ fn use_type_parameter_in_with() {
 #[test]
 fn regex_depending_on_the_parameter() {
     use parse_display::FromStrFormat;
-    use std::any::{type_name, Any};
+    use std::any::{Any, type_name};
 
     struct TypeNameFormat;
     impl<T: Default + Any> FromStrFormat<T> for TypeNameFormat {

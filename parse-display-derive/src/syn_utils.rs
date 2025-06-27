@@ -1,14 +1,14 @@
 use proc_macro2::TokenStream;
-use quote::{quote, quote_spanned, ToTokens};
+use quote::{ToTokens, quote, quote_spanned};
 use std::collections::HashSet;
 use syn::{
-    ext::IdentExt,
-    parse::{discouraged::Speculative, Parse, ParseStream},
-    parse2, parse_str,
-    punctuated::Punctuated,
-    visit::{visit_path, Visit},
     DeriveInput, GenericParam, Generics, Ident, LitStr, Path, PathArguments, PathSegment, Result,
     Token, Type, WherePredicate,
+    ext::IdentExt,
+    parse::{Parse, ParseStream, discouraged::Speculative},
+    parse_str, parse2,
+    punctuated::Punctuated,
+    visit::{Visit, visit_path},
 };
 
 macro_rules! bail {

@@ -1,6 +1,6 @@
 use crate::{
-    field_map, get_option_element, join, regex_utils::*, set_span, syn_utils::*, Bounds,
-    DisplayFormat, DisplayFormatPart, DisplayStyle, FieldKey, HelperAttributes, VarBase, With,
+    Bounds, DisplayFormat, DisplayFormatPart, DisplayStyle, FieldKey, HelperAttributes, VarBase,
+    With, field_map, get_option_element, join, regex_utils::*, set_span, syn_utils::*,
 };
 use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote, quote_spanned};
@@ -14,8 +14,8 @@ use std::{
     mem,
 };
 use syn::{
-    parse_quote, spanned::Spanned, DataStruct, Expr, Field, Fields, Ident, LitStr, Path, Result,
-    Variant,
+    DataStruct, Expr, Field, Fields, Ident, LitStr, Path, Result, Variant, parse_quote,
+    spanned::Spanned,
 };
 
 pub(crate) struct ParserBuilder<'a> {
@@ -624,7 +624,7 @@ impl ParseFormat {
             Self::String(s) => {
                 let mut hirs = vec![];
                 push_str(&mut hirs, s);
-                std::mem::swap(self, &mut Self::Hirs(hirs));
+                *self = Self::Hirs(hirs);
             }
         }
         if let Self::Hirs(hirs) = self {

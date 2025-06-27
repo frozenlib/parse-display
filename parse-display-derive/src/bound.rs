@@ -1,8 +1,9 @@
 use std::ops::{Deref, DerefMut};
 use structmeta::ToTokens;
 use syn::{
-    parse::{discouraged::Speculative, Parse, ParseStream},
-    parse_quote, Path, Result, Token, Type, WherePredicate,
+    Path, Result, Token, Type, WherePredicate,
+    parse::{Parse, ParseStream, discouraged::Speculative},
+    parse_quote,
 };
 
 #[derive(Clone, ToTokens)]
