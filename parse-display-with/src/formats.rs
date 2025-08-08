@@ -92,7 +92,7 @@ where
     }
 }
 
-pub fn join<I: ?Sized, F>(item_format: F, delimiter: &str) -> Join<I, F> {
+pub fn join<I: ?Sized, F>(item_format: F, delimiter: &str) -> Join<'_, I, F> {
     Join {
         item_format,
         delimiter,
@@ -100,6 +100,6 @@ pub fn join<I: ?Sized, F>(item_format: F, delimiter: &str) -> Join<I, F> {
     }
 }
 
-pub fn delimiter<I: ?Sized>(delimiter: &str) -> Join<I> {
+pub fn delimiter<I: ?Sized>(delimiter: &str) -> Join<'_, I> {
     join(fmt(), delimiter)
 }

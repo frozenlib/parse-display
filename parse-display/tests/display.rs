@@ -884,8 +884,10 @@ fn bound_by_hand_with_auto() {
 #[test]
 fn bound_struct_field() {
     #[derive(Display)]
+    #[allow(dead_code)]
     struct Inner<T>(T);
     #[derive(Display)]
+    #[allow(dead_code)]
     pub struct Outer<T>(#[display(bound(T))] Inner<T>);
 }
 #[allow(dead_code)]

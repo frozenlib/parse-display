@@ -785,9 +785,11 @@ struct TestStructPrivateGeneric<T>(T);
 fn bound_predicate_struct() {
     #[derive(FromStr, Debug, Eq, PartialEq)]
     #[display(bound("T : Default"))]
+    #[allow(dead_code)]
     pub struct TestStructBoundPredicate<T>(FromStrIfDefault<T>);
 
     #[derive(Debug, Eq, PartialEq)]
+    #[allow(dead_code)]
     struct FromStrIfDefault<T>(T);
     impl<T: Default> FromStr for FromStrIfDefault<T> {
         type Err = ParseError;
@@ -830,8 +832,10 @@ fn bound_type_enum() {
 #[test]
 fn bound_struct_field() {
     #[derive(FromStr)]
+    #[allow(dead_code)]
     struct Inner<T>(T);
     #[derive(FromStr)]
+    #[allow(dead_code)]
     pub struct Outer<T>(#[from_str(bound(T))] Inner<T>);
 }
 

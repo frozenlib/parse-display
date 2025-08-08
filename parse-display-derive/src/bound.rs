@@ -66,7 +66,7 @@ impl Bounds {
             Bound::Default(_) => self.can_extend = true,
         }
     }
-    pub fn child(&mut self, bounds: Option<Vec<Bound>>) -> BoundsChild {
+    pub fn child(&mut self, bounds: Option<Vec<Bound>>) -> BoundsChild<'_> {
         let bounds = if self.can_extend {
             Self::from_data(bounds)
         } else {
