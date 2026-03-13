@@ -28,7 +28,7 @@
 //! assert_eq!("var_a".parse(), Ok(Y::VarA));
 //! ```
 #![cfg_attr(not(feature = "std"), no_std)]
-#![cfg_attr(feature = "docs", feature(doc_auto_cfg))]
+#![cfg_attr(feature = "docs", feature(doc_cfg))]
 
 use core::convert::Infallible;
 use core::fmt::{Display, Formatter, Result};
