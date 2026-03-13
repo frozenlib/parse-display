@@ -44,3 +44,12 @@ jobs:
       - uses: taiki-e/install-action@cargo-hack
       - name: Check msrv
         run: cargo hack test --rust-version --workspace --all-targets --ignore-private
+
+      - name: Doc (without docs feature)
+        run: cargo doc --no-deps
+        env:
+          RUSTDOCFLAGS: -D warnings
+      - name: Doc (with docs feature)
+        run: cargo +nightly doc --no-deps --features docs
+        env:
+          RUSTDOCFLAGS: -D warnings     
