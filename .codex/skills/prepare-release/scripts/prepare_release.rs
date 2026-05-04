@@ -276,17 +276,45 @@ fn update_docs(
 ) -> Result<(), String> {
     for path in doc_files(root)? {
         let text = read(&path)?;
-        let mut new_text = text.replace(
-            &format!("parse-display = \"{old_version}\""),
-            &format!("parse-display = \"{version}\""),
-        );
-        new_text = new_text.replace(
-            &format!("docs.rs/parse-display/{old_version}/"),
-            &format!("docs.rs/parse-display/{version}/"),
-        );
+        let new_text = update_doc_text(&text, old_version, version);
         write_if_changed(&path, new_text, dry_run, changed)?;
     }
     Ok(())
+}
+
+fn update_doc_text(text: &str, old_version: &str, version: &str) -> String {
+    let dependency_before = format!("parse-display = \"{old_version}\"");
+    let dependency_after = format!("parse-display = \"{version}\"");
+    let docs_before = format!("docs.rs/parse-display/{old_version}/");
+    let docs_after = format!("docs.rs/parse-display/{version}/");
+    let mut in_deprecated_section = false;
+
+    let lines = text
+        .lines()
+        .map(|line| {
+            let doc_line = markdown_text(line);
+            if doc_line.starts_with("## ") {
+                in_deprecated_section =
+                    doc_line.contains("Deprecated") || doc_line.contains("非推奨");
+            }
+
+            let mut line = line.replace(&dependency_before, &dependency_after);
+            if !in_deprecated_section {
+                line = line.replace(&docs_before, &docs_after);
+            }
+            line
+        })
+        .collect::<Vec<_>>();
+
+    finish(lines)
+}
+
+fn markdown_text(line: &str) -> &str {
+    line.trim_start()
+        .strip_prefix("///")
+        .or_else(|| line.trim_start().strip_prefix("//!"))
+        .unwrap_or(line)
+        .trim_start()
 }
 
 fn doc_files(root: &Path) -> Result<Vec<PathBuf>, String> {

@@ -30,7 +30,8 @@ In sandboxed Codex environments, `cargo +nightly -Zscript` may need approval bec
 4. If `cargo +nightly -Zscript` is unavailable, make the same edits manually.
    - Set `parse-display/Cargo.toml` package `version` to `<version>`.
    - Update `Cargo.lock`'s `parse-display` package version to `<version>`.
-   - Search docs and Rust doc comments for the previous parse-display version and update only parse-display version references, such as:
+   - Search docs and Rust doc comments for the previous parse-display version and update only active parse-display version references, such as dependency snippets and current-version docs links.
+   - Do not update docs.rs links for deprecated features. Deprecated feature documentation must keep linking to the older version where that deprecated feature is still documented.
 
 ```powershell
 rg -n '<old-version>|parse-display = "' README.md parse-display parse-display-with
