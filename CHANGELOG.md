@@ -16,6 +16,8 @@
 
 ### Deprecated
 
+- Deprecate `#[from_str(default_fields(...))]`; use `#[from_str(default)]` instead.
+
 ### Removed
 
 ### Fixed
