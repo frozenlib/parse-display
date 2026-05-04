@@ -1,0 +1,4 @@
+interface:
+  display_name: "Prepare Release"
+  short_description: "Prepare parse-display release changes"
+  default_prompt: "Use $prepare-release to prepare parse-display for version 0.0.0."
