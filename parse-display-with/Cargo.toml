@@ -19,4 +19,4 @@ default = ["std"]
 std = ["parse-display/std"]
 
 [dependencies]
-parse-display = { version = "0.10.0", path = "../parse-display", default-features = false }
+parse-display = { version = "0.11.0", path = "../parse-display", default-features = false }

@@ -14,7 +14,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! parse-display = "0.10.0"
+//! parse-display = "0.11.0"
 //! ```
 //!
 //! ## Documentation

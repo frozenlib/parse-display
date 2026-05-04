@@ -4,6 +4,22 @@
 
 ### Added
 
+### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Performance
+
+### Security
+
+## [0.11.0] - 2026-05-04
+
+### Added
+
 - Add `FromStrRegex` trait.
 - Support `#[from_str(regex_infer)]`.
 - Support `#[display(opt)]`.
@@ -17,14 +33,6 @@
 ### Deprecated
 
 - Deprecate `#[from_str(default_fields(...))]`; use `#[from_str(default)]` instead.
-
-### Removed
-
-### Fixed
-
-### Performance
-
-### Security
 
 ## [0.10.0] - 2024-08-04
 
@@ -111,7 +119,8 @@
 
 - Support `#[from_str(ignore)]` for variant.
 
-[unreleased]: https://github.com/frozenlib/parse-display/compare/v0.10.0...HEAD
+[unreleased]: https://github.com/frozenlib/parse-display/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/frozenlib/parse-display/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/frozenlib/parse-display/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/frozenlib/parse-display/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/frozenlib/parse-display/compare/v0.8.2...v0.9.0
