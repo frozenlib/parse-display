@@ -9,20 +9,20 @@
 
 ヘルパー属性は、次の位置に記述できます。
 
-| 属性                                                          | `#[display]` | `#[from_str]` | struct | enum | variant | field |
-| ------------------------------------------------------------- | ------------ | ------------- | ------ | ---- | ------- | ----- |
-| [`#[display("...")]`](#display)                               | ✔            |               | ✔      | ✔    | ✔       | ✔     |
-| [`#[display(style = "...")]`](#displaystyle--)                | ✔            |               |        | ✔    | ✔       |       |
-| [`#[display(with = ...)]`](#displaywith---from_strwith--)     | ✔            | ✔             |        |      |         | ✔     |
-| [`#[display(opt)]`](#displayopt)                              |              |               |        |      |         | ✔     |
-| [`#[display(bound(...))]`](#displaybound-from_strbound)       | ✔            | ✔             | ✔      | ✔    | ✔       | ✔     |
-| [`#[display(crate = ...)]`](#displaycrate--)                  | ✔            |               | ✔      | ✔    |         |       |
-| [`#[display(dump)]`](#displaydump-from_strdump)               | ✔            | ✔             | ✔      | ✔    |         |       |
-| [`#[from_str(regex = "...")]`](#from_strregex--)              |              | ✔             | ✔      | ✔    | ✔       | ✔     |
-| [`#[from_str(regex_infer)]`](#from_strregex_infer)            |              | ✔             | ✔      | ✔    | ✔       | ✔     |
-| [`#[from_str(new = ...)]`](#from_strnew--)                    |              | ✔             | ✔      |      | ✔       |       |
-| [`#[from_str(ignore)]`](#from_strignore)                      |              | ✔             |        |      | ✔       |       |
-| [`#[from_str(default)]`](#from_strdefault)                    |              | ✔             | ✔      |      |         | ✔     |
+| 属性                                                      | `#[display]` | `#[from_str]` | struct | enum | variant | field |
+| --------------------------------------------------------- | ------------ | ------------- | ------ | ---- | ------- | ----- |
+| [`#[display("...")]`](#display)                           | ✔            |               | ✔      | ✔    | ✔       | ✔     |
+| [`#[display(style = "...")]`](#displaystyle--)            | ✔            |               |        | ✔    | ✔       |       |
+| [`#[display(with = ...)]`](#displaywith---from_strwith--) | ✔            | ✔             |        |      |         | ✔     |
+| [`#[display(opt)]`](#displayopt)                          |              |               |        |      |         | ✔     |
+| [`#[display(bound(...))]`](#displaybound-from_strbound)   | ✔            | ✔             | ✔      | ✔    | ✔       | ✔     |
+| [`#[display(crate = ...)]`](#displaycrate--)              | ✔            |               | ✔      | ✔    |         |       |
+| [`#[display(dump)]`](#displaydump-from_strdump)           | ✔            | ✔             | ✔      | ✔    |         |       |
+| [`#[from_str(regex = "...")]`](#from_strregex--)          |              | ✔             | ✔      | ✔    | ✔       | ✔     |
+| [`#[from_str(regex_infer)]`](#from_strregex_infer)        |              | ✔             | ✔      | ✔    | ✔       | ✔     |
+| [`#[from_str(new = ...)]`](#from_strnew--)                |              | ✔             | ✔      |      | ✔       |       |
+| [`#[from_str(ignore)]`](#from_strignore)                  |              | ✔             |        |      | ✔       |       |
+| [`#[from_str(default)]`](#from_strdefault)                |              | ✔             | ✔      |      |         | ✔     |
 
 ## `#[display("...")]`
 
@@ -30,13 +30,13 @@
 
 ただし、`std::format!()` と異なり、`{}` は次の意味を持ちます。
 
-| フォーマット                | struct | enum | variant | field | 説明                                                                     |
-| --------------------- | ------ | ---- | ------- | ----- | ---------------------------------------------------------------------- |
-| [`{a}`, `{b}`, `{1}`] | ✔      | ✔    | ✔       | ✔     | 指定した名前のフィールドを使用します。                                                    |
-| [`{}`]                |        | ✔    | ✔       |       | enum の variant 名を使用します。                                                |
-| [`{}`,`{:x}`, `{:?}`] |        |      |         | ✔     | フィールド自身を使用します。                                                         |
+| フォーマット          | struct | enum | variant | field | 説明                                                                                     |
+| --------------------- | ------ | ---- | ------- | ----- | ---------------------------------------------------------------------------------------- |
+| [`{a}`, `{b}`, `{1}`] | ✔      | ✔    | ✔       | ✔     | 指定した名前のフィールドを使用します。                                                   |
+| [`{}`]                |        | ✔    | ✔       |       | enum の variant 名を使用します。                                                         |
+| [`{}`,`{:x}`, `{:?}`] |        |      |         | ✔     | フィールド自身を使用します。                                                             |
 | [`{:x}`, `{:?}`]      | ✔      | ✔    |         |       | `self` に [`Display`] 以外のフォーマット trait を使用します。例: [`LowerHex`], [`Debug`] |
-| [`{a.b.c}`]           | ✔      | ✔    | ✔       | ✔     | ネストしたフィールドを使用します。                                                      |
+| [`{a.b.c}`]           | ✔      | ✔    | ✔       | ✔     | ネストしたフィールドを使用します。                                                       |
 
 [`LowerHex`]: std::fmt::LowerHex
 [`{a}`, `{b}`, `{1}`]: #struct-format
@@ -826,6 +826,6 @@ assert_eq!("10".parse(), Ok(MyStruct { a:0, b:10 }));
 
 以下の非推奨機能は将来のバージョンで削除されます。
 
-| 機能 | 説明 |
-| ---- | ---- |
+| 機能                                                                                                                                | 説明                                                                                                                |
+| ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | [`#[from_str(default_fields(...))]`](https://docs.rs/parse-display/0.10.0/parse_display/derive.Display.html#from_strdefault_fields) | 複数の variant にある同名フィールドへデフォルト値を設定します。代わりに `#[from_str(default)]` を使用してください。 |
