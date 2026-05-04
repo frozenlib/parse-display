@@ -883,7 +883,6 @@ pub use from_str_regex::FromStrRegex;
 /// | feature | description |
 /// | ------- | ----------- |
 /// | [`#[from_str(default_fields(...))]`](https://docs.rs/parse-display/0.10.0/parse_display/derive.Display.html#from_strdefault_fields) | Sets default values for same-named fields across variants; use `#[from_str(default)]` instead. |
-///
 // #[include_doc("display.md", end)]
 pub use parse_display_derive::Display;
 

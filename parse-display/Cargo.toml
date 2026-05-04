@@ -23,7 +23,7 @@ regex = { workspace = true, optional = true }
 regex-syntax = { workspace = true, optional = true }
 
 [dev-dependencies]
-trybuild = "1.0.99"
+trybuild = "1.0.116"
 
 [package.metadata.docs.rs]
 features = ["docs"]
