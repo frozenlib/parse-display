@@ -19,7 +19,7 @@ use crate::{format_syntax::*, syn_utils::*};
 use bound::{Bound, Bounds};
 use parser_builder::{ParseVariantCode, ParserBuilder};
 use proc_macro2::{Span, TokenStream};
-use quote::{ToTokens, format_ident, quote};
+use quote::{ToTokens, format_ident, quote, quote_spanned};
 use regex_syntax::escape;
 use std::{
     collections::BTreeMap,
@@ -28,8 +28,8 @@ use std::{
 use structmeta::{Flag, StructMeta, ToTokens};
 use syn::{
     Attribute, Data, DataEnum, DataStruct, DeriveInput, Expr, Field, Fields, FieldsNamed,
-    FieldsUnnamed, GenericArgument, Ident, LitStr, Member, Path, PathArguments, Result, Type,
-    Variant,
+    FieldsUnnamed, GenericArgument, Ident, LitStr, Member, Path, PathArguments, Result, Token,
+    Type, Variant,
     ext::IdentExt,
     parse::{Parse, ParseStream},
     parse_macro_input, parse_quote, parse_str,
@@ -173,6 +173,7 @@ fn derive_from_str_for_struct(input: &DeriveInput, data: &DataStruct) -> Result<
     let hattrs = HelperAttributes::from(&input.attrs, true)?;
     let p = ParserBuilder::from_struct(&hattrs, data)?;
     let crate_path = &hattrs.crate_path;
+    let warnings = hattrs.deprecated_default_fields_warnings();
     let trait_path = parse_quote!(::core::str::FromStr);
     let body = p.build_from_str_body(parse_quote!(Self))?;
     let generics = GenericParamSet::new(&input.generics);
@@ -187,6 +188,7 @@ fn derive_from_str_for_struct(input: &DeriveInput, data: &DataStruct) -> Result<
         quote! {
             type Err = #crate_path::ParseError;
             fn from_str(s: &str) -> ::core::result::Result<Self, Self::Err> {
+                #warnings
                 #body
             }
         },
@@ -221,8 +223,15 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Toke
     let mut arms = Vec::new();
     let mut regex_fmts = Vec::new();
     let mut regex_args = Vec::new();
+    let mut deprecated_default_fields_warning_spans =
+        hattrs_enum.deprecated_default_fields_warning_spans.clone();
     for variant in &data.variants {
         let hattrs_variant = HelperAttributes::from(&variant.attrs, true)?;
+        deprecated_default_fields_warning_spans.extend(
+            hattrs_variant
+                .deprecated_default_fields_warning_spans
+                .iter(),
+        );
         if hattrs_variant.ignore.value() {
             continue;
         }
@@ -248,6 +257,8 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Toke
         }
     };
     let wheres = bounds.build_wheres(&trait_path);
+    let warnings =
+        deprecated_default_fields_warnings(crate_path, &deprecated_default_fields_warning_spans);
 
     let mut ts = TokenStream::new();
     ts.extend(impl_trait(
@@ -257,6 +268,7 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Toke
         quote! {
             type Err = #crate_path::ParseError;
             fn from_str(s: &str) -> ::core::result::Result<Self, Self::Err> {
+                #warnings
                 #match_body
                 #({ #bodys })*
                 ::core::result::Result::Err(#crate_path::ParseError::new())
@@ -379,6 +391,7 @@ struct HelperAttributes {
     regex_infer: bool,
     default_self: Option<Span>,
     default_fields: Vec<DefaultField>,
+    deprecated_default_fields_warning_spans: Vec<Span>,
     new_expr: Option<Expr>,
     ignore: Flag,
     dump_display: bool,
@@ -399,6 +412,7 @@ impl HelperAttributes {
             new_expr: None,
             default_self: None,
             default_fields: Vec::new(),
+            deprecated_default_fields_warning_spans: Vec::new(),
             ignore: Flag::NONE,
             dump_display: false,
             dump_from_str: false,
@@ -409,6 +423,7 @@ impl HelperAttributes {
                 hattrs.set_display_args(a.parse_args()?)?;
             }
             if use_from_str && a.path().is_ident("from_str") {
+                hattrs.push_from_str_warning_spans(a)?;
                 hattrs.set_from_str_args(a.parse_args()?);
             }
         }
@@ -476,6 +491,28 @@ impl HelperAttributes {
         }
         self.dump_from_str |= args.dump;
     }
+    fn push_from_str_warning_spans(&mut self, attr: &Attribute) -> Result<()> {
+        attr.parse_nested_meta(|meta| {
+            if meta.path.is_ident("default_fields") {
+                self.deprecated_default_fields_warning_spans
+                    .push(meta.path.span());
+            }
+            if meta.input.peek(Token![=]) {
+                meta.value()?.parse::<TokenStream>()?;
+            } else if meta.input.peek(syn::token::Paren) {
+                let content;
+                syn::parenthesized!(content in meta.input);
+                content.parse::<TokenStream>()?;
+            }
+            Ok(())
+        })
+    }
+    fn deprecated_default_fields_warnings(&self) -> TokenStream {
+        deprecated_default_fields_warnings(
+            &self.crate_path,
+            &self.deprecated_default_fields_warning_spans,
+        )
+    }
     fn span_of_from_str_format(&self) -> Option<Span> {
         if let Some(lit) = &self.regex {
             return Some(lit.span());
@@ -490,6 +527,18 @@ impl HelperAttributes {
             .clone()
             .or_else(|| self.bound_display.clone())
     }
+}
+
+fn deprecated_default_fields_warnings(crate_path: &Path, spans: &[Span]) -> TokenStream {
+    let warnings = spans.iter().map(|span| {
+        set_span(
+            quote_spanned! { *span=>
+                #crate_path::helpers::from_str_default_fields();
+            },
+            *span,
+        )
+    });
+    quote! { #(#warnings)* }
 }
 
 #[derive(Copy, Clone)]

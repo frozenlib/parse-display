@@ -1,0 +1,13 @@
+error: force trybuild to compare warnings
+  --> tests/compile_warn/from_str/default_fields.rs:11:1
+   |
+11 | compile_error!("force trybuild to compare warnings");
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated function `parse_display::helpers::from_str_default_fields`: `#[from_str(default_fields)]` will be removed in a future version. Use `#[from_str(default)]` instead.
+ --> tests/compile_warn/from_str/default_fields.rs:5:12
+  |
+5 | #[from_str(default_fields(b))]
+  |            ^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(deprecated)]` on by default

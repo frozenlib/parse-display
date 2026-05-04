@@ -55,3 +55,8 @@ where
         }
     }
 }
+
+#[deprecated(
+    note = "`#[from_str(default_fields)]` will be removed in a future version. Use `#[from_str(default)]` instead."
+)]
+pub fn from_str_default_fields() {}
