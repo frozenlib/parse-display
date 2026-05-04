@@ -23,7 +23,6 @@
 | [`#[from_str(new = ...)]`](#from_strnew--)                    |              | ✔             | ✔      |      | ✔       |       |
 | [`#[from_str(ignore)]`](#from_strignore)                      |              | ✔             |        |      | ✔       |       |
 | [`#[from_str(default)]`](#from_strdefault)                    |              | ✔             | ✔      |      |         | ✔     |
-| [`#[from_str(default_fields(...))]`](#from_strdefault_fields) |              | ✔             | ✔      | ✔    | ✔       |       |
 
 ## `#[display("...")]`
 
@@ -823,21 +822,10 @@ impl Default for MyStruct {
 assert_eq!("10".parse(), Ok(MyStruct { a:0, b:10 }));
 ```
 
-## `#[from_str(default_fields(...))]`
+## 非推奨機能
 
-複数の variant にある同じ名前のフィールドにデフォルト値を設定したい場合、`#[from_str(default_fields(...))]` を使用できます。
+以下の非推奨機能は将来のバージョンで削除されます。
 
-```rust
-use parse_display::FromStr;
-
-#[derive(FromStr, PartialEq, Debug)]
-#[display("{}-{a}")]
-#[from_str(default_fields("b", "c"))]
-enum MyEnum {
-  VarA { a:u8, b:u8, c:u8 },
-  VarB { a:u8, b:u8, c:u8 },
-}
-
-assert_eq!("VarA-10".parse(), Ok(MyEnum::VarA { a:10, b:0, c:0 }));
-assert_eq!("VarB-10".parse(), Ok(MyEnum::VarB { a:10, b:0, c:0 }));
-```
+| 機能 | 説明 |
+| ---- | ---- |
+| [`#[from_str(default_fields(...))]`](https://docs.rs/parse-display/0.10.0/parse_display/derive.Display.html#from_strdefault_fields) | 複数の variant にある同名フィールドへデフォルト値を設定します。代わりに `#[from_str(default)]` を使用してください。 |

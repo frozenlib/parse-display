@@ -74,7 +74,6 @@ pub use from_str_regex::FromStrRegex;
 /// | [`#[from_str(new = ...)]`](#from_strnew--)                    |              | ✔             | ✔      |      | ✔       |       |
 /// | [`#[from_str(ignore)]`](#from_strignore)                      |              | ✔             |        |      | ✔       |       |
 /// | [`#[from_str(default)]`](#from_strdefault)                    |              | ✔             | ✔      |      |         | ✔     |
-/// | [`#[from_str(default_fields(...))]`](#from_strdefault_fields) |              | ✔             | ✔      | ✔    | ✔       |       |
 ///
 /// ## `#[display("...")]`
 ///
@@ -877,24 +876,14 @@ pub use from_str_regex::FromStrRegex;
 /// assert_eq!("10".parse(), Ok(MyStruct { a:0, b:10 }));
 /// ```
 ///
-/// ## `#[from_str(default_fields(...))]`
+/// ## Deprecated features
 ///
-/// You can use `#[from_str(default_fields(...))]` if you want to set default values for the same-named fields of multiple variants.
+/// The following deprecated features will be removed in a future version.
 ///
-/// ```rust
-/// use parse_display::FromStr;
+/// | feature | description |
+/// | ------- | ----------- |
+/// | [`#[from_str(default_fields(...))]`](https://docs.rs/parse-display/0.10.0/parse_display/derive.Display.html#from_strdefault_fields) | Sets default values for same-named fields across variants; use `#[from_str(default)]` instead. |
 ///
-/// #[derive(FromStr, PartialEq, Debug)]
-/// #[display("{}-{a}")]
-/// #[from_str(default_fields("b", "c"))]
-/// enum MyEnum {
-///   VarA { a:u8, b:u8, c:u8 },
-///   VarB { a:u8, b:u8, c:u8 },
-/// }
-///
-/// assert_eq!("VarA-10".parse(), Ok(MyEnum::VarA { a:10, b:0, c:0 }));
-/// assert_eq!("VarB-10".parse(), Ok(MyEnum::VarB { a:10, b:0, c:0 }));
-/// ```
 // #[include_doc("display.md", end)]
 pub use parse_display_derive::Display;
 
