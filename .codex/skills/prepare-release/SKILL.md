@@ -9,7 +9,12 @@ description: Prepare parse-display release changes before publishing with a Rust
 
 1. Extract the target version from the user's request.
    - Accept only an explicit version such as `0.11.0`.
-   - If the user did not provide a version, do not modify files. Ask the user to provide the target version and end the turn.
+   - If the user did not provide a version, do not modify files. Show next-version candidates, ask the user to provide the target version, and end the turn.
+   - Prefer using the bundled Cargo script with no version to show candidates:
+
+```powershell
+cargo +nightly -Zscript .codex\skills\prepare-release\scripts\prepare_release.rs
+```
 
 2. Confirm the repository root is the parse-display workspace.
    - Work from the directory containing `Cargo.toml`, `CHANGELOG.md`, `parse-display/Cargo.toml`, and `parse-display-derive/Cargo.toml`.

@@ -20,6 +20,13 @@ const CATEGORIES: &[&str] = &[
     "Security",
 ];
 
+#[derive(Clone, Copy)]
+struct Version {
+    major: u64,
+    minor: u64,
+    patch: u64,
+}
+
 fn main() {
     if let Err(err) = run() {
         eprintln!("error: {err}");
@@ -41,25 +48,28 @@ fn run() -> Result<(), String> {
         }
     }
 
-    let version =
-        version.ok_or_else(|| "usage: prepare_release.rs [--dry-run] <version>".to_owned())?;
+    let root = find_root(&env::current_dir().map_err(|err| err.to_string())?)?;
+    let parse_display_manifest = root.join("parse-display").join("Cargo.toml");
+    let current_version = package_version(&parse_display_manifest)?;
+
+    let Some(version) = version else {
+        print_version_candidates(&root, &current_version)?;
+        return Ok(());
+    };
     if !is_version(&version) {
         return Err("version must be explicit x.y.z, for example 0.11.0".to_owned());
     }
 
-    let root = find_root(&env::current_dir().map_err(|err| err.to_string())?)?;
-    let parse_display_manifest = root.join("parse-display").join("Cargo.toml");
     let derive_manifest = root.join("parse-display-derive").join("Cargo.toml");
     let lockfile = root.join("Cargo.lock");
 
-    let old_version = package_version(&parse_display_manifest)?;
     let previous_version = previous_changelog_version(&root.join("CHANGELOG.md"))?;
     let derive_changed = derive_changed_since_last_version(&root)?;
 
     let mut changed = Vec::new();
     set_package_version(&parse_display_manifest, &version, dry_run, &mut changed)?;
     set_lock_package_version(&lockfile, "parse-display", &version, dry_run, &mut changed)?;
-    update_docs(&root, &old_version, &version, dry_run, &mut changed)?;
+    update_docs(&root, &current_version, &version, dry_run, &mut changed)?;
 
     if derive_changed {
         set_package_version(&derive_manifest, &version, dry_run, &mut changed)?;
@@ -100,11 +110,65 @@ fn run() -> Result<(), String> {
 }
 
 fn is_version(value: &str) -> bool {
-    let parts: Vec<_> = value.split('.').collect();
-    parts.len() == 3
-        && parts
+    parse_version(value).is_some()
+}
+
+fn parse_version(value: &str) -> Option<Version> {
+    let parts = value.split('.').collect::<Vec<_>>();
+    if parts.len() != 3
+        || !parts
             .iter()
             .all(|part| !part.is_empty() && part.chars().all(|ch| ch.is_ascii_digit()))
+    {
+        return None;
+    }
+
+    Some(Version {
+        major: parts[0].parse().ok()?,
+        minor: parts[1].parse().ok()?,
+        patch: parts[2].parse().ok()?,
+    })
+}
+
+fn print_version_candidates(root: &Path, current_version: &str) -> Result<(), String> {
+    let version = parse_version(current_version)
+        .ok_or_else(|| format!("current parse-display version is invalid: {current_version}"))?;
+    let categories = unreleased_categories(&root.join("CHANGELOG.md"))?;
+    let has_minor_changes = categories.iter().any(|(name, body)| {
+        matches!(
+            name.as_str(),
+            "Added" | "Changed" | "Deprecated" | "Removed"
+        ) && body.iter().any(|line| !line.trim().is_empty())
+    });
+    let has_patch_changes = categories.iter().any(|(name, body)| {
+        matches!(name.as_str(), "Fixed" | "Performance" | "Security")
+            && body.iter().any(|line| !line.trim().is_empty())
+    });
+
+    let patch = format!("{}.{}.{}", version.major, version.minor, version.patch + 1);
+    let minor = format!("{}.{}.0", version.major, version.minor + 1);
+    let major = format!("{}.0.0", version.major + 1);
+    let recommended = if has_minor_changes {
+        &minor
+    } else if has_patch_changes {
+        &patch
+    } else {
+        &minor
+    };
+
+    println!("No target version was provided. No files were changed.");
+    println!("Current parse-display version: {current_version}");
+    println!("Next version candidates:");
+    println!("- patch: {patch}");
+    println!("- minor: {minor}");
+    println!("- major: {major}");
+    if has_minor_changes || has_patch_changes {
+        println!("Recommended from CHANGELOG.md Unreleased entries: {recommended}");
+    } else {
+        println!("Recommended default when Unreleased is empty: {recommended}");
+    }
+    println!("Run again with an explicit version, for example: {recommended}");
+    Ok(())
 }
 
 fn find_root(start: &Path) -> Result<PathBuf, String> {
@@ -423,6 +487,22 @@ fn previous_changelog_version(changelog: &Path) -> Result<String, String> {
         }
     }
     Err("could not find previous changelog version".to_owned())
+}
+
+fn unreleased_categories(changelog: &Path) -> Result<Vec<(String, Vec<String>)>, String> {
+    let text = read(changelog)?;
+    let lines = text.lines().map(str::to_owned).collect::<Vec<_>>();
+    let unreleased = lines
+        .iter()
+        .position(|line| line == "## [Unreleased]")
+        .ok_or_else(|| "could not find ## [Unreleased] in CHANGELOG.md".to_owned())?;
+    let next_release = lines[unreleased + 1..]
+        .iter()
+        .position(|line| line.starts_with("## ["))
+        .map(|index| unreleased + 1 + index)
+        .ok_or_else(|| "could not find previous release section in CHANGELOG.md".to_owned())?;
+
+    split_categories(&lines[unreleased + 1..next_release])
 }
 
 fn update_changelog(
