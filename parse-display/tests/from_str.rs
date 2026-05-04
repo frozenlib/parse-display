@@ -365,6 +365,7 @@ fn from_str_tuple_field_default() {
 }
 
 #[test]
+#[allow(deprecated)]
 fn from_str_struct_default_fields_str() {
     #[derive(FromStr, Debug, Eq, PartialEq, Default)]
     #[display("{a}")]
@@ -377,6 +378,7 @@ fn from_str_struct_default_fields_str() {
 }
 
 #[test]
+#[allow(deprecated)]
 fn from_str_struct_default_fields_many() {
     #[derive(FromStr, Debug, Eq, PartialEq, Default)]
     #[display("{a}")]
@@ -390,6 +392,7 @@ fn from_str_struct_default_fields_many() {
 }
 
 #[test]
+#[allow(deprecated)]
 fn from_str_struct_default_fields_ident() {
     #[derive(FromStr, Debug, Eq, PartialEq, Default)]
     #[display("{a}")]
@@ -402,6 +405,7 @@ fn from_str_struct_default_fields_ident() {
 }
 
 #[test]
+#[allow(deprecated)]
 fn from_str_struct_default_fields_ident_keyword() {
     #[derive(FromStr, Debug, Eq, PartialEq, Default)]
     #[display("{fn}")]
@@ -436,6 +440,7 @@ fn from_str_enum_tuple_field_default() {
 }
 
 #[test]
+#[allow(deprecated)]
 fn from_str_enum_default_fields() {
     #[derive(FromStr, PartialEq, Debug)]
     #[display("{a}")]
@@ -816,6 +821,7 @@ fn different_bound() {
 }
 
 #[test]
+#[allow(deprecated)]
 fn bound_type_enum() {
     assert_from_str("10", Outer::A(Inner(10)));
     #[derive(FromStr, Debug, Eq, PartialEq)]
