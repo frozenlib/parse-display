@@ -21,7 +21,7 @@ std = []
 
 
 [dependencies]
-syn = { version = "2.0.117", features = ["visit"] }
+syn = { version = "3.0.3", features = ["visit"] }
 quote = "1.0.45"
 proc-macro2 = "1.0.106"
 regex = { workspace = true }
