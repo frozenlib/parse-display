@@ -2,8 +2,18 @@
   // See https://go.microsoft.com/fwlink/?LinkId=733558
   // for the documentation about the tasks.json format
   "version": "2.0.0",
+  "options": {
+    "env": {
+      // "RUST_BACKTRACE": "1",
+    },
+  },
+  "presentation": {
+    "panel": "dedicated",
+    "clear": true,
+  },
   "tasks": [
     {
+      // Needed for run (F5)
       "type": "shell",
       "label": "cargo build",
       "command": "cargo",
@@ -13,15 +23,6 @@
       "problemMatcher": [
         "$rustc"
       ],
-      "presentation": {
-        "panel": "dedicated",
-        "clear": true
-      }
-      // "options": {
-      //     "env": {
-      //         "RUST_BACKTRACE": "1",
-      //     }
-      // }
     },
     {
       "type": "shell",
@@ -34,17 +35,30 @@
       "problemMatcher": [
         "$rustc"
       ],
-      "presentation": {
-        "panel": "dedicated",
-        "clear": true
-      }
     },
     {
       "type": "shell",
-      "label": "cargo test",
+      "label": "cargo test fast",
       "command": "cargo",
       "args": [
-        "test"
+        "nextest",
+        "run",
+        "--all-targets",
+      ],
+      "problemMatcher": [
+        "$rustc"
+      ],
+      "dependsOn": [
+        "rustdoc-include"
+      ],
+    },
+    {
+      "type": "shell",
+      "label": "cargo test all",
+      "command": "cargo",
+      "args": [
+        "test",
+        "--doc",
       ],
       "problemMatcher": [
         "$rustc"
@@ -53,13 +67,24 @@
         "kind": "build",
         "isDefault": true
       },
-      "presentation": {
-        "panel": "dedicated",
-        "clear": true
-      },
       "dependsOn": [
-        "rustdoc-include"
+        "cargo test fast"
       ],
+    },
+    {
+      "type": "shell",
+      "label": "cargo watch test",
+      "command": "watchexec",
+      "args": [
+        "-c",
+        "--restart",
+        "--",
+        "cargo",
+        "test"
+        // "nextest", "run",
+        // "nextest", "run", "-p", "{project}", "--test", "{file}", "--", "{module}",
+      ],
+      "problemMatcher": [],
     },
     {
       "type": "shell",
@@ -79,17 +104,13 @@
         "kind": "test",
         "isDefault": true
       },
-      "presentation": {
-        "panel": "dedicated",
-        "clear": true
-      },
       "dependsOn": [
         "rustdoc-include"
       ],
     },
     {
       "type": "shell",
-      "label": "cargo run exmaple",
+      "label": "cargo run example",
       "command": "cargo",
       "args": [
         "run",
@@ -99,10 +120,15 @@
       "problemMatcher": [
         "$rustc"
       ],
-      "presentation": {
-        "panel": "dedicated",
-        "clear": true
-      }
+    },
+    {
+      "type": "shell",
+      "label": "watch example",
+      "command": "watchexec -c --restart -- cargo run --example ${fileBasenameNoExtension}",
+      "args": [],
+      "problemMatcher": [
+        "$rustc"
+      ],
     },
     {
       "type": "shell",
@@ -113,7 +139,23 @@
         "doc",
         "--open",
         "--no-deps",
+        "--workspace",
         "--all-features"
+      ],
+      "problemMatcher": [
+        "$rustc"
+      ],
+      "dependsOn": [
+        "rustdoc-include"
+      ],
+    },
+    {
+      "type": "shell",
+      "label": "cargo llvm-cov open",
+      "command": "cargo",
+      "args": [
+        "llvm-cov",
+        "--open",
       ],
       "problemMatcher": [
         "$rustc"
@@ -122,9 +164,6 @@
         "panel": "dedicated",
         "clear": true
       },
-      "dependsOn": [
-        "rustdoc-include"
-      ],
     },
     {
       "type": "shell",
@@ -132,54 +171,41 @@
       "command": "cargo",
       "args": [
         "expand",
+        "-p",
+        "parse-display",
         "--test",
         "lib"
       ],
-      "options": {
-        "cwd": "${workspaceFolder}/parse-display-tests"
-      },
       "problemMatcher": [
         "$rustc"
       ],
-      "presentation": {
-        "panel": "dedicated",
-        "clear": true
-      }
     },
     {
       "type": "shell",
       "label": "cargo clippy",
       "command": "cargo",
       "args": [
+        "+nightly",
         "clippy",
-        "--tests",
-        "--lib",
+        "--all-features",
+        "--all-targets",
+        "--workspace",
         "--",
         "-W",
         "clippy::all"
       ],
       "problemMatcher": [
-        {
-          "base": "$rustc",
-          "owner": "clippy",
-        }
+        "$rustc"
       ],
-      "presentation": {
-        "panel": "dedicated",
-        "clear": true
-      }
     },
     {
       "type": "shell",
       "label": "cargo fix & fmt",
-      "command": "cargo fix && cargo clippy --fix --allow-dirty && cargo fmt",
+      "command": "cargo +nightly fix --all-features --all-targets --allow-dirty --workspace && cargo +nightly clippy --fix --allow-dirty --all-features --all-targets --workspace && cargo fmt",
+      "args": [],
       "problemMatcher": [
         "$rustc"
       ],
-      "presentation": {
-        "panel": "dedicated",
-        "clear": true,
-      }
     },
     {
       "type": "shell",
@@ -197,10 +223,6 @@
       "problemMatcher": [
         "$rustc"
       ],
-      "presentation": {
-        "panel": "dedicated",
-        "clear": true
-      }
     },
     {
       "type": "shell",
@@ -215,10 +237,6 @@
       "problemMatcher": [
         "$rustc"
       ],
-      "presentation": {
-        "panel": "dedicated",
-        "clear": true
-      }
     },
     {
       "type": "shell",
@@ -234,15 +252,20 @@
       "problemMatcher": [
         "$rustc"
       ],
-      "presentation": {
-        "panel": "dedicated",
-        "clear": true
-      },
       "options": {
         "env": {
-          "TRYBUILD": "overwrite"
+          "TRYBUILD": "overwrite",
         }
       }
+    },
+    {
+      "type": "shell",
+      "label": "check msrv",
+      "command": "cargo hack build --rust-version --workspace --ignore-private",
+      "args": [],
+      "problemMatcher": [
+        "$rustc"
+      ],
     },
     {
       "type": "shell",
@@ -274,10 +297,6 @@
           ]
         },
       ],
-      "presentation": {
-        "panel": "dedicated",
-        "clear": true
-      }
     },
-  ]
+  ],
 }
