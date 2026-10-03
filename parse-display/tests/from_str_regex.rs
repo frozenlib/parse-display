@@ -1,6 +1,5 @@
 #![cfg(feature = "std")]
 
-use core::f32;
 use std::fmt::Display;
 
 use parse_display::FromStrRegex;
