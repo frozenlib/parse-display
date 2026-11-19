@@ -1,10 +1,10 @@
 #![cfg(feature = "std")]
 #![deny(clippy::pattern_type_mismatch)]
+#![no_std]
+
+extern crate std;
 
 use parse_display::*;
-use std::fmt::Debug;
-use std::fmt::Display;
-use std::str::FromStr;
 
 #[test]
 fn from_str_newtype() {
@@ -99,7 +99,7 @@ fn from_str_struct_field_regex_all() {
     struct TestStruct {
         #[from_str(regex = "[0-9]+")]
         a: u32,
-        b: String,
+        b: std::string::String,
     }
     assert_from_str(
         "12abc",
@@ -118,7 +118,7 @@ fn from_str_struct_field_regex_all_with_display() {
         #[display("a = {}")]
         #[from_str(regex = "[0-9]+")]
         a: u32,
-        b: String,
+        b: std::string::String,
     }
     assert_from_str(
         "a = 12, abc",
@@ -749,7 +749,7 @@ fn private_in_public_non_generic() {
 fn newline_struct() {
     #[derive(FromStr, Debug, Eq, PartialEq)]
     #[display("{0}")]
-    struct X(String);
+    struct X(std::string::String);
 
     assert_from_str("\n", X("\n".into()));
 }
@@ -759,7 +759,7 @@ fn newline_enum() {
     #[derive(FromStr, Debug, Eq, PartialEq)]
     enum X {
         #[display("{0}")]
-        A(String),
+        A(std::string::String),
     }
 
     assert_from_str("\n", X::A("\n".into()));
@@ -796,7 +796,7 @@ fn bound_predicate_struct() {
     #[derive(Debug, Eq, PartialEq)]
     #[allow(dead_code)]
     struct FromStrIfDefault<T>(T);
-    impl<T: Default> FromStr for FromStrIfDefault<T> {
+    impl<T: Default> std::str::FromStr for FromStrIfDefault<T> {
         type Err = ParseError;
 
         fn from_str(_: &str) -> Result<Self, Self::Err> {
@@ -810,8 +810,8 @@ fn different_bound() {
     #![deny(private_bounds)]
 
     #[derive(Display, FromStr, PartialEq, Debug)]
-    #[display(bound("T : Display"))]
-    #[from_str(bound("T : FromStr"))]
+    #[display(bound("T : std::fmt::Display"))]
+    #[from_str(bound("T : std::str::FromStr"))]
     pub struct Outer<T>(Inner<T>);
 
     #[derive(Display, FromStr, PartialEq, Debug)]
@@ -946,7 +946,11 @@ fn new_return_option() {
 
     impl Non1USize {
         fn new(value: usize) -> Option<Self> {
-            if value == 1 { None } else { Some(Self(value)) }
+            if value == 1 {
+                None
+            } else {
+                Some(Self(value))
+            }
         }
     }
 
@@ -997,7 +1001,11 @@ fn new_tuple() {
 
     impl MyNonZeroUSize {
         fn new(value: usize) -> Option<Self> {
-            if value == 0 { None } else { Some(Self(value)) }
+            if value == 0 {
+                None
+            } else {
+                Some(Self(value))
+            }
         }
     }
 
@@ -1114,9 +1122,12 @@ fn variant_ignore() {
         #[from_str(ignore)]
         A(CanNotFromStr),
         #[display("{0}")]
-        B(String),
+        B(std::string::String),
     }
-    assert_from_str("123", HasIgnore::B("123".to_string()));
+    assert_from_str(
+        "123",
+        HasIgnore::B(std::string::ToString::to_string(&"123")),
+    );
 }
 
 #[test]
@@ -1213,7 +1224,7 @@ fn use_type_parameter_in_with() {
 #[test]
 fn regex_depending_on_the_parameter() {
     use parse_display::FromStrFormat;
-    use std::any::{Any, type_name};
+    use std::any::{type_name, Any};
 
     struct TypeNameFormat;
     impl<T: Default + Any> FromStrFormat<T> for TypeNameFormat {
@@ -1221,8 +1232,8 @@ fn regex_depending_on_the_parameter() {
         fn parse(&self, _s: &str) -> core::result::Result<T, Self::Err> {
             Ok(Default::default())
         }
-        fn regex(&self) -> Option<String> {
-            Some(type_name::<T>().to_string())
+        fn regex(&self) -> Option<std::string::String> {
+            Some(std::string::ToString::to_string(&type_name::<T>()))
         }
     }
 
@@ -1231,8 +1242,8 @@ fn regex_depending_on_the_parameter() {
         #[from_str(with = TypeNameFormat)]
         _x: T,
     }
-    let _ = X::<u32>::from_str("u32");
-    let _ = X::<u16>::from_str("u16"); // panic on debug mode
+    let _ = <X<u32> as std::str::FromStr>::from_str("u32");
+    let _ = <X<u16> as std::str::FromStr>::from_str("u16"); // panic on debug mode
 
     panic_on_release_mode();
 }
@@ -1242,14 +1253,14 @@ fn regex_infer() {
     #[derive(FromStr, Debug, Eq, PartialEq)]
     #[display("{a}{b}")]
     struct X {
-        a: String,
+        a: std::string::String,
         #[from_str(regex_infer)]
         b: u32,
     }
     #[derive(FromStr, Debug, Eq, PartialEq)]
     #[display("{a}{b}")]
     struct Y {
-        a: String,
+        a: std::string::String,
         b: u32,
     }
 
@@ -1269,7 +1280,7 @@ fn regex_infer_all() {
     #[display("{a}{b}")]
     #[from_str(regex_infer)]
     struct X {
-        a: String,
+        a: std::string::String,
         b: u32,
     }
     assert_from_str(
@@ -1440,9 +1451,9 @@ fn from_str_opt_generic() {
 }
 
 #[track_caller]
-fn assert_from_str<T: FromStr + Debug + PartialEq>(s: &str, value: T)
+fn assert_from_str<T: std::str::FromStr + std::fmt::Debug + PartialEq>(s: &str, value: T)
 where
-    <T as FromStr>::Err: Display,
+    <T as std::str::FromStr>::Err: std::fmt::Display,
 {
     match s.parse::<T>() {
         Ok(a) => assert_eq!(a, value, "input = \"{s}\""),
@@ -1451,7 +1462,7 @@ where
 }
 
 #[track_caller]
-fn assert_from_str_err<T: FromStr + Debug>(s: &str) {
+fn assert_from_str_err<T: std::str::FromStr + std::fmt::Debug>(s: &str) {
     if let Ok(a) = s.parse::<T>() {
         panic!("from_str(\"{s}\") should return Err. but return `{a:?}`.");
     }

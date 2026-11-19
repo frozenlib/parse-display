@@ -201,7 +201,7 @@ fn derive_from_str_for_struct(input: &DeriveInput, data: &DataStruct) -> Result<
             &parse_quote!(#crate_path::FromStrRegex),
             &wheres,
             quote! {
-                fn from_str_regex() -> String {
+                fn from_str_regex() -> ::std::string::String {
                     #body
                 }
             },
@@ -292,7 +292,7 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Toke
                 })
                 .collect::<Vec<_>>();
             let fmt = fmts.join("|");
-            quote! { format!(#fmt, #(#regex_args,)*) }
+            quote! { ::std::format!(#fmt, #(#regex_args,)*) }
         };
 
         ts.extend(impl_trait(
@@ -300,7 +300,7 @@ fn derive_from_str_for_enum(input: &DeriveInput, data: &DataEnum) -> Result<Toke
             &parse_quote!(#crate_path::FromStrRegex),
             &wheres,
             quote! {
-                fn from_str_regex() -> String {
+                fn from_str_regex() -> ::std::string::String {
                     #body
                 }
             },
