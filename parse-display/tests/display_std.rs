@@ -1,14 +1,15 @@
-use std::{
-    fmt::{self, Formatter},
-    path::{Path, PathBuf},
-};
+#![no_std]
+
+extern crate std;
+
+use std::path::{Path, PathBuf};
 
 use parse_display::{Display, DisplayFormat};
 
 struct PathFormat;
 
 impl<T: ?Sized + AsRef<Path>> DisplayFormat<T> for PathFormat {
-    fn write(&self, f: &mut Formatter, value: &T) -> fmt::Result {
+    fn write(&self, f: &mut core::fmt::Formatter, value: &T) -> std::fmt::Result {
         write!(f, "{}", value.as_ref().display())
     }
 }
@@ -33,6 +34,6 @@ fn with_path_buf() {
 }
 
 fn assert_display<T: core::fmt::Display>(value: T, display: &str) {
-    let value_display = format!("{value}");
+    let value_display = std::format!("{value}");
     assert_eq!(value_display, display);
 }
